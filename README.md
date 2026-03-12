@@ -1,5 +1,7 @@
 # EOSLT
 
+End of Season League Tournament Manager
+
 Next.js 16 app with TypeScript, Auth.js (Google OAuth), Tailwind CSS 4, and Convex.
 
 ## Setup
