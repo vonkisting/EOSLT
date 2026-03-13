@@ -309,18 +309,6 @@
 .home-bracket-root .theme-dark-trendy .team {
   overflow: hidden;
 }
-.home-bracket-root .theme-dark-trendy .score:before {
-  opacity: 0.25;
-  position: absolute;
-  z-index: 1;
-  content: "";
-  display: block;
-  background: black;
-  min-height: 50px;
-  min-width: 70px;
-  transform: translate(-12px, 0) rotate(25deg);
-}
-
 .home-bracket-root .disable-image .image,
 .home-bracket-root .disable-seed .seed,
 .home-bracket-root .disable-name .name,
