@@ -1,10 +1,14 @@
 import { auth } from "@/auth";
+import { redirect } from "next/navigation";
 
 /**
- * Protected profile page. Middleware redirects unauthenticated users to sign-in.
+ * Protected profile page. Redirects unauthenticated users to sign-in.
  */
 export default async function ProfilePage() {
   const session = await auth();
+  if (!session?.user) {
+    redirect("/signin?callbackUrl=/profile");
+  }
 
   return (
     <div className="flex flex-col gap-4">

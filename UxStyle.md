@@ -2,12 +2,18 @@
 
 Project-specific UX, branding, and design patterns. Update this file as the product evolves.
 
+## Theme: Dark indigo / frosted glass
+
+Tech-inspired dark UI: black main content, translucent dark purple-blue surfaces (navbar, modals), subtle white borders, purple gradient accents and soft glows.
+
 ## Color palette
 
-- **Background (light):** `#ffffff` (--background)
-- **Foreground (light):** `#171717` (--foreground)
-- **Background (dark):** `#0a0a0a`
-- **Foreground (dark):** `#ededed`
+- **Background (main content):** `#000000` (--background)
+- **Foreground:** `#e2e8f0` (--foreground) – light grey
+- **Surface (navbar, modals):** Translucent `rgba(42, 32, 74, 0.9)` with backdrop-blur
+- **Surface border:** `rgba(255, 255, 255, 0.1)`
+- **Primary button:** Gradient purple (e.g. purple-700 → purple-400), white text, subtle purple glow
+- **Secondary / outline:** Transparent, thin white/light grey border, white text
 
 ## Typography
 

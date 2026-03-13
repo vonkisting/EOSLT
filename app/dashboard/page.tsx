@@ -1,10 +1,14 @@
 import { auth } from "@/auth";
+import { redirect } from "next/navigation";
 
 /**
- * Protected dashboard page. Middleware redirects unauthenticated users to sign-in.
+ * Protected dashboard page. Redirects unauthenticated users to sign-in.
  */
 export default async function DashboardPage() {
   const session = await auth();
+  if (!session?.user) {
+    redirect("/signin?callbackUrl=/dashboard");
+  }
 
   return (
     <div className="flex flex-col gap-4">
