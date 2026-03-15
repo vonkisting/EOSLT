@@ -852,7 +852,7 @@ export function DashboardContent() {
                   className={`flex flex-col gap-3 overflow-hidden px-[5px] pb-4 transition-[max-height] duration-200 ease-out ${week2SectionOpen ? "max-h-[320px]" : "max-h-0"}`}
                   aria-hidden={!week2SectionOpen}
                 >
-                  {WEEK_2_KEYS.map((key) => (
+                  {week2SectionOpen && WEEK_2_KEYS.map((key) => (
                     <label key={key} className="flex flex-col gap-1.5">
                       <span className="text-sm font-medium opacity-90">{LOCATION_LABELS[key]}</span>
                       <select
