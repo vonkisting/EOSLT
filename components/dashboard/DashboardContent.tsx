@@ -196,6 +196,12 @@ export function DashboardContent() {
   const [venueSyncError, setVenueSyncError] = useState<string | null>(null);
   const venuesLoading = loadingVenues || syncingVenuesFromPoolHub;
 
+  /** True when all location dropdowns (Week 1, Week 2, Finals) have a value. */
+  const allLocationsFilled = useMemo(
+    () => LOCATION_KEYS.every((key) => (locations[key] ?? "").trim() !== ""),
+    [locations]
+  );
+
   const usersList = useQuery(api.users.list, {});
 
   useEffect(() => {
@@ -571,7 +577,7 @@ export function DashboardContent() {
 
   return (
     <div className="flex flex-wrap gap-6 items-start">
-      <div className="flex w-max min-w-[400px] flex-col gap-6">
+      <div className="flex w-full min-w-0 flex-col gap-6 md:w-max md:min-w-[400px]">
       {/* Users card – list of Convex users */}
       <div className="w-full min-w-0 overflow-hidden rounded-xl border border-[var(--surface-border)] bg-black text-foreground">
         <button
@@ -722,7 +728,14 @@ export function DashboardContent() {
               <button
                 type="button"
                 onClick={startTournament}
-                disabled={!allFirstRoundFilled || tournamentStarted || tournamentPaused}
+                disabled={
+                  !allFirstRoundFilled ||
+                  tournamentStarted ||
+                  tournamentPaused ||
+                  !selectedLeagueName?.trim() ||
+                  !selectedSeason?.trim() ||
+                  !allLocationsFilled
+                }
                 className="cursor-pointer rounded-lg border border-blue-400/50 bg-gradient-to-r from-blue-800 to-blue-600 px-4 py-2.5 text-sm font-medium text-blue-100 shadow-sm transition-colors hover:from-blue-700 hover:to-blue-500 hover:border-blue-300/60 disabled:opacity-55 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-slate-700/80 disabled:border-slate-600"
                 aria-label="Start Tournament"
               >

@@ -19,7 +19,7 @@ export default async function DashboardPage() {
   }
 
   return (
-    <div className="p-[25px]">
+    <div className="w-full min-w-0 px-4 py-6 md:p-[25px]">
       <DashboardContent />
     </div>
   );
