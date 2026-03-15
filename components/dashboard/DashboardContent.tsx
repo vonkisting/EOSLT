@@ -191,6 +191,10 @@ export function DashboardContent() {
   const venueList = useQuery(api.venues.list, {});
   const venueNames = Array.isArray(venueList) ? venueList : [];
   const loadingVenues = venueList === undefined;
+  const hasTriggeredVenueSyncRef = useRef(false);
+  const [syncingVenuesFromPoolHub, setSyncingVenuesFromPoolHub] = useState(false);
+  const [venueSyncError, setVenueSyncError] = useState<string | null>(null);
+  const venuesLoading = loadingVenues || syncingVenuesFromPoolHub;
 
   const usersList = useQuery(api.users.list, {});
 
@@ -212,6 +216,23 @@ export function DashboardContent() {
         setLoadingLeagues(false);
       });
   }, []);
+
+  useEffect(() => {
+    if (venueList === undefined || venueNames.length > 0 || hasTriggeredVenueSyncRef.current) return;
+    hasTriggeredVenueSyncRef.current = true;
+    setSyncingVenuesFromPoolHub(true);
+    setVenueSyncError(null);
+    fetch("/api/sync-venues", { method: "POST" })
+      .then((r) => r.json().catch(() => ({})))
+      .then((body: { ok?: boolean; error?: string; message?: string }) => {
+        setSyncingVenuesFromPoolHub(false);
+        if (body?.ok !== true && body?.error) setVenueSyncError(body.error);
+      })
+      .catch(() => {
+        setSyncingVenuesFromPoolHub(false);
+        setVenueSyncError("Failed to load venues from database.");
+      });
+  }, [venueList, venueNames.length]);
 
   useEffect(() => {
     if (savedSettings !== undefined) settingsQueryHasReturned.current = true;
@@ -744,6 +765,11 @@ export function DashboardContent() {
                 : "Reset"}
             </p>
             <hr className="border-t border-[var(--surface-border)] my-4" aria-hidden />
+            {venueSyncError && (
+              <p className="rounded-lg border border-amber-500/50 bg-amber-950/30 px-3 py-2 text-sm text-amber-200" role="alert">
+                {venueSyncError}
+              </p>
+            )}
             <div className="flex flex-col gap-3">
               {/* Week 1 – collapsible */}
               <div className="flex flex-col gap-2">
@@ -780,7 +806,7 @@ export function DashboardContent() {
                           setLocations((prev) => ({ ...prev, [key]: v }));
                         }}
                         onBlur={saveLocations}
-                        disabled={loadingVenues || tournamentStarted || tournamentPaused}
+                        disabled={venuesLoading || tournamentStarted || tournamentPaused}
                         className={`select-dark rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-800/70 disabled:text-slate-400 ${locations[key]?.trim() ? "slot-filled" : ""}`}
                         style={{ borderColor: "var(--surface-border)" }}
                         aria-label={LOCATION_LABELS[key]}
@@ -836,7 +862,7 @@ export function DashboardContent() {
                           setLocations((prev) => ({ ...prev, [key]: v }));
                         }}
                         onBlur={saveLocations}
-                        disabled={loadingVenues || tournamentStarted || tournamentPaused}
+                        disabled={venuesLoading || tournamentStarted || tournamentPaused}
                         className={`select-dark rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-800/70 disabled:text-slate-400 ${locations[key]?.trim() ? "slot-filled" : ""}`}
                         style={{ borderColor: "var(--surface-border)" }}
                         aria-label={LOCATION_LABELS[key]}
@@ -891,7 +917,7 @@ export function DashboardContent() {
                         setLocations((prev) => ({ ...prev, finalsLocation: v }));
                       }}
                       onBlur={saveLocations}
-                      disabled={loadingVenues || tournamentStarted || tournamentPaused}
+                      disabled={venuesLoading || tournamentStarted || tournamentPaused}
                       className={`select-dark rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-800/70 disabled:text-slate-400 ${locations.finalsLocation?.trim() ? "slot-filled" : ""}`}
                       style={{ borderColor: "var(--surface-border)" }}
                       aria-label={LOCATION_LABELS.finalsLocation}

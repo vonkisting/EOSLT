@@ -9,8 +9,15 @@ let pool: sql.ConnectionPool | null = null;
  * POOLHUB_DATABASE_URL is not set. Use only for SELECT queries.
  */
 function getConnectionConfig(): string {
-  const url = POOLHUB_DATABASE_URL!;
+  const url = (POOLHUB_DATABASE_URL ?? "").trim();
+  if (!url) return "";
   const lower = url.toLowerCase();
+  if (!lower.includes("server=") && !lower.includes("data source=")) {
+    throw new Error(
+      "POOLHUB_DATABASE_URL must be a SQL Server connection string containing Server= or Data Source= (e.g. Server=host,1433;Database=dbname;User ID=user;Password=pass;...). " +
+        "In Vercel, paste the same value as in .env.local; avoid URI format (mssql://...) and check for truncation or extra line breaks."
+    );
+  }
   const needsTls =
     !lower.includes("trustservercertificate") || !lower.includes("encrypt=");
   if (!needsTls) return url;
@@ -36,16 +43,19 @@ async function getPool(): Promise<sql.ConnectionPool | null> {
       if (detail.length > 400) detail = detail.slice(0, 397) + "...";
       const redact = /password|pwd=|connectionstring|user id|data source|server=/i;
       const safeDetail = !redact.test(detail) ? detail : "";
+      const isConfigServerError = /config\.server|property is required/i.test(detail);
       const message = [
         "PoolHub database is unreachable.",
         "",
         "What this usually means:",
-        "• Database is on a private network or on-premises — Vercel cannot reach it. Use a cloud SQL Server or a proxy that Vercel can call.",
-        "• Firewall is blocking your host (e.g. Vercel) from the DB host:port. Allow outbound to the SQL Server port (often 1433).",
+        isConfigServerError
+          ? "• (Driver says \"config.server\" is required.) In production, POOLHUB_DATABASE_URL in Vercel is likely malformed or different from .env.local. It must be a single line in the form: Server=host,port;Database=name;User ID=user;Password=pass;... Paste the exact same string from .env.local into Vercel → Settings → Environment Variables; avoid mssql:// URI format and check for extra line breaks or truncation."
+          : "• Database is on a private network or on-premises — Vercel cannot reach it. Use a cloud SQL Server or a proxy that Vercel can call.",
+        !isConfigServerError ? "• Firewall is blocking your host (e.g. Vercel) from the DB host:port. Allow outbound to the SQL Server port (often 1433)." : "",
         "• Wrong Server, Database, User ID, or Password in POOLHUB_DATABASE_URL. Double-check the value in Vercel → Settings → Environment Variables.",
         "• TLS/encryption mismatch — add Encrypt=false;TrustServerCertificate=true to the end of the connection string.",
         "",
-        "Next step: In Vercel (or your host) open the deployment → Logs or Runtime Logs. Search for \"[PoolHub DB] Connection error\" to see the exact driver error.",
+        "Next step: In Vercel open the deployment → Logs. Search for \"[PoolHub DB] Connection error\" to see the exact driver error.",
         code ? `Error code: ${code}` : "",
         safeDetail ? `Driver message: ${safeDetail}` : "",
       ]
