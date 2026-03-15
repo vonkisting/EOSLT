@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { Modal } from "@/components/ui/Modal";
 
 type StatsRow = Record<string, string | number | null | undefined>;
 function getStatValue(row: StatsRow, ...keys: string[]): string | number | null | undefined {
@@ -375,10 +376,18 @@ export function LiveScoringCard({
     return { total1CellClass: `${base} ${neutral}`, total2CellClass: `${base} ${neutral}` };
   }, [player1RaceTo, player2RaceTo, total1, total2]);
 
-  const canSubmitScores = useMemo(
-    () => totalsReached && allGameRowsValid(player1Scores, player2Scores),
-    [totalsReached, player1Scores, player2Scores]
-  );
+  /** Allow submit when a player's total >= their goes to; skip per-game validity if match is already decided. */
+  const canSubmitScores = useMemo(() => totalsReached, [totalsReached]);
+
+  const [submitSuccessModalOpen, setSubmitSuccessModalOpen] = useState(false);
+  useEffect(() => {
+    if (!submitSuccessModalOpen) return;
+    const t = setTimeout(() => {
+      setSubmitSuccessModalOpen(false);
+      router.replace("/");
+    }, 3000);
+    return () => clearTimeout(t);
+  }, [submitSuccessModalOpen, router]);
 
   return (
     <div className="mx-auto max-w-2xl pb-8 mt-[5px]">
@@ -396,8 +405,16 @@ export function LiveScoringCard({
               >
                 <div className="flex flex-wrap items-center justify-between gap-8 sm:gap-12">
                   <div className="min-w-0 flex-1 basis-0 text-center">
-                    <p className="break-words text-sm font-semibold text-white sm:text-base">
-                      {player1Name}
+                    <p
+                      className={
+                        player1RaceTo != null && total1 >= player1RaceTo
+                          ? "break-words text-sm font-semibold text-yellow-400 sm:text-base"
+                          : "break-words text-sm font-semibold text-white sm:text-base"
+                      }
+                    >
+                      {player1RaceTo != null && total1 >= player1RaceTo
+                        ? `${player1Name} Wins!!!`
+                        : player1Name}
                     </p>
                     <p className="mt-1 bg-gradient-to-r from-cyan-400 via-teal-400 to-blue-500 bg-clip-text text-3xl font-medium tabular-nums text-transparent">
                       {player1RaceTo != null ? player1RaceTo : "—"}
@@ -407,29 +424,22 @@ export function LiveScoringCard({
                     vs
                   </p>
                   <div className="min-w-0 flex-1 basis-0 text-center">
-                    <p className="break-words text-sm font-semibold text-white sm:text-base">
-                      {player2Name}
+                    <p
+                      className={
+                        player2RaceTo != null && total2 >= player2RaceTo
+                          ? "break-words text-sm font-semibold text-yellow-400 sm:text-base"
+                          : "break-words text-sm font-semibold text-white sm:text-base"
+                      }
+                    >
+                      {player2RaceTo != null && total2 >= player2RaceTo
+                        ? `${player2Name} Wins!!!`
+                        : player2Name}
                     </p>
                     <p className="mt-1 bg-gradient-to-r from-cyan-400 via-teal-400 to-blue-500 bg-clip-text text-3xl font-medium tabular-nums text-transparent">
                       {player2RaceTo != null ? player2RaceTo : "—"}
                     </p>
                   </div>
                 </div>
-                {(player1RaceTo != null && total1 > player1RaceTo) ||
-                (player2RaceTo != null && total2 > player2RaceTo) ? (
-                  <div className="mt-4 flex w-full justify-center rounded bg-transparent px-3 py-2">
-                    <p className="text-center text-2xl font-bold text-yellow-400">
-                      {player1RaceTo != null &&
-                      total1 > player1RaceTo &&
-                      player2RaceTo != null &&
-                      total2 > player2RaceTo
-                        ? `${player1Name} & ${player2Name} Win!`
-                        : player1RaceTo != null && total1 > player1RaceTo
-                          ? `${player1Name} Wins!`
-                          : `${player2Name} Wins!`}
-                    </p>
-                  </div>
-                ) : null}
               </header>
               <div className="mt-[5px] overflow-x-auto rounded-lg border border-slate-600">
                 <table className="w-full min-w-full border-collapse text-sm">
@@ -438,11 +448,27 @@ export function LiveScoringCard({
                       <th className="whitespace-nowrap border border-slate-600 px-3 py-2.5 text-center font-bold text-white">
                         Game #
                       </th>
-                      <th className="border border-slate-600 px-3 py-2.5 text-center font-bold text-white">
-                        {player1Name}
+                      <th
+                        className={
+                          player1RaceTo != null && total1 >= player1RaceTo
+                            ? "border border-slate-600 px-3 py-2.5 text-center font-bold text-yellow-400"
+                            : "border border-slate-600 px-3 py-2.5 text-center font-bold text-white"
+                        }
+                      >
+                        {player1RaceTo != null && total1 >= player1RaceTo
+                          ? `${player1Name} Wins!!!`
+                          : player1Name}
                       </th>
-                      <th className="border border-slate-600 px-3 py-2.5 text-center font-bold text-white">
-                        {player2Name}
+                      <th
+                        className={
+                          player2RaceTo != null && total2 >= player2RaceTo
+                            ? "border border-slate-600 px-3 py-2.5 text-center font-bold text-yellow-400"
+                            : "border border-slate-600 px-3 py-2.5 text-center font-bold text-white"
+                        }
+                      >
+                        {player2RaceTo != null && total2 >= player2RaceTo
+                          ? `${player2Name} Wins!!!`
+                          : player2Name}
                       </th>
                     </tr>
                   </thead>
@@ -479,6 +505,7 @@ export function LiveScoringCard({
                           </td>
                         </tr>
                         {(() => {
+                          if (totalsReached) return null;
                           const msg = getGameRowErrorMessage(player1Scores, player2Scores, i);
                           return msg ? (
                             <tr>
@@ -512,6 +539,7 @@ export function LiveScoringCard({
                     type="button"
                     onClick={() => {
                       updateMatchStatus("Completed");
+                      setSubmitSuccessModalOpen(true);
                     }}
                     className="rounded-lg bg-gradient-to-r from-blue-700 to-blue-500 px-5 py-2.5 font-semibold text-white shadow transition-opacity hover:from-blue-600 hover:to-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-800"
                   >
@@ -533,6 +561,21 @@ export function LiveScoringCard({
           )}
         </div>
       </div>
+      <Modal
+        open={submitSuccessModalOpen}
+        onClose={() => {
+          setSubmitSuccessModalOpen(false);
+          router.replace("/");
+        }}
+        title="Success"
+      >
+        <p className="text-slate-200">
+          Success, match scores successfully submitted.
+        </p>
+        <p className="mt-2 text-sm text-slate-400">
+          Redirecting to home…
+        </p>
+      </Modal>
       </div>
   );
 }

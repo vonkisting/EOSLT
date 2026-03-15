@@ -94,10 +94,10 @@ export function Bracket({ data }: { data: BracketData }) {
   const hasChampion = lastRound?.matches.length === 1;
 
   return (
-    <div className="overflow-x-auto pb-4">
+    <div className="overflow-x-auto pb-2">
       <div className="flex flex-col">
         {/* Labels row: one label per round + spacer above each connector, + Champion label */}
-        <div className="inline-flex min-w-max items-center px-4 pb-2" style={{ gap: 0 }}>
+        <div className="inline-flex min-w-max items-center px-4 pb-0.5" style={{ gap: 0 }}>
           {data.rounds.map((round, idx) => (
             <Fragment key={round.roundNumber}>
               <div
@@ -127,7 +127,7 @@ export function Bracket({ data }: { data: BracketData }) {
 
         {/* Content row: Round column, Connector, Round column, ... then Champion. Align at top so later rounds sit centered between feeding pairs. */}
         <div
-          className="inline-flex min-w-max items-start px-4 py-6"
+          className="inline-flex min-w-max items-start px-4 pt-2 pb-2"
           style={{ gap: 0 }}
         >
           {data.rounds.map((round, idx) => (
@@ -149,12 +149,12 @@ export function Bracket({ data }: { data: BracketData }) {
             </Fragment>
           ))}
           {hasChampion && (
-            <div className="flex shrink-0 flex-col items-center gap-2" style={{ minWidth: COLUMN_MIN_WIDTH }}>
-              <div className="rounded-lg border-2 border-sky-400/60 bg-sky-800/90 px-4 py-3 text-center shadow-lg">
+            <div className="flex shrink-0 flex-col items-center gap-0.5" style={{ minWidth: COLUMN_MIN_WIDTH }}>
+              <div className="rounded-lg border-2 border-sky-400/60 bg-sky-800/90 px-4 py-2 text-center shadow-lg">
                 <div className="text-xs font-medium uppercase tracking-wider text-sky-300">
                   Champion
                 </div>
-                <div className="mt-1 text-sm font-semibold text-white">
+                <div className="mt-0.5 text-sm font-semibold text-white">
                   —
                 </div>
               </div>

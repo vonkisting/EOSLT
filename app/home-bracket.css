@@ -409,11 +409,13 @@
   position: static;
   height: auto;
 }
-/* Matchup card width */
+/* Matchup card width; vertical margin 1/3 of base (14px → ~5px) for tighter spacing */
 .home-bracket-root.bracket-8-two-rounds .match {
   width: 243px;
   min-width: 243px;
   max-width: 243px;
+  margin-top: 5px;
+  margin-bottom: 5px;
 }
 /* Second round has no right connectors, use smaller right margin */
 .home-bracket-root.bracket-8-two-rounds .column:last-child .match {

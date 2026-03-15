@@ -1152,7 +1152,7 @@ export function DashboardContent() {
               <div
                 id={`week1-slot-${index}-body`}
                 aria-labelledby={`week1-slot-${index}-heading`}
-                className="max-h-[70vh] min-h-0 overflow-auto rounded-b-xl border-t border-white/40 bg-black pt-4 pl-4"
+                className="max-h-[70vh] min-h-0 overflow-auto rounded-b-xl border-t border-white/40 bg-black pt-2 pl-4"
               >
                 <Bracket8TwoRounds
                   key={`${bracketResetKey}-${index}`}
