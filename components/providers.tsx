@@ -2,6 +2,7 @@
 
 import { ConvexProvider, ConvexReactClient } from "convex/react";
 import { SessionProvider } from "next-auth/react";
+import { EnsureConvexUser } from "@/components/EnsureConvexUser";
 
 const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
 const convex = convexUrl ? new ConvexReactClient(convexUrl) : null;
@@ -14,7 +15,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <SessionProvider>
       {convex ? (
-        <ConvexProvider client={convex}>{children}</ConvexProvider>
+        <ConvexProvider client={convex}>
+          <EnsureConvexUser />
+          {children}
+        </ConvexProvider>
       ) : (
         children
       )}

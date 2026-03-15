@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" aria-hidden="true">
+  <defs>
+    <linearGradient id="neutral-skin" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#d4a574"/>
+      <stop offset="50%" stop-color="#c4956a"/>
+      <stop offset="100%" stop-color="#b88660"/>
+    </linearGradient>
+    <linearGradient id="neutral-hair" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#4a4035"/>
+      <stop offset="100%" stop-color="#2a2420"/>
+    </linearGradient>
+  </defs>
+  <!-- Face -->
+  <ellipse cx="50" cy="52" rx="27" ry="31" fill="url(#neutral-skin)"/>
+  <!-- Neutral short hair -->
+  <path d="M23 30 Q21 42 25 56 Q28 66 38 70 L62 70 Q72 66 75 56 Q79 42 77 30 Q74 20 50 16 Q26 20 23 30Z" fill="url(#neutral-hair)"/>
+  <!-- Subtle eyes -->
+  <ellipse cx="38" cy="48" rx="3" ry="2" fill="#5c4033"/>
+  <ellipse cx="62" cy="48" rx="3" ry="2" fill="#5c4033"/>
+</svg>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import {
@@ -8,13 +9,15 @@ import {
   signInWithGoogleAction,
 } from "@/app/actions/auth";
 
-const CALLBACK_URL = "/dashboard";
+/** After sign-in, land on auth/landing (redirects to Profile or Dashboard by email). */
+const CALLBACK_URL = "/auth/landing";
 
 /**
  * Sign-in modal: Google + email/password (sign in or register).
  * Trigger button opens the modal; auth happens via server actions.
  */
 export function SignInModal() {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"signin" | "register">("signin");
   const [error, setError] = useState<string | null>(null);
@@ -30,9 +33,16 @@ export function SignInModal() {
           return;
         }
         await registerAction(formData);
+        setOpen(false);
+        router.push("/profile");
       } else {
         const result = await signInWithCredentialsAction(formData);
-        if (result?.error) setError(result.error);
+        if (result?.error) {
+          setError(result.error);
+        } else {
+          setOpen(false);
+          router.push("/auth/landing");
+        }
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");
@@ -80,7 +90,29 @@ export function SignInModal() {
             action={(fd) => handleCredentials(fd)}
             className="flex flex-col gap-3"
           >
-            <input type="hidden" name="callbackUrl" value={CALLBACK_URL} />
+            <input
+              type="hidden"
+              name="callbackUrl"
+              value={mode === "register" ? "/profile" : CALLBACK_URL}
+            />
+            {mode === "register" && (
+              <div>
+                <label
+                  htmlFor="name"
+                  className="mb-1 block text-sm font-medium text-slate-300"
+                >
+                  Name
+                </label>
+                <input
+                  id="name"
+                  name="name"
+                  type="text"
+                  autoComplete="name"
+                  className="w-full rounded-xl border border-white/20 bg-white/5 px-3 py-2.5 text-white placeholder-slate-500 focus:border-purple-400/50 focus:outline-none focus:ring-1 focus:ring-purple-400/50"
+                  placeholder="Your name"
+                />
+              </div>
+            )}
             <div>
               <label
                 htmlFor="email"
@@ -91,11 +123,11 @@ export function SignInModal() {
               <input
                 id="email"
                 name="email"
-                type="email"
+                type="text"
                 required
                 autoComplete="email"
                 className="w-full rounded-xl border border-white/20 bg-white/5 px-3 py-2.5 text-white placeholder-slate-500 focus:border-purple-400/50 focus:outline-none focus:ring-1 focus:ring-purple-400/50"
-                placeholder="you@example.com"
+                placeholder="Email or username"
               />
             </div>
             <div>

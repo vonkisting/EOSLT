@@ -1,11 +1,53 @@
+/* eslint-disable */
 /**
- * Stub until you run `bunx convex dev` (which overwrites _generated).
- * Email/password sign-in and registration require Convex to be set up.
+ * Generated `api` utility.
+ *
+ * THIS CODE IS AUTOMATICALLY GENERATED.
+ *
+ * To regenerate, run `npx convex dev`.
+ * @module
  */
-export declare const api: {
-  users: {
-    getByEmail: unknown;
-    createUser: unknown;
-  };
-};
-export declare const internal: Record<string, unknown>;
+
+import type * as dashboardSettings from "../dashboardSettings.js";
+import type * as users from "../users.js";
+import type * as venues from "../venues.js";
+
+import type {
+  ApiFromModules,
+  FilterApi,
+  FunctionReference,
+} from "convex/server";
+
+declare const fullApi: ApiFromModules<{
+  dashboardSettings: typeof dashboardSettings;
+  users: typeof users;
+  venues: typeof venues;
+}>;
+
+/**
+ * A utility for referencing Convex functions in your app's public API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = api.myModule.myFunction;
+ * ```
+ */
+export declare const api: FilterApi<
+  typeof fullApi,
+  FunctionReference<any, "public">
+>;
+
+/**
+ * A utility for referencing Convex functions in your app's internal API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = internal.myModule.myFunction;
+ * ```
+ */
+export declare const internal: FilterApi<
+  typeof fullApi,
+  FunctionReference<any, "internal">
+>;
+
+export declare const components: {};

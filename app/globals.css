@@ -21,3 +21,39 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
 }
+
+/* Pointer cursor on all buttons (current and future) */
+button,
+[role="button"] {
+  cursor: pointer;
+}
+
+/* All dropdowns: white text, black background; selected option white text, blue background */
+select,
+select.select-dark {
+  background-color: #000;
+  color: #fff;
+}
+select option,
+select.select-dark option {
+  background-color: #000;
+  color: #fff;
+}
+select option:checked,
+select option:focus,
+select.select-dark option:checked,
+select.select-dark option:focus {
+  background-color: #2563eb;
+  color: #fff;
+}
+
+/* Selected dropdown (location or bracket): same gradient as winner cells */
+select.slot-filled {
+  background: linear-gradient(
+    135deg,
+    #1e2a3a 0%,
+    #162536 50%,
+    #0f1c2e 100%
+  ) !important;
+  border-color: rgba(255, 255, 255, 0.2);
+}

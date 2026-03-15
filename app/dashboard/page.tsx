@@ -1,28 +1,24 @@
 import { auth } from "@/auth";
+import { DashboardContent } from "@/components/dashboard/DashboardContent";
+import { canAccessDashboard } from "@/lib/dashboard-access";
 import { redirect } from "next/navigation";
 
 /**
- * Protected dashboard page. Redirects unauthenticated users to sign-in.
+ * Protected dashboard page. Only the allowed email can access; others are redirected.
+ * Unauthenticated users are sent to sign-in.
  */
 export default async function DashboardPage() {
   const session = await auth();
   if (!session?.user) {
     redirect("/signin?callbackUrl=/dashboard");
   }
+  if (!canAccessDashboard(session.user.email)) {
+    redirect("/");
+  }
 
   return (
-    <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
-        Dashboard
-      </h1>
-      <p className="text-zinc-600 dark:text-zinc-400">
-        This page is protected. Only signed-in users can see it.
-      </p>
-      {session?.user && (
-        <p className="text-zinc-600 dark:text-zinc-400">
-          Logged in as <strong>{session.user.email ?? session.user.name}</strong>.
-        </p>
-      )}
+    <div className="p-[25px]">
+      <DashboardContent />
     </div>
   );
 }

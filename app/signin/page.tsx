@@ -13,10 +13,10 @@ export default async function SignInPage({
 }) {
   const session = await auth();
   if (session?.user) {
-    redirect("/dashboard");
+    redirect("/auth/landing");
   }
   const { callbackUrl } = await searchParams;
-  const safeCallback = callbackUrl?.startsWith("/") ? callbackUrl : "/dashboard";
+  const safeCallback = callbackUrl?.startsWith("/") ? callbackUrl : "/auth/landing";
 
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center gap-6">
@@ -28,7 +28,7 @@ export default async function SignInPage({
           "use server";
           const cb = formData.get("callbackUrl");
           const url =
-            typeof cb === "string" && cb.startsWith("/") ? cb : "/dashboard";
+            typeof cb === "string" && cb.startsWith("/") ? cb : "/auth/landing";
           await signIn("google", { callbackUrl: url });
         }}
       >

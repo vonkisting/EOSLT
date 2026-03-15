@@ -2,17 +2,19 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { signOutAction } from "@/app/actions/auth";
 import { SignInModal } from "@/components/SignInModal";
+import { canAccessDashboard } from "@/lib/dashboard-access";
 
 /**
  * App header with brand, nav links, and auth actions.
- * Responsive: mobile menu can be added later per UxStyle.
+ * Dashboard link only shown for the allowed email.
  */
 export async function Header() {
   const session = await auth();
+  const showDashboardLink = canAccessDashboard(session?.user?.email);
 
   return (
     <header className="sticky top-0 z-50">
-      <div className="flex h-14 w-full items-center justify-between gap-4 border-b border-white/10 bg-[#2A204A]/90 px-4 shadow-lg backdrop-blur-md sm:px-6">
+      <div className="flex h-14 w-full items-center justify-between gap-4 border-b border-white/10 bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 px-4 shadow-lg sm:px-6">
         <Link
           href="/"
           className="font-semibold text-white"
@@ -29,12 +31,14 @@ export async function Header() {
           </Link>
           {session?.user ? (
             <>
-              <Link
-                href="/dashboard"
-                className="text-sm text-slate-300 hover:text-white transition-colors"
-              >
-                Dashboard
-              </Link>
+              {showDashboardLink && (
+                <Link
+                  href="/dashboard"
+                  className="text-sm text-slate-300 hover:text-white transition-colors"
+                >
+                  Dashboard
+                </Link>
+              )}
               <Link
                 href="/profile"
                 className="text-sm text-slate-300 hover:text-white transition-colors"

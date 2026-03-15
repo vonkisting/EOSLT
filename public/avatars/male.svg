@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" aria-hidden="true">
+  <defs>
+    <linearGradient id="male-skin" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#d4a574"/>
+      <stop offset="50%" stop-color="#c4956a"/>
+      <stop offset="100%" stop-color="#b88660"/>
+    </linearGradient>
+    <linearGradient id="male-hair" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#3d2914"/>
+      <stop offset="100%" stop-color="#2a1c0e"/>
+    </linearGradient>
+  </defs>
+  <!-- Face -->
+  <ellipse cx="50" cy="52" rx="28" ry="32" fill="url(#male-skin)"/>
+  <!-- Short hair / sides -->
+  <path d="M22 28 Q20 45 24 58 Q28 68 38 72 L62 72 Q72 68 76 58 Q80 45 78 28 Q75 18 50 15 Q25 18 22 28Z" fill="url(#male-hair)"/>
+  <!-- Forehead hairline -->
+  <path d="M28 32 Q50 26 72 32" stroke="#2a1c0e" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <!-- Subtle eyes -->
+  <ellipse cx="38" cy="48" rx="3" ry="2" fill="#5c4033"/>
+  <ellipse cx="62" cy="48" rx="3" ry="2" fill="#5c4033"/>
+</svg>

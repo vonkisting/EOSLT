@@ -2,15 +2,18 @@
 
 import { signIn, signOut } from "@/auth";
 import { registerUser } from "@/lib/auth-db";
+import { redirect } from "next/navigation";
 
 /**
- * Server action to sign out the current user.
+ * Server action to sign out the current user. Redirects to Home (bracket page).
  */
 export async function signOutAction() {
-  await signOut();
+  await signOut({ redirect: false });
+  redirect("/");
 }
 
-const DEFAULT_CALLBACK = "/dashboard";
+/** After sign-in: landing page redirects to Profile or Dashboard (by email). */
+const DEFAULT_CALLBACK = "/auth/landing";
 
 /**
  * Register a new user with email and password, then sign in.
@@ -19,6 +22,7 @@ const DEFAULT_CALLBACK = "/dashboard";
 export async function registerAction(formData: FormData) {
   const email = formData.get("email");
   const password = formData.get("password");
+  const name = formData.get("name");
   const callbackUrl = formData.get("callbackUrl");
   if (typeof email !== "string" || typeof password !== "string") {
     throw new Error("Email and password required");
@@ -26,7 +30,8 @@ export async function registerAction(formData: FormData) {
   if (password.length < 8) {
     throw new Error("Password must be at least 8 characters");
   }
-  await registerUser(email, password);
+  const nameStr = typeof name === "string" ? name.trim() || undefined : undefined;
+  await registerUser(email, password, nameStr);
   await signIn("credentials", {
     email,
     password,
