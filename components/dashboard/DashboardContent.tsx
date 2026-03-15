@@ -793,7 +793,7 @@ export function DashboardContent() {
                 </button>
                 <div
                   id="league-card-week1-locations"
-                  className={`flex flex-col gap-3 overflow-hidden transition-[max-height] duration-200 ease-out ${week1SectionOpen ? "max-h-[500px]" : "max-h-0"}`}
+                  className={`flex flex-col gap-3 overflow-hidden pb-10 transition-[max-height] duration-200 ease-out ${week1SectionOpen ? "max-h-[750px]" : "max-h-0"}`}
                   aria-hidden={!week1SectionOpen}
                 >
                   {WEEK_1_KEYS.map((key) => (
