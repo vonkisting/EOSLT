@@ -123,9 +123,12 @@ export function LiveScoringCard({
   const lastSyncedRawRef = useRef<string | null>(null);
   /** When true, the next save effect run should skip writing (state was just set from a remote sync to avoid ping-pong). */
   const skipNextSaveRef = useRef(false);
+  /** Last raw we wrote to Convex; skip applying it when it comes back so we don't re-render from our own echo. */
+  const lastWrittenRawRef = useRef<string | null>(null);
 
   useEffect(() => {
     lastSyncedRawRef.current = null;
+    lastWrittenRawRef.current = null;
   }, [cardIndex, matchIndex]);
 
   useEffect(() => {
@@ -135,7 +138,12 @@ export function LiveScoringCard({
     const raw = s[`liveScoreGames${key}`];
     if (typeof raw === "string") {
       if (raw === lastSyncedRawRef.current) return;
+      if (raw === lastWrittenRawRef.current) {
+        lastSyncedRawRef.current = raw;
+        return;
+      }
       lastSyncedRawRef.current = raw;
+      lastWrittenRawRef.current = null;
       skipNextSaveRef.current = true;
       try {
         const parsed = JSON.parse(raw) as { p1?: unknown[]; p2?: unknown[] };
@@ -192,6 +200,7 @@ export function LiveScoringCard({
     []
   );
 
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!email || !settings || typeof settings !== "object" || !validCard || !validMatch) return;
     if (skipNextSaveRef.current) {
@@ -205,14 +214,26 @@ export function LiveScoringCard({
       player1Scores.every((c) => !(c ?? "").trim()) &&
       player2Scores.every((c) => !(c ?? "").trim());
     if (bothEmpty) return;
-    setDashboardSettings({
-      email: email as string,
-      leagueName: String(s.leagueName ?? ""),
-      season: String(s.season ?? ""),
-      [`liveScoreGames${key}`]: JSON.stringify({ p1: player1Scores, p2: player2Scores }),
-      [`bracketScoreTop${key}`]: String(total1),
-      [`bracketScoreBottom${key}`]: String(total2),
-    } as Parameters<typeof setDashboardSettings>[0]);
+
+    const payload = JSON.stringify({ p1: player1Scores, p2: player2Scores });
+    const totals = { total1, total2 };
+
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => {
+      saveTimeoutRef.current = null;
+      lastWrittenRawRef.current = payload;
+      setDashboardSettings({
+        email: email as string,
+        leagueName: String(s.leagueName ?? ""),
+        season: String(s.season ?? ""),
+        [`liveScoreGames${key}`]: payload,
+        [`bracketScoreTop${key}`]: String(totals.total1),
+        [`bracketScoreBottom${key}`]: String(totals.total2),
+      } as Parameters<typeof setDashboardSettings>[0]);
+    }, 400);
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
   }, [email, settings, validCard, validMatch, cardIndex, matchIndex, player1Scores, player2Scores, setDashboardSettings]);
 
   const updateMatchStatus = useCallback(
@@ -351,9 +372,9 @@ export function LiveScoringCard({
   );
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8">
+    <div className="mx-auto max-w-2xl pb-8">
       <div className="flex flex-col gap-6">
-        <div className="rounded-xl border border-white/10 bg-gradient-to-br from-slate-900/90 to-slate-800/50 p-8">
+        <div className="rounded-xl border border-white/10 bg-gradient-to-br from-slate-900/90 to-slate-800/50 pb-8">
           {(!validCard || !validMatch) ? (
             <p className="text-center text-sm text-amber-400/90">
               Invalid or missing card/match. Use the link from your bracket.
