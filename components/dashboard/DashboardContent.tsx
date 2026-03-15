@@ -612,6 +612,18 @@ export function DashboardContent() {
       </div>
 
       {/* League & Season card – content height only, collapsible; width matches wider card */}
+      {leagueLoadError && (
+        <div className="w-full min-w-0" role="alert">
+          <p id="league-load-error" className="rounded-xl border border-amber-500/50 bg-amber-950/30 px-4 py-3 text-sm text-amber-200">
+            {leagueLoadError}
+          </p>
+        </div>
+      )}
+      {!loadingLeagues && leagueNames.length === 0 && !leagueLoadError && (
+        <div className="w-full min-w-0 rounded-xl border border-amber-500/30 bg-amber-950/20 px-4 py-3 text-sm text-amber-200/90">
+          No leagues loaded. Set <code className="rounded bg-white/10 px-1">POOLHUB_DATABASE_URL</code> in your deployment environment and ensure the database is reachable.
+        </div>
+      )}
       <div className="w-full min-w-0 overflow-hidden rounded-xl border border-[var(--surface-border)] text-foreground">
         <button
           type="button"
@@ -640,11 +652,6 @@ export function DashboardContent() {
             aria-labelledby="league-card-heading"
             className="flex flex-col gap-4 rounded-b-xl border-t border-[var(--surface-border)] bg-gradient-to-br from-[#0c1220] via-[#0e1525] to-[#0c1220] p-5"
           >
-            {leagueLoadError && (
-              <p id="league-load-error" className="rounded-lg border border-amber-500/50 bg-amber-950/30 px-3 py-2 text-sm text-amber-200" role="alert">
-                {leagueLoadError}
-              </p>
-            )}
             <label className="flex flex-col gap-1.5">
               <span className="text-sm font-medium opacity-90">League Name</span>
               <select
