@@ -14,7 +14,7 @@ export default async function ProfilePage() {
   }
 
   return (
-    <div className="mx-auto min-w-[500px] max-w-[50%] p-[25px]">
+    <div className="mx-auto w-full max-w-full px-4 py-6 md:min-w-[500px] md:max-w-[50%] md:p-[25px]">
       <div className="overflow-hidden rounded-xl border border-[var(--surface-border)] bg-black text-foreground">
         <div className="rounded-t-xl bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 px-6 py-5">
           <h1 className="text-xl font-semibold tracking-tight text-blue-100">

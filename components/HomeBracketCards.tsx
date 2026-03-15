@@ -393,7 +393,7 @@ export function HomeBracketCards() {
             : "Reset"}
         </p>
       </div>
-      <div className="flex flex-wrap gap-6">
+      <div className="flex flex-wrap gap-x-6 gap-y-[4.5rem]">
         {WEEK_1_LOCATION_KEYS.map((key, index) => (
           <div
             key={key}
