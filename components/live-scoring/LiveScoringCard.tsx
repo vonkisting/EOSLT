@@ -68,7 +68,21 @@ function allGameRowsValid(row1: string[], row2: string[]): boolean {
   return true;
 }
 
-const ROW_ERROR_MESSAGE = "One player must have 10 each game.";
+/** Returns the error message for this game row if invalid, or null if valid. */
+function getGameRowErrorMessage(
+  row1: string[],
+  row2: string[],
+  index: number
+): string | null {
+  const v1 = (row1[index] ?? "").trim();
+  const v2 = (row2[index] ?? "").trim();
+  if (v1 === "" || v2 === "") return null;
+  const n1 = parseInt(v1, 10);
+  const n2 = parseInt(v2, 10);
+  if (n1 === 10 && n2 === 10) return "Only 1 player can score a 10 per game.";
+  if (n1 !== 10 && n2 !== 10) return "One player MUST score a 10 each game.";
+  return null;
+}
 
 /** True iff this game row has both values and is invalid (both 10 or both < 10). */
 function isGameRowInvalid(
@@ -76,12 +90,7 @@ function isGameRowInvalid(
   row2: string[],
   index: number
 ): boolean {
-  const v1 = (row1[index] ?? "").trim();
-  const v2 = (row2[index] ?? "").trim();
-  if (v1 === "" || v2 === "") return false;
-  const n1 = parseInt(v1, 10);
-  const n2 = parseInt(v2, 10);
-  return (n1 === 10 && n2 === 10) || (n1 !== 10 && n2 !== 10);
+  return getGameRowErrorMessage(row1, row2, index) != null;
 }
 
 /**
@@ -469,13 +478,16 @@ export function LiveScoringCard({
                             />
                           </td>
                         </tr>
-                        {isGameRowInvalid(player1Scores, player2Scores, i) && (
-                          <tr>
-                            <td colSpan={3} className="border border-slate-300 bg-red-50 px-3 py-1.5 text-center text-sm font-medium text-red-600">
-                              Game {i + 1}: {ROW_ERROR_MESSAGE}
-                            </td>
-                          </tr>
-                        )}
+                        {(() => {
+                          const msg = getGameRowErrorMessage(player1Scores, player2Scores, i);
+                          return msg ? (
+                            <tr>
+                              <td colSpan={3} className="border border-slate-300 bg-red-50 px-3 py-1.5 text-center text-sm font-medium text-red-600">
+                                Game {i + 1}: {msg}
+                              </td>
+                            </tr>
+                          ) : null;
+                        })()}
                       </Fragment>
                     ))}
                   </tbody>
