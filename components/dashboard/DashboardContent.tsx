@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Bracket8TwoRounds } from "@/components/Bracket8TwoRounds";
+import { Modal } from "@/components/ui/Modal";
 
 const PLAYER_SLOTS = 64;
 const BYE_LABEL = "-- Bye --";
@@ -150,6 +151,7 @@ export function DashboardContent() {
   const [week2SectionOpen, setWeek2SectionOpen] = useState(false);
   const [finalsSectionOpen, setFinalsSectionOpen] = useState(false);
   const [bracketResetKey, setBracketResetKey] = useState(0);
+  const [resetBracketsModalOpen, setResetBracketsModalOpen] = useState(false);
 
   /** Player list with byes numbered as "-- Bye 1 --", "-- Bye 2 --", etc. for display and bracket. */
   const playerDisplayNames = useMemo(() => {
@@ -246,12 +248,15 @@ export function DashboardContent() {
 
   useEffect(() => {
     if (hasAppliedInitialSettings.current || savedSettings == null) return;
-    if (!leagueNames.length) return;
     const { leagueName, season, leagueGuid, ...rest } = savedSettings;
-    if (!leagueName || !leagueNames.includes(leagueName)) return;
+    const leagueNameStr = typeof leagueName === "string" ? leagueName.trim() : "";
+    const seasonStr = typeof season === "string" ? season.trim() : "";
+    if (!leagueNameStr) return;
+    if (leagueNames.length > 0 && !leagueNames.includes(leagueNameStr)) return;
     hasAppliedInitialSettings.current = true;
-    setSelectedLeagueName(leagueName);
-    pendingSeasonFromSettings.current = season;
+    setSelectedLeagueName(leagueNameStr);
+    if (seasonStr) setSelectedSeason(seasonStr);
+    pendingSeasonFromSettings.current = seasonStr || null;
     if (leagueGuid) setSelectedLeagueGuid(leagueGuid);
     const locUpdate: Partial<Record<LocationKey, string>> = {};
     for (const key of LOCATION_KEYS) {
@@ -259,7 +264,6 @@ export function DashboardContent() {
       if (typeof v === "string") locUpdate[key] = v;
     }
     if (Object.keys(locUpdate).length) setLocations((prev) => ({ ...prev, ...locUpdate }));
-    // Restore collapsible UI state from Convex
     const ui = rest as Record<string, unknown>;
     if (ui.uiUsersCardOpen === true) setUsersCardOpen(true);
     if (ui.uiLeagueCardOpen === true) setLeagueCardOpen(true);
@@ -667,7 +671,7 @@ export function DashboardContent() {
           id="league-card-heading"
         >
           <h2 className="text-lg font-semibold tracking-tight text-blue-100">
-            Tournament Details
+            Tournament Settings
           </h2>
           <span className="text-blue-100/80" aria-hidden>
             {leagueCardOpen ? "▼" : "▶"}
@@ -777,6 +781,44 @@ export function DashboardContent() {
                   : "Currently Running"
                 : "Reset"}
             </p>
+            <button
+              type="button"
+              onClick={() => setResetBracketsModalOpen(true)}
+              disabled={tournamentPaused}
+              className="mt-2 cursor-pointer rounded-lg border border-blue-400/50 bg-blue-800/60 px-3 py-2 text-sm font-medium text-blue-100 shadow-sm transition-colors hover:bg-blue-700/70 disabled:opacity-55 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-slate-700/80 disabled:border-slate-600"
+              aria-label="Reset Brackets"
+            >
+              Reset Brackets
+            </button>
+            <Modal
+              open={resetBracketsModalOpen}
+              onClose={() => setResetBracketsModalOpen(false)}
+              title="Reset Brackets"
+            >
+              <p className="mb-6 text-slate-200">
+                Clear all player selections from every bracket slot (all 8 Week 1 cards)? Location and other tournament settings will not be changed.
+              </p>
+              <div className="flex flex-wrap justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setResetBracketsModalOpen(false)}
+                  className="cursor-pointer rounded-lg border border-white/20 bg-transparent px-4 py-2.5 text-sm font-medium text-slate-200 transition-colors hover:bg-white/10"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    resetBracketPlayerSlotsOnly();
+                    setResetBracketsModalOpen(false);
+                  }}
+                  className="cursor-pointer rounded-lg border border-red-400/50 bg-red-800/80 px-4 py-2.5 text-sm font-medium text-red-100 shadow-sm transition-colors hover:bg-red-700/80"
+                  aria-label="Confirm reset brackets"
+                >
+                  Reset Brackets
+                </button>
+              </div>
+            </Modal>
             <hr className="border-t border-[var(--surface-border)] my-4" aria-hidden />
             {venueSyncError && (
               <p className="rounded-lg border border-amber-500/50 bg-amber-950/30 px-3 py-2 text-sm text-amber-200" role="alert">
@@ -1065,16 +1107,6 @@ export function DashboardContent() {
                   {locations[key]?.trim() || "TBD"}
                 </h2>
               </button>
-              {index === 0 && (
-                <button
-                  type="button"
-                  onClick={resetBracketPlayerSlotsOnly}
-                  disabled={tournamentPaused}
-                  className="cursor-pointer rounded border border-blue-400/50 bg-blue-800/60 px-2 py-1 text-sm font-medium text-blue-100 shadow-sm transition-colors hover:bg-blue-700/70 disabled:opacity-55 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-slate-700/80 disabled:border-slate-600"
-                >
-                  Reset
-                </button>
-              )}
               <button
                 type="button"
                 onClick={() => {
