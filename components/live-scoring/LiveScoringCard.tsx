@@ -331,6 +331,13 @@ export function LiveScoringCard({
     [player1RaceTo, player2RaceTo, total1, total2]
   );
 
+  const bothHaveWinningTotals = useMemo(
+    () =>
+      (player1RaceTo != null && total1 >= player1RaceTo) &&
+      (player2RaceTo != null && total2 >= player2RaceTo),
+    [player1RaceTo, player2RaceTo, total1, total2]
+  );
+
   const handleScoreChange = useCallback(
     (playerIndex: 0 | 1, gameIndex: number, value: string) => {
       const digitsOnly = value.replace(/\D/g, "");
@@ -376,8 +383,11 @@ export function LiveScoringCard({
     return { total1CellClass: `${base} ${neutral}`, total2CellClass: `${base} ${neutral}` };
   }, [player1RaceTo, player2RaceTo, total1, total2]);
 
-  /** Allow submit when a player's total >= their goes to; skip per-game validity if match is already decided. */
-  const canSubmitScores = useMemo(() => totalsReached, [totalsReached]);
+  /** Allow submit when one player has reached their goes to and not both (only one winner). */
+  const canSubmitScores = useMemo(
+    () => totalsReached && !bothHaveWinningTotals,
+    [totalsReached, bothHaveWinningTotals]
+  );
 
   const [submitSuccessModalOpen, setSubmitSuccessModalOpen] = useState(false);
   useEffect(() => {
@@ -533,29 +543,36 @@ export function LiveScoringCard({
                   </tfoot>
                 </table>
               </div>
-              <div className="mt-3 flex justify-center gap-3">
-                {canSubmitScores && (
+              <div className="mt-3 flex flex-col gap-3">
+                {bothHaveWinningTotals && (
+                  <p className="w-full rounded-lg border border-amber-500/60 bg-amber-950/40 px-4 py-3 text-center text-sm font-medium text-amber-200" role="alert">
+                    Both players can&apos;t have winning totals. Adjust the scores to represent who won first.
+                  </p>
+                )}
+                <div className="flex justify-center gap-3">
+                  {canSubmitScores && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        updateMatchStatus("Completed");
+                        setSubmitSuccessModalOpen(true);
+                      }}
+                      className="rounded-lg bg-gradient-to-r from-blue-700 to-blue-500 px-5 py-2.5 font-semibold text-white shadow transition-opacity hover:from-blue-600 hover:to-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-800"
+                    >
+                      Submit Scores
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => {
-                      updateMatchStatus("Completed");
-                      setSubmitSuccessModalOpen(true);
+                      updateMatchStatus("Paused");
+                      router.push("/");
                     }}
-                    className="rounded-lg bg-gradient-to-r from-blue-700 to-blue-500 px-5 py-2.5 font-semibold text-white shadow transition-opacity hover:from-blue-600 hover:to-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-800"
+                    className="rounded-lg bg-gradient-to-r from-red-700 to-red-500 px-5 py-2.5 font-semibold text-white shadow transition-opacity hover:from-red-600 hover:to-red-400 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-2 focus:ring-offset-slate-800"
                   >
-                    Submit Scores
+                    Pause Match
                   </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => {
-                    updateMatchStatus("Paused");
-                    router.push("/");
-                  }}
-                  className="rounded-lg bg-gradient-to-r from-red-700 to-red-500 px-5 py-2.5 font-semibold text-white shadow transition-opacity hover:from-red-600 hover:to-red-400 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-2 focus:ring-offset-slate-800"
-                >
-                  Pause Match
-                </button>
+                </div>
               </div>
             </>
           )}
