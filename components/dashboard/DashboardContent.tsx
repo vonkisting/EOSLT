@@ -402,6 +402,17 @@ export function DashboardContent() {
     const statusReset = Object.fromEntries(
       Array.from({ length: 48 }, (_, i) => [`bracketMatchStatus${i}`, ""])
     );
+    const scoreReset = Object.fromEntries([
+      ...Array.from({ length: 48 }, (_, i) => [`bracketScoreTop${i}`, "0"]),
+      ...Array.from({ length: 48 }, (_, i) => [`bracketScoreBottom${i}`, "0"]),
+    ]);
+    const emptyGames = JSON.stringify({
+      p1: Array.from({ length: 11 }, () => ""),
+      p2: Array.from({ length: 11 }, () => ""),
+    });
+    const liveScoreReset = Object.fromEntries(
+      Array.from({ length: 48 }, (_, i) => [`liveScoreGames${i}`, emptyGames])
+    );
     setDashboardSettings({
       email,
       leagueName: selectedLeagueName,
@@ -409,6 +420,8 @@ export function DashboardContent() {
       tournamentStarted: false,
       tournamentPaused: false,
       ...statusReset,
+      ...scoreReset,
+      ...liveScoreReset,
     } as Parameters<typeof setDashboardSettings>[0]);
   }, [email, selectedLeagueName, selectedSeason, setDashboardSettings]);
 
