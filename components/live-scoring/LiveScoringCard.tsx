@@ -374,7 +374,7 @@ export function LiveScoringCard({
   return (
     <div className="mx-auto max-w-2xl pb-8 mt-[5px]">
       <div className="flex flex-col gap-6">
-        <div className="rounded-xl border border-white/10 bg-gradient-to-br from-slate-900/90 to-slate-800/50 pb-8">
+        <div className="rounded-xl border border-white/10 bg-gradient-to-br from-slate-900/90 to-slate-800/50 pb-4">
           {(!validCard || !validMatch) ? (
             <p className="text-center text-sm text-amber-400/90">
               Invalid or missing card/match. Use the link from your bracket.
@@ -382,7 +382,7 @@ export function LiveScoringCard({
           ) : (
             <>
               <header
-                className="rounded-xl border border-white/10 bg-gradient-to-br from-blue-900 via-blue-800 to-blue-900 px-6 py-6 shadow-lg"
+                className="rounded-xl border border-white/10 bg-gradient-to-br from-black via-[#020c1b] to-black px-6 py-6 shadow-lg"
                 aria-label="Matchup"
               >
                 <div className="flex flex-wrap items-center justify-between gap-8 sm:gap-12">
@@ -422,7 +422,7 @@ export function LiveScoringCard({
                   </div>
                 ) : null}
               </header>
-              <div className="overflow-x-auto rounded-lg border border-slate-600">
+              <div className="mt-[5px] overflow-x-auto rounded-lg border border-slate-600">
                 <table className="w-full min-w-full border-collapse text-sm">
                   <thead>
                     <tr className="bg-gradient-to-b from-slate-700 to-slate-800">
@@ -494,8 +494,7 @@ export function LiveScoringCard({
                   </tfoot>
                 </table>
               </div>
-              <hr className="my-6 border-slate-600" />
-              <div className="flex justify-center gap-3">
+              <div className="mt-3 flex justify-center gap-3">
                 {canSubmitScores && (
                   <button
                     type="button"
