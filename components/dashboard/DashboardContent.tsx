@@ -793,7 +793,7 @@ export function DashboardContent() {
                 </button>
                 <div
                   id="league-card-week1-locations"
-                  className={`flex flex-col gap-3 overflow-hidden pb-10 transition-[max-height] duration-200 ease-out ${week1SectionOpen ? "max-h-[750px]" : "max-h-0"}`}
+                  className={`flex flex-col gap-3 overflow-hidden px-[5px] pb-[5px] transition-[max-height] duration-200 ease-out ${week1SectionOpen ? "max-h-[750px]" : "max-h-0"}`}
                   aria-hidden={!week1SectionOpen}
                 >
                   {WEEK_1_KEYS.map((key) => (
@@ -849,7 +849,7 @@ export function DashboardContent() {
                 </button>
                 <div
                   id="league-card-week2-locations"
-                  className={`flex flex-col gap-3 overflow-hidden transition-[max-height] duration-200 ease-out ${week2SectionOpen ? "max-h-[300px]" : "max-h-0"}`}
+                  className={`flex flex-col gap-3 overflow-hidden px-[5px] pb-4 transition-[max-height] duration-200 ease-out ${week2SectionOpen ? "max-h-[320px]" : "max-h-0"}`}
                   aria-hidden={!week2SectionOpen}
                 >
                   {WEEK_2_KEYS.map((key) => (
@@ -905,7 +905,7 @@ export function DashboardContent() {
                 </button>
                 <div
                   id="league-card-finals-location"
-                  className={`flex flex-col gap-3 overflow-hidden transition-[max-height] duration-200 ease-out ${finalsSectionOpen ? "max-h-[120px]" : "max-h-0"}`}
+                  className={`flex flex-col gap-3 overflow-hidden px-[5px] pb-[5px] transition-[max-height] duration-200 ease-out ${finalsSectionOpen ? "max-h-[120px]" : "max-h-0"}`}
                   aria-hidden={!finalsSectionOpen}
                 >
                   <label className="flex flex-col gap-1.5">
