@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 import { createPortal } from "react-dom";
 
 /**
@@ -19,7 +19,8 @@ export function Modal({
   children: React.ReactNode;
 }) {
   const overlayRef = useRef<HTMLDivElement>(null);
-  const titleId = useRef(`modal-title-${Math.random().toString(36).slice(2)}`).current;
+  const id = useId();
+  const titleId = `modal-title-${id.replace(/:/g, "")}`;
 
   useEffect(() => {
     if (!open) return;

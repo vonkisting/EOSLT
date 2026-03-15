@@ -130,8 +130,12 @@ export function LiveScoringCard({
           parsed.p1.length === GAME_COUNT &&
           parsed.p2.length === GAME_COUNT
         ) {
-          setPlayer1Scores(parsed.p1.map((c) => (c != null && c !== "" ? String(c).trim() : "")));
-          setPlayer2Scores(parsed.p2.map((c) => (c != null && c !== "" ? String(c).trim() : "")));
+          const p1 = parsed.p1.map((c) => (c != null && c !== "" ? String(c).trim() : ""));
+          const p2 = parsed.p2.map((c) => (c != null && c !== "" ? String(c).trim() : ""));
+          queueMicrotask(() => {
+            setPlayer1Scores(p1);
+            setPlayer2Scores(p2);
+          });
         }
       } catch {
         /* ignore invalid JSON */
@@ -227,7 +231,7 @@ export function LiveScoringCard({
   const leagueGuid = (settings as Record<string, unknown> | undefined)?.leagueGuid as string | undefined;
   useEffect(() => {
     if (!leagueGuid?.trim()) {
-      setRaceToMap({});
+      queueMicrotask(() => setRaceToMap({}));
       return;
     }
     let cancelled = false;

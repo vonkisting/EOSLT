@@ -44,3 +44,12 @@ Next.js 16 app with TypeScript, Auth.js (Google OAuth), Tailwind CSS 4, and Conv
 - **Prod:** `bunx convex deploy` – deploys to production. Set `NEXT_PUBLIC_CONVEX_URL` in your production host to the production Convex URL.
 
 See `convex/README.md` for backend details.
+
+## Deploy (Vercel)
+
+- **Build:** Uses `bun run build`. `vercel.json` pins install to `bun install --frozen-lockfile`.
+- **Env (Production):** In Vercel project → Settings → Environment Variables, set at least:
+  - `AUTH_SECRET` (required for Auth.js)
+  - `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` (Google OAuth)
+  - `NEXT_PUBLIC_CONVEX_URL` (production Convex deployment URL; run `bunx convex deploy` and add the URL).
+- Deploy Convex before or with the first deploy: `bunx convex deploy`.

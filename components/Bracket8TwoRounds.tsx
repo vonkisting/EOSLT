@@ -259,7 +259,8 @@ export function Bracket8TwoRounds({
     if (hasAppliedInitial.current || !initialSlotSelections?.length) return;
     if (initialSlotSelections.length === 12) {
       hasAppliedInitial.current = true;
-      setSlotSelections([...initialSlotSelections]);
+      const next = [...initialSlotSelections];
+      queueMicrotask(() => setSlotSelections(next));
     }
   }, [initialSlotSelections]);
 
@@ -301,7 +302,7 @@ export function Bracket8TwoRounds({
   useEffect(() => {
     if (initialScoresSerialized == null) return;
     const next = JSON.parse(initialScoresSerialized) as string[];
-    setScores(next);
+    queueMicrotask(() => setScores(next));
   }, [initialScoresSerialized]);
 
   const handleScoreChange = useCallback(
