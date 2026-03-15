@@ -471,8 +471,8 @@ export function LiveScoringCard({
                         </tr>
                         {isGameRowInvalid(player1Scores, player2Scores, i) && (
                           <tr>
-                            <td colSpan={3} className="border border-slate-300 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-600">
-                              Game {i + 1} {ROW_ERROR_MESSAGE}
+                            <td colSpan={3} className="border border-slate-300 bg-red-50 px-3 py-1.5 text-center text-sm font-medium text-red-600">
+                              Game {i + 1}: {ROW_ERROR_MESSAGE}
                             </td>
                           </tr>
                         )}
