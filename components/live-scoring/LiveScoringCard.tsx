@@ -372,7 +372,7 @@ export function LiveScoringCard({
   );
 
   return (
-    <div className="mx-auto max-w-2xl pb-8">
+    <div className="mx-auto max-w-2xl pb-8 mt-[25px]">
       <div className="flex flex-col gap-6">
         <div className="rounded-xl border border-white/10 bg-gradient-to-br from-slate-900/90 to-slate-800/50 pb-8">
           {(!validCard || !validMatch) ? (
@@ -382,7 +382,7 @@ export function LiveScoringCard({
           ) : (
             <>
               <header
-                className="rounded-xl border border-white/10 bg-gradient-to-br from-slate-900/95 via-slate-900 to-slate-900/95 px-6 py-6 shadow-lg"
+                className="rounded-xl border border-white/10 bg-gradient-to-br from-blue-900 via-blue-800 to-blue-900 px-6 py-6 shadow-lg"
                 aria-label="Matchup"
               >
                 <div className="flex flex-wrap items-center justify-between gap-8 sm:gap-12">
@@ -422,7 +422,7 @@ export function LiveScoringCard({
                   </div>
                 ) : null}
               </header>
-              <div className="overflow-x-auto rounded-lg border border-slate-600 mt-6">
+              <div className="overflow-x-auto rounded-lg border border-slate-600">
                 <table className="w-full min-w-full border-collapse text-sm">
                   <thead>
                     <tr className="bg-gradient-to-b from-slate-700 to-slate-800">
