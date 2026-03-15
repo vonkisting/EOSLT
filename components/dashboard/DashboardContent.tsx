@@ -139,6 +139,7 @@ export function DashboardContent() {
   const [loadingLeagues, setLoadingLeagues] = useState(true);
   const [loadingSeasons, setLoadingSeasons] = useState(false);
   const [loadingPlayers, setLoadingPlayers] = useState(false);
+  const [leagueLoadError, setLeagueLoadError] = useState<string | null>(null);
   const [leagueCardOpen, setLeagueCardOpen] = useState(false);
   const [playersCardOpen, setPlayersCardOpen] = useState(false);
   const [usersCardOpen, setUsersCardOpen] = useState(false);
@@ -195,12 +196,21 @@ export function DashboardContent() {
 
   useEffect(() => {
     fetch("/api/leagues")
-      .then((r) => r.json())
-      .then((data: string[]) => {
-        setLeagueNames(Array.isArray(data) ? data : []);
+      .then((r) => r.json().then((data: { leagues?: string[]; error?: string } | string[]) => ({ ok: r.ok, data })))
+      .then(({ ok, data }) => {
+        if (Array.isArray(data)) {
+          setLeagueNames(data);
+          setLeagueLoadError(ok ? null : "Failed to load leagues.");
+        } else {
+          setLeagueNames(data?.leagues ?? []);
+          setLeagueLoadError(data?.error ?? (ok ? null : "Failed to load leagues."));
+        }
         setLoadingLeagues(false);
       })
-      .catch(() => setLoadingLeagues(false));
+      .catch(() => {
+        setLeagueLoadError("Failed to load leagues.");
+        setLoadingLeagues(false);
+      });
   }, []);
 
   useEffect(() => {
@@ -630,6 +640,11 @@ export function DashboardContent() {
             aria-labelledby="league-card-heading"
             className="flex flex-col gap-4 rounded-b-xl border-t border-[var(--surface-border)] bg-gradient-to-br from-[#0c1220] via-[#0e1525] to-[#0c1220] p-5"
           >
+            {leagueLoadError && (
+              <p id="league-load-error" className="rounded-lg border border-amber-500/50 bg-amber-950/30 px-3 py-2 text-sm text-amber-200" role="alert">
+                {leagueLoadError}
+              </p>
+            )}
             <label className="flex flex-col gap-1.5">
               <span className="text-sm font-medium opacity-90">League Name</span>
               <select
@@ -643,6 +658,7 @@ export function DashboardContent() {
                 className="select-dark rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-800/70 disabled:text-slate-400"
                 style={{ borderColor: "var(--surface-border)" }}
                 aria-label="League Name"
+                aria-describedby={leagueLoadError ? "league-load-error" : undefined}
               >
                 <option value="">Select league...</option>
                 {leagueNames.map((name) => (

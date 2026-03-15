@@ -122,9 +122,9 @@ export function LinkPlayerList({ userEmail }: { userEmail: string }) {
     setLoadingFallback(true);
     fetch("/api/leagues")
       .then((r) => r.json())
-      .then((data: string[]) => {
+      .then((data: { leagues?: string[]; error?: string } | string[]) => {
         if (cancelled) return;
-        const leagues = Array.isArray(data) ? data : [];
+        const leagues = Array.isArray(data) ? data : (data?.leagues ?? []);
         const firstLeague = leagues[0];
         if (!firstLeague) {
           setLoadingFallback(false);

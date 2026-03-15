@@ -28,7 +28,7 @@ async function getPool(): Promise<sql.ConnectionPool | null> {
       pool = await sql.connect(getConnectionConfig());
     } catch (err) {
       console.error("[PoolHub DB] Connection error:", err);
-      return null;
+      throw new Error("PoolHub database is unreachable. Check POOLHUB_DATABASE_URL and network (e.g. DB must be reachable from Vercel).");
     }
   }
   return pool;
