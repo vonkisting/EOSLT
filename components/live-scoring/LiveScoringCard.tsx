@@ -391,7 +391,7 @@ export function LiveScoringCard({
           ) : (
             <>
               <header
-                className="rounded-xl border border-white/10 bg-gradient-to-br from-black via-[#020c1b] to-black px-6 py-6 shadow-lg"
+                className="rounded-xl border border-white/10 bg-gradient-to-br from-[#020c1b] via-[#1e3a5f] to-[#020c1b] px-6 py-6 shadow-lg"
                 aria-label="Matchup"
               >
                 <div className="flex flex-wrap items-center justify-between gap-8 sm:gap-12">

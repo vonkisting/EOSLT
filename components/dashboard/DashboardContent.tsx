@@ -399,12 +399,16 @@ export function DashboardContent() {
 
   const resetTournament = useCallback(() => {
     if (!email) return;
+    const statusReset = Object.fromEntries(
+      Array.from({ length: 48 }, (_, i) => [`bracketMatchStatus${i}`, ""])
+    );
     setDashboardSettings({
       email,
       leagueName: selectedLeagueName,
       season: selectedSeason,
       tournamentStarted: false,
       tournamentPaused: false,
+      ...statusReset,
     } as Parameters<typeof setDashboardSettings>[0]);
   }, [email, selectedLeagueName, selectedSeason, setDashboardSettings]);
 
