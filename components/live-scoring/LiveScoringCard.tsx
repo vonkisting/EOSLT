@@ -372,7 +372,7 @@ export function LiveScoringCard({
   );
 
   return (
-    <div className="mx-auto max-w-2xl pb-8 mt-[25px]">
+    <div className="mx-auto max-w-2xl pb-8 mt-[5px]">
       <div className="flex flex-col gap-6">
         <div className="rounded-xl border border-white/10 bg-gradient-to-br from-slate-900/90 to-slate-800/50 pb-8">
           {(!validCard || !validMatch) ? (
