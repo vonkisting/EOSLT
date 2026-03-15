@@ -614,7 +614,7 @@ export function DashboardContent() {
       {/* League & Season card – content height only, collapsible; width matches wider card */}
       {leagueLoadError && (
         <div className="w-full min-w-0" role="alert">
-          <p id="league-load-error" className="rounded-xl border border-amber-500/50 bg-amber-950/30 px-4 py-3 text-sm text-amber-200">
+          <p id="league-load-error" className="whitespace-pre-line rounded-xl border border-amber-500/50 bg-amber-950/30 px-4 py-3 text-sm text-amber-200">
             {leagueLoadError}
           </p>
         </div>

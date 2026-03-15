@@ -28,7 +28,30 @@ async function getPool(): Promise<sql.ConnectionPool | null> {
       pool = await sql.connect(getConnectionConfig());
     } catch (err) {
       console.error("[PoolHub DB] Connection error:", err);
-      throw new Error("PoolHub database is unreachable. Check POOLHUB_DATABASE_URL and network (e.g. DB must be reachable from Vercel).");
+      const errObj = err instanceof Error ? err : new Error(String(err));
+      const code = "code" in errObj && typeof (errObj as NodeJS.ErrnoException).code === "string"
+        ? (errObj as NodeJS.ErrnoException).code
+        : "";
+      let detail = errObj.message;
+      if (detail.length > 400) detail = detail.slice(0, 397) + "...";
+      const redact = /password|pwd=|connectionstring|user id|data source|server=/i;
+      const safeDetail = !redact.test(detail) ? detail : "";
+      const message = [
+        "PoolHub database is unreachable.",
+        "",
+        "What this usually means:",
+        "• Database is on a private network or on-premises — Vercel cannot reach it. Use a cloud SQL Server or a proxy that Vercel can call.",
+        "• Firewall is blocking your host (e.g. Vercel) from the DB host:port. Allow outbound to the SQL Server port (often 1433).",
+        "• Wrong Server, Database, User ID, or Password in POOLHUB_DATABASE_URL. Double-check the value in Vercel → Settings → Environment Variables.",
+        "• TLS/encryption mismatch — add Encrypt=false;TrustServerCertificate=true to the end of the connection string.",
+        "",
+        "Next step: In Vercel (or your host) open the deployment → Logs or Runtime Logs. Search for \"[PoolHub DB] Connection error\" to see the exact driver error.",
+        code ? `Error code: ${code}` : "",
+        safeDetail ? `Driver message: ${safeDetail}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+      throw new Error(message);
     }
   }
   return pool;
