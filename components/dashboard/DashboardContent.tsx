@@ -728,7 +728,7 @@ export function DashboardContent() {
                 ))}
               </select>
             </label>
-            <div className="flex flex-wrap gap-3 pt-1">
+            <div className="flex flex-wrap items-center gap-3 pt-1">
               <button
                 type="button"
                 onClick={startTournament}
@@ -742,9 +742,28 @@ export function DashboardContent() {
                 }
                 className="cursor-pointer rounded-lg border border-blue-400/50 bg-gradient-to-r from-blue-800 to-blue-600 px-4 py-2.5 text-sm font-medium text-blue-100 shadow-sm transition-colors hover:from-blue-700 hover:to-blue-500 hover:border-blue-300/60 disabled:opacity-55 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-slate-700/80 disabled:border-slate-600"
                 aria-label="Start Tournament"
+                aria-describedby={!tournamentStarted && !tournamentPaused ? "start-tournament-hint" : undefined}
               >
                 Start Tournament
               </button>
+              {!tournamentStarted && !tournamentPaused && (
+                <p
+                  id="start-tournament-hint"
+                  className="text-sm text-blue-200/80"
+                  role="status"
+                  aria-live="polite"
+                >
+                  {!selectedLeagueName?.trim()
+                    ? "Select a league."
+                    : !selectedSeason?.trim()
+                      ? "Select a season."
+                      : !allLocationsFilled
+                        ? "Set all Week 1, Week 2, and Finals locations."
+                        : !allFirstRoundFilled
+                          ? "Fill all 64 first-round bracket slots (expand each Week 1 card and assign players)."
+                          : "Ready to start."}
+                </p>
+              )}
               {tournamentStarted && (
                 <button
                   type="button"

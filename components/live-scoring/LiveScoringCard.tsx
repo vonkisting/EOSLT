@@ -108,20 +108,21 @@ export function LiveScoringCard({
 
   const [player1Scores, setPlayer1Scores] = useState<string[]>(() => [...EMPTY_ROW]);
   const [player2Scores, setPlayer2Scores] = useState<string[]>(() => [...EMPTY_ROW]);
-  const hasInitializedFromConvex = useRef(false);
+  /** Last raw JSON we synced from Convex for this card/match so we only update state when Convex value actually changes (real-time sync across clients). */
+  const lastSyncedRawRef = useRef<string | null>(null);
 
   useEffect(() => {
-    hasInitializedFromConvex.current = false;
+    lastSyncedRawRef.current = null;
   }, [cardIndex, matchIndex]);
 
   useEffect(() => {
     if (!validCard || !validMatch || !settings || typeof settings !== "object") return;
     const key = cardIndex * 6 + matchIndex;
-    if (hasInitializedFromConvex.current) return;
-    hasInitializedFromConvex.current = true;
     const s = settings as Record<string, unknown>;
     const raw = s[`liveScoreGames${key}`];
     if (typeof raw === "string") {
+      if (raw === lastSyncedRawRef.current) return;
+      lastSyncedRawRef.current = raw;
       try {
         const parsed = JSON.parse(raw) as { p1?: unknown[]; p2?: unknown[] };
         if (
@@ -132,13 +133,11 @@ export function LiveScoringCard({
         ) {
           const p1 = parsed.p1.map((c) => (c != null && c !== "" ? String(c).trim() : ""));
           const p2 = parsed.p2.map((c) => (c != null && c !== "" ? String(c).trim() : ""));
-          queueMicrotask(() => {
-            setPlayer1Scores(p1);
-            setPlayer2Scores(p2);
-          });
+          setPlayer1Scores(p1);
+          setPlayer2Scores(p2);
         }
       } catch {
-        /* ignore invalid JSON */
+        lastSyncedRawRef.current = null;
       }
       return;
     }
@@ -147,6 +146,9 @@ export function LiveScoringCard({
       p1: Array.from({ length: GAME_COUNT }, () => ""),
       p2: Array.from({ length: GAME_COUNT }, () => ""),
     });
+    lastSyncedRawRef.current = emptyGames;
+    setPlayer1Scores([...EMPTY_ROW]);
+    setPlayer2Scores([...EMPTY_ROW]);
     setDashboardSettings({
       email: email as string,
       leagueName: String(s.leagueName ?? ""),
@@ -184,7 +186,7 @@ export function LiveScoringCard({
     const bothEmpty =
       player1Scores.every((c) => !(c ?? "").trim()) &&
       player2Scores.every((c) => !(c ?? "").trim());
-    if (bothEmpty && !hasInitializedFromConvex.current) return;
+    if (bothEmpty) return;
     setDashboardSettings({
       email: email as string,
       leagueName: String(s.leagueName ?? ""),
