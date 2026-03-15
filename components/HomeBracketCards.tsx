@@ -76,6 +76,13 @@ export function HomeBracketCards() {
     { playerName: string; raceTo: number | null }[]
   >([]);
   const [loadingPlayers, setLoadingPlayers] = useState(false);
+  const [loadingTimedOut, setLoadingTimedOut] = useState(false);
+
+  useEffect(() => {
+    if (status !== "loading" && settings !== undefined) return;
+    const t = setTimeout(() => setLoadingTimedOut(true), 10000);
+    return () => clearTimeout(t);
+  }, [status, settings]);
 
   const hasLeagueAndSeason =
     settings &&
@@ -322,10 +329,28 @@ export function HomeBracketCards() {
     [settings]
   );
 
-  if (status === "loading" || settings === undefined) {
+  if (!loadingTimedOut && (status === "loading" || settings === undefined)) {
     return (
       <div className="rounded-xl border border-[var(--surface-border)] bg-black/40 p-6">
         <p className="text-sm text-blue-200/80">Loading…</p>
+      </div>
+    );
+  }
+
+  if (loadingTimedOut && (status === "loading" || settings === undefined)) {
+    return (
+      <div className="rounded-xl border border-[var(--surface-border)] bg-black/40 p-6 text-center">
+        <h1 className="text-xl font-semibold tracking-tight text-blue-100">
+          EOSLT
+        </h1>
+        <p className="mt-2 text-sm text-blue-200/80">
+          Taking longer than usual. Check that{" "}
+          <code className="rounded bg-white/10 px-1">NEXT_PUBLIC_CONVEX_URL</code>{" "}
+          is set in your deployment and Convex is deployed.
+        </p>
+        <p className="mt-2 text-sm text-blue-200/80">
+          Or use the navigation to open Dashboard or Profile.
+        </p>
       </div>
     );
   }
