@@ -152,6 +152,7 @@ export function DashboardContent() {
   const [finalsSectionOpen, setFinalsSectionOpen] = useState(false);
   const [bracketResetKey, setBracketResetKey] = useState(0);
   const [resetBracketsModalOpen, setResetBracketsModalOpen] = useState(false);
+  const [resetTournamentModalOpen, setResetTournamentModalOpen] = useState(false);
 
   /** Player list with byes numbered as "-- Bye 1 --", "-- Bye 2 --", etc. for display and bracket. */
   const playerDisplayNames = useMemo(() => {
@@ -802,12 +803,12 @@ export function DashboardContent() {
               </button>
               <button
                 type="button"
-                onClick={resetTournament}
+                onClick={() => setResetTournamentModalOpen(true)}
                 disabled={!tournamentStarted || tournamentPaused}
                 className="cursor-pointer rounded-lg border border-red-400/50 bg-gradient-to-r from-red-800 to-red-600 px-4 py-2.5 text-sm font-medium text-red-100 shadow-sm transition-colors hover:from-red-700 hover:to-red-500 hover:border-red-300/60 disabled:opacity-55 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-slate-700/80 disabled:border-slate-600"
-                aria-label="Reset Tournament"
+                aria-label="Reset Match Scores"
               >
-                Reset Tournament
+                Reset Match Scores
               </button>
             </div>
             <p className="mt-2 text-[1.3125rem] text-blue-400" aria-live="polite">
@@ -827,6 +828,35 @@ export function DashboardContent() {
             >
               Reset Brackets
             </button>
+            <Modal
+              open={resetTournamentModalOpen}
+              onClose={() => setResetTournamentModalOpen(false)}
+              title="Reset tournament?"
+            >
+              <p className="mb-6 text-slate-200">
+                Are you sure you want to reset the tournament? All scores will be reset, but the bracket will remain the same.
+              </p>
+              <div className="flex flex-wrap justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setResetTournamentModalOpen(false)}
+                  className="cursor-pointer rounded-lg border border-white/20 bg-transparent px-4 py-2.5 text-sm font-medium text-slate-200 transition-colors hover:bg-white/10"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    resetTournament();
+                    setResetTournamentModalOpen(false);
+                  }}
+                  className="cursor-pointer rounded-lg border border-red-400/50 bg-red-800/80 px-4 py-2.5 text-sm font-medium text-red-100 shadow-sm transition-colors hover:bg-red-700/80"
+                  aria-label="Confirm reset match scores"
+                >
+                  Reset Match Scores
+                </button>
+              </div>
+            </Modal>
             <Modal
               open={resetBracketsModalOpen}
               onClose={() => setResetBracketsModalOpen(false)}
