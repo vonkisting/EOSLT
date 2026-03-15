@@ -90,6 +90,12 @@ export function HomeBracketCards() {
     (settings as Record<string, unknown>).leagueName &&
     (settings as Record<string, unknown>).season;
 
+  const tournamentStarted =
+    settings && typeof settings === "object" && (settings as Record<string, unknown>).tournamentStarted === true;
+  const tournamentPaused =
+    settings && typeof settings === "object" && (settings as Record<string, unknown>).tournamentPaused === true;
+  const tournamentInProgress = tournamentStarted && !tournamentPaused;
+
   const resolveLeagueGuid = useCallback(
     async (leagueName: string, season: string) => {
       const res = await fetch(
@@ -403,7 +409,11 @@ export function HomeBracketCards() {
               <h2 className="text-lg font-semibold tracking-tight text-blue-100">
                 {getLocationName(key)}
               </h2>
-              {linkedName && getMyMatchInCard(index) !== null && (
+              {linkedName &&
+                getMyMatchInCard(index) !== null &&
+                (getMyMatchStatusRaw(index) === "Paused" ||
+                  getMyMatchStatusRaw(index) === "Paused..." ||
+                  (tournamentInProgress && getMyMatchStatusRaw(index) !== "Completed")) && (
                 <div className="flex shrink-0 items-center gap-3">
                   {getMyMatchStatusRaw(index) !== "Completed" &&
                     (getMyMatchStatusRaw(index) === "Paused" || getMyMatchStatusRaw(index) === "Paused..." ? (
@@ -418,7 +428,7 @@ export function HomeBracketCards() {
                       >
                         Resume Match
                       </button>
-                    ) : (
+                    ) : tournamentInProgress ? (
                       <button
                         type="button"
                         onClick={() => {
@@ -440,7 +450,7 @@ export function HomeBracketCards() {
                       >
                         Live Score My Match
                       </button>
-                    ))}
+                    ) : null)}
                 </div>
               )}
             </div>

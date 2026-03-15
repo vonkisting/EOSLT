@@ -106,10 +106,23 @@ export function LiveScoringCard({
   );
   const setDashboardSettings = useMutation(api.dashboardSettings.set);
 
+  const tournamentStarted =
+    settings && typeof settings === "object" && (settings as Record<string, unknown>).tournamentStarted === true;
+  const tournamentPaused =
+    settings && typeof settings === "object" && (settings as Record<string, unknown>).tournamentPaused === true;
+  const tournamentInProgress = tournamentStarted && !tournamentPaused;
+
+  useEffect(() => {
+    if (settings === undefined) return;
+    if (!tournamentInProgress) router.replace("/");
+  }, [settings, tournamentInProgress, router]);
+
   const [player1Scores, setPlayer1Scores] = useState<string[]>(() => [...EMPTY_ROW]);
   const [player2Scores, setPlayer2Scores] = useState<string[]>(() => [...EMPTY_ROW]);
   /** Last raw JSON we synced from Convex for this card/match so we only update state when Convex value actually changes (real-time sync across clients). */
   const lastSyncedRawRef = useRef<string | null>(null);
+  /** When true, the next save effect run should skip writing (state was just set from a remote sync to avoid ping-pong). */
+  const skipNextSaveRef = useRef(false);
 
   useEffect(() => {
     lastSyncedRawRef.current = null;
@@ -123,6 +136,7 @@ export function LiveScoringCard({
     if (typeof raw === "string") {
       if (raw === lastSyncedRawRef.current) return;
       lastSyncedRawRef.current = raw;
+      skipNextSaveRef.current = true;
       try {
         const parsed = JSON.parse(raw) as { p1?: unknown[]; p2?: unknown[] };
         if (
@@ -180,6 +194,10 @@ export function LiveScoringCard({
 
   useEffect(() => {
     if (!email || !settings || typeof settings !== "object" || !validCard || !validMatch) return;
+    if (skipNextSaveRef.current) {
+      skipNextSaveRef.current = false;
+      return;
+    }
     const key = cardIndex * 6 + matchIndex;
     const s = settings as Record<string, unknown>;
     const { total1, total2 } = sumScoresWhenBothPresent(player1Scores, player2Scores);
