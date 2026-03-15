@@ -2,6 +2,8 @@ import { auth } from "@/auth";
 import { ProfileCard } from "@/components/profile/ProfileCard";
 import { redirect } from "next/navigation";
 
+export const dynamic = "force-dynamic";
+
 /**
  * Protected profile page. Redirects unauthenticated users to sign-in.
  */

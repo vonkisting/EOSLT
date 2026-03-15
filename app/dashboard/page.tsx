@@ -3,6 +3,8 @@ import { DashboardContent } from "@/components/dashboard/DashboardContent";
 import { canAccessDashboard } from "@/lib/dashboard-access";
 import { redirect } from "next/navigation";
 
+export const dynamic = "force-dynamic";
+
 /**
  * Protected dashboard page. Only the allowed email can access; others are redirected.
  * Unauthenticated users are sent to sign-in.

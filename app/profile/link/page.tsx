@@ -2,6 +2,8 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { LinkPlayerList } from "@/components/profile/LinkPlayerList";
 
+export const dynamic = "force-dynamic";
+
 /**
  * Link account to a PoolHub player name. Lists the same players as the dashboard
  * with a Link button; already-linked players do not show the button.

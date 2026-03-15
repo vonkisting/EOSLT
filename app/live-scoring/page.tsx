@@ -1,5 +1,7 @@
 import { LiveScoringCard } from "@/components/live-scoring/LiveScoringCard";
 
+export const dynamic = "force-dynamic";
+
 /**
  * Live scoring page. Reached after "Start Live Scoring" from a matchup modal.
  * Query params: card (0–7), match (0–5). Header shows the two players and avatars.
