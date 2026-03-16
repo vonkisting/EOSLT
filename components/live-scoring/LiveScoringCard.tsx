@@ -391,12 +391,28 @@ export function LiveScoringCard({
     return v1 !== "" && v2 !== "";
   }, [singleWinnerName, player1Name, player2Name, player1RaceTo, player2RaceTo, player1Scores, player2Scores]);
 
+  const winningBallDelayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
-    if (singleWinnerName != null && !legalWinConfirmed && winningGameHasBothScores) {
-      setLegalWinModalOpen(true);
-    } else if (!winningGameHasBothScores) {
+    if (!winningGameHasBothScores) {
+      if (winningBallDelayRef.current != null) {
+        clearTimeout(winningBallDelayRef.current);
+        winningBallDelayRef.current = null;
+      }
       setLegalWinModalOpen(false);
+      return;
     }
+    if (singleWinnerName == null || legalWinConfirmed) return;
+    winningBallDelayRef.current = setTimeout(() => {
+      winningBallDelayRef.current = null;
+      setLegalWinModalOpen(true);
+    }, 5000);
+    return () => {
+      if (winningBallDelayRef.current != null) {
+        clearTimeout(winningBallDelayRef.current);
+        winningBallDelayRef.current = null;
+      }
+    };
   }, [singleWinnerName, legalWinConfirmed, winningGameHasBothScores]);
 
   const handleScoreChange = useCallback(
@@ -407,7 +423,7 @@ export function LiveScoringCard({
         return;
       }
       const num = parseInt(digitsOnly, 10);
-      if (num > 10) {
+      if (num > 10 || num === 8 || num === 9) {
         updateScore(playerIndex, gameIndex, "");
         return;
       }
