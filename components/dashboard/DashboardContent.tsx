@@ -831,10 +831,10 @@ export function DashboardContent() {
             <Modal
               open={resetTournamentModalOpen}
               onClose={() => setResetTournamentModalOpen(false)}
-              title="Reset tournament?"
+              title="Reset Match Scores?"
             >
               <p className="mb-6 text-slate-200">
-                Are you sure you want to reset the tournament? All scores will be reset, but the bracket will remain the same.
+                All match scores will be cleared. The bracket and player assignments will stay the same. This cannot be undone.
               </p>
               <div className="flex flex-wrap justify-end gap-3">
                 <button

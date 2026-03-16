@@ -324,19 +324,38 @@ export function LiveScoringCard({
     [player1Scores, player2Scores]
   );
 
-  const totalsReached = useMemo(
+  const [legalWinConfirmed, setLegalWinConfirmed] = useState(false);
+  const [requireStrictExceedPlayer1, setRequireStrictExceedPlayer1] = useState(false);
+  const [requireStrictExceedPlayer2, setRequireStrictExceedPlayer2] = useState(false);
+  const [legalWinModalOpen, setLegalWinModalOpen] = useState(false);
+
+  useEffect(() => {
+    setLegalWinConfirmed(false);
+  }, [total1, total2]);
+
+  const p1Won = useMemo(
     () =>
-      (player1RaceTo != null && total1 >= player1RaceTo) ||
-      (player2RaceTo != null && total2 >= player2RaceTo),
-    [player1RaceTo, player2RaceTo, total1, total2]
+      player1RaceTo != null &&
+      (requireStrictExceedPlayer1 ? total1 > player1RaceTo : total1 >= player1RaceTo),
+    [player1RaceTo, total1, requireStrictExceedPlayer1]
+  );
+  const p2Won = useMemo(
+    () =>
+      player2RaceTo != null &&
+      (requireStrictExceedPlayer2 ? total2 > player2RaceTo : total2 >= player2RaceTo),
+    [player2RaceTo, total2, requireStrictExceedPlayer2]
   );
 
-  const bothHaveWinningTotals = useMemo(
-    () =>
-      (player1RaceTo != null && total1 >= player1RaceTo) &&
-      (player2RaceTo != null && total2 >= player2RaceTo),
-    [player1RaceTo, player2RaceTo, total1, total2]
+  const totalsReached = useMemo(() => p1Won || p2Won, [p1Won, p2Won]);
+  const bothHaveWinningTotals = useMemo(() => p1Won && p2Won, [p1Won, p2Won]);
+  const singleWinnerName = useMemo(
+    () => (p1Won && !p2Won ? player1Name : p2Won && !p1Won ? player2Name : null),
+    [p1Won, p2Won, player1Name, player2Name]
   );
+
+  useEffect(() => {
+    if (singleWinnerName != null && !legalWinConfirmed) setLegalWinModalOpen(true);
+  }, [singleWinnerName, legalWinConfirmed]);
 
   const handleScoreChange = useCallback(
     (playerIndex: 0 | 1, gameIndex: number, value: string) => {
@@ -372,21 +391,19 @@ export function LiveScoringCard({
     const green = "bg-green-500 text-white font-semibold";
     const pink = "bg-pink-500 text-white font-semibold";
     const neutral = "font-semibold text-black";
-    const p1Reached = player1RaceTo != null && total1 >= player1RaceTo;
-    const p2Reached = player2RaceTo != null && total2 >= player2RaceTo;
-    if (p1Reached) {
+    if (p1Won) {
       return { total1CellClass: `${base} ${green}`, total2CellClass: `${base} ${pink}` };
     }
-    if (p2Reached) {
+    if (p2Won) {
       return { total1CellClass: `${base} ${pink}`, total2CellClass: `${base} ${green}` };
     }
     return { total1CellClass: `${base} ${neutral}`, total2CellClass: `${base} ${neutral}` };
-  }, [player1RaceTo, player2RaceTo, total1, total2]);
+  }, [p1Won, p2Won]);
 
-  /** Allow submit when one player has reached their goes to and not both (only one winner). */
+  /** Allow submit when one player has won (under strict rule if set), not both, and user confirmed legal win. */
   const canSubmitScores = useMemo(
-    () => totalsReached && !bothHaveWinningTotals,
-    [totalsReached, bothHaveWinningTotals]
+    () => totalsReached && !bothHaveWinningTotals && legalWinConfirmed,
+    [totalsReached, bothHaveWinningTotals, legalWinConfirmed]
   );
 
   const [submitSuccessModalOpen, setSubmitSuccessModalOpen] = useState(false);
@@ -417,14 +434,12 @@ export function LiveScoringCard({
                   <div className="min-w-0 flex-1 basis-0 text-center">
                     <p
                       className={
-                        player1RaceTo != null && total1 >= player1RaceTo
+                        p1Won
                           ? "break-words text-sm font-semibold text-yellow-400 sm:text-base"
                           : "break-words text-sm font-semibold text-white sm:text-base"
                       }
                     >
-                      {player1RaceTo != null && total1 >= player1RaceTo
-                        ? `${player1Name} Wins!!!`
-                        : player1Name}
+                      {p1Won ? `${player1Name} Wins!!!` : player1Name}
                     </p>
                     <p className="mt-1 bg-gradient-to-r from-cyan-400 via-teal-400 to-blue-500 bg-clip-text text-3xl font-medium tabular-nums text-transparent">
                       {player1RaceTo != null ? player1RaceTo : "—"}
@@ -436,14 +451,12 @@ export function LiveScoringCard({
                   <div className="min-w-0 flex-1 basis-0 text-center">
                     <p
                       className={
-                        player2RaceTo != null && total2 >= player2RaceTo
+                        p2Won
                           ? "break-words text-sm font-semibold text-yellow-400 sm:text-base"
                           : "break-words text-sm font-semibold text-white sm:text-base"
                       }
                     >
-                      {player2RaceTo != null && total2 >= player2RaceTo
-                        ? `${player2Name} Wins!!!`
-                        : player2Name}
+                      {p2Won ? `${player2Name} Wins!!!` : player2Name}
                     </p>
                     <p className="mt-1 bg-gradient-to-r from-cyan-400 via-teal-400 to-blue-500 bg-clip-text text-3xl font-medium tabular-nums text-transparent">
                       {player2RaceTo != null ? player2RaceTo : "—"}
@@ -460,25 +473,21 @@ export function LiveScoringCard({
                       </th>
                       <th
                         className={
-                          player1RaceTo != null && total1 >= player1RaceTo
+                          p1Won
                             ? "border border-slate-600 px-3 py-2.5 text-center font-bold text-yellow-400"
                             : "border border-slate-600 px-3 py-2.5 text-center font-bold text-white"
                         }
                       >
-                        {player1RaceTo != null && total1 >= player1RaceTo
-                          ? `${player1Name} Wins!!!`
-                          : player1Name}
+                        {p1Won ? `${player1Name} Wins!!!` : player1Name}
                       </th>
                       <th
                         className={
-                          player2RaceTo != null && total2 >= player2RaceTo
+                          p2Won
                             ? "border border-slate-600 px-3 py-2.5 text-center font-bold text-yellow-400"
                             : "border border-slate-600 px-3 py-2.5 text-center font-bold text-white"
                         }
                       >
-                        {player2RaceTo != null && total2 >= player2RaceTo
-                          ? `${player2Name} Wins!!!`
-                          : player2Name}
+                        {p2Won ? `${player2Name} Wins!!!` : player2Name}
                       </th>
                     </tr>
                   </thead>
@@ -578,6 +587,39 @@ export function LiveScoringCard({
           )}
         </div>
       </div>
+      <Modal
+        open={legalWinModalOpen}
+        onClose={() => setLegalWinModalOpen(false)}
+        title="Confirm winning ball"
+      >
+        <p className="mb-6 text-slate-200">
+          Was the winning ball made legally by {singleWinnerName ?? "the winner"}?
+        </p>
+        <div className="flex flex-wrap justify-end gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              setLegalWinModalOpen(false);
+              if (singleWinnerName === player1Name) setRequireStrictExceedPlayer1(true);
+              else if (singleWinnerName === player2Name) setRequireStrictExceedPlayer2(true);
+            }}
+            className="cursor-pointer rounded-lg border border-white/20 bg-transparent px-4 py-2.5 text-sm font-medium text-slate-200 transition-colors hover:bg-white/10"
+          >
+            No
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setLegalWinConfirmed(true);
+              setLegalWinModalOpen(false);
+            }}
+            className="cursor-pointer rounded-lg border border-emerald-400/50 bg-emerald-800/80 px-4 py-2.5 text-sm font-medium text-emerald-100 shadow-sm transition-colors hover:bg-emerald-700/80"
+            aria-label="Yes, winning ball was legal"
+          >
+            Yes
+          </button>
+        </div>
+      </Modal>
       <Modal
         open={submitSuccessModalOpen}
         onClose={() => {
