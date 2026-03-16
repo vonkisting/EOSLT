@@ -54,6 +54,32 @@ function sumScoresWhenBothPresent(
   return { total1, total2 };
 }
 
+/**
+ * Index of the first game where this player's running total (only counting games
+ * with both scores) reaches >= raceTo. Returns null if never reached or raceTo is null.
+ * The game at this index is the "winning game"; we only show the legal-win modal
+ * when that game has both players' scores.
+ */
+function getWinningGameIndex(
+  row1: string[],
+  row2: string[],
+  raceTo: number | null,
+  forPlayer1: boolean
+): number | null {
+  if (raceTo == null) return null;
+  let sum = 0;
+  for (let i = 0; i < row1.length; i++) {
+    const v1 = (row1[i] ?? "").trim();
+    const v2 = (row2[i] ?? "").trim();
+    if (v1 !== "" && v2 !== "") {
+      const n = forPlayer1 ? parseInt(v1, 10) : parseInt(v2, 10);
+      sum += Number.isNaN(n) ? 0 : n;
+      if (sum >= raceTo) return i;
+    }
+  }
+  return null;
+}
+
 /** True iff every game row with both values has exactly one player at 10. */
 function allGameRowsValid(row1: string[], row2: string[]): boolean {
   for (let i = 0; i < row1.length; i++) {
@@ -353,9 +379,25 @@ export function LiveScoringCard({
     [p1Won, p2Won, player1Name, player2Name]
   );
 
+  /** Only show winning-ball confirmation when the game that put the winner's total >= raceTo has both players' scores. */
+  const winningGameHasBothScores = useMemo(() => {
+    if (singleWinnerName == null) return false;
+    const forPlayer1 = singleWinnerName === player1Name;
+    const raceTo = forPlayer1 ? player1RaceTo : player2RaceTo;
+    const idx = getWinningGameIndex(player1Scores, player2Scores, raceTo, forPlayer1);
+    if (idx == null) return false;
+    const v1 = (player1Scores[idx] ?? "").trim();
+    const v2 = (player2Scores[idx] ?? "").trim();
+    return v1 !== "" && v2 !== "";
+  }, [singleWinnerName, player1Name, player2Name, player1RaceTo, player2RaceTo, player1Scores, player2Scores]);
+
   useEffect(() => {
-    if (singleWinnerName != null && !legalWinConfirmed) setLegalWinModalOpen(true);
-  }, [singleWinnerName, legalWinConfirmed]);
+    if (singleWinnerName != null && !legalWinConfirmed && winningGameHasBothScores) {
+      setLegalWinModalOpen(true);
+    } else if (!winningGameHasBothScores) {
+      setLegalWinModalOpen(false);
+    }
+  }, [singleWinnerName, legalWinConfirmed, winningGameHasBothScores]);
 
   const handleScoreChange = useCallback(
     (playerIndex: 0 | 1, gameIndex: number, value: string) => {
