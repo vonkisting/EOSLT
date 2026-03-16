@@ -484,19 +484,9 @@ export function LiveScoringCard({
           ) : (
             <>
               <header
-                className="relative rounded-xl border border-white/10 bg-gradient-to-br from-[#020c1b] via-[#1e3a5f] to-[#020c1b] px-6 py-6 shadow-lg"
+                className="rounded-xl border border-white/10 bg-gradient-to-br from-[#020c1b] via-[#1e3a5f] to-[#020c1b] px-6 py-6 shadow-lg"
                 aria-label="Matchup"
               >
-                <button
-                  type="button"
-                  onClick={() => router.push("/")}
-                  className="absolute right-3 top-3 rounded-lg p-1.5 text-red-400 transition-colors hover:bg-red-500/20 hover:text-red-300 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-2 focus:ring-offset-[#020c1b]"
-                  aria-label="Exit live scoring and return home"
-                >
-                  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
                 <div className="flex flex-wrap items-center justify-between gap-8 sm:gap-12">
                   <div className="min-w-0 flex-1 basis-0 text-center">
                     <p
@@ -638,6 +628,14 @@ export function LiveScoringCard({
                       Submit Scores
                     </button>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => router.push("/")}
+                    className="rounded-lg bg-gradient-to-r from-red-700 to-red-500 px-5 py-2.5 font-semibold text-white shadow transition-opacity hover:from-red-600 hover:to-red-400 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-2 focus:ring-offset-slate-800"
+                    aria-label="Exit live scoring and return home"
+                  >
+                    Exit
+                  </button>
                 </div>
               </div>
             </>
