@@ -406,7 +406,7 @@ export function LiveScoringCard({
     winningBallDelayRef.current = setTimeout(() => {
       winningBallDelayRef.current = null;
       setLegalWinModalOpen(true);
-    }, 5000);
+    }, 3000);
     return () => {
       if (winningBallDelayRef.current != null) {
         clearTimeout(winningBallDelayRef.current);
