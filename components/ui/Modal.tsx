@@ -12,11 +12,18 @@ export function Modal({
   onClose,
   title,
   children,
+  hideCloseButton = false,
+  closeOnEscape = true,
+  closeOnBackdropClick = true,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   children: React.ReactNode;
+  /** When true, the X button is hidden; user must use actions inside the modal (e.g. Yes/No). */
+  hideCloseButton?: boolean;
+  closeOnEscape?: boolean;
+  closeOnBackdropClick?: boolean;
 }) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const id = useId();
@@ -25,7 +32,7 @@ export function Modal({
   useEffect(() => {
     if (!open) return;
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && closeOnEscape) onClose();
     };
     document.addEventListener("keydown", handleEscape);
     document.body.style.overflow = "hidden";
@@ -33,7 +40,7 @@ export function Modal({
       document.removeEventListener("keydown", handleEscape);
       document.body.style.overflow = "";
     };
-  }, [open, onClose]);
+  }, [open, onClose, closeOnEscape]);
 
   useEffect(() => {
     if (open && overlayRef.current) {
@@ -56,7 +63,7 @@ export function Modal({
     >
       <div
         className="absolute inset-0 bg-black/80"
-        onClick={onClose}
+        onClick={closeOnBackdropClick ? onClose : undefined}
         aria-hidden="true"
       />
       <div className="relative flex min-h-full items-center justify-center">
@@ -64,23 +71,25 @@ export function Modal({
           className="relative my-8 w-full max-w-md shrink-0 rounded-2xl border border-white/10 bg-[#2A204A]/95 p-6 shadow-2xl shadow-purple-950/50 backdrop-blur-md"
           onClick={(e) => e.stopPropagation()}
         >
-        <div className="mb-4 flex items-center justify-between">
+        <div className={`mb-4 flex items-center ${hideCloseButton ? "" : "justify-between"}`}>
           <h2
             id={titleId}
             className="text-xl font-semibold text-white"
           >
             {title}
           </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-1 text-slate-400 hover:bg-white/10 hover:text-white transition-colors"
-            aria-label="Close"
-          >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          {!hideCloseButton && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg p-1 text-slate-400 hover:bg-white/10 hover:text-white transition-colors"
+              aria-label="Close"
+            >
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
         </div>
         {children}
         </div>
