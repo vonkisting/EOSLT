@@ -22,10 +22,10 @@ export default async function AuthLandingPage() {
     session.user.image ?? undefined
   );
   if (!email) {
-    redirect("/profile");
+    redirect("/auth/welcome?next=/profile");
   }
   if (canAccessDashboard(email)) {
-    redirect("/dashboard");
+    redirect("/auth/welcome?next=/dashboard");
   }
   let hasPoolHubLink = false;
   try {
@@ -35,7 +35,7 @@ export default async function AuthLandingPage() {
     // Convex unavailable or lookup failed → treat as no link, send to Profile
   }
   if (hasPoolHubLink) {
-    redirect("/");
+    redirect("/auth/welcome?next=/");
   }
-  redirect("/profile");
+  redirect("/auth/welcome?next=/profile");
 }

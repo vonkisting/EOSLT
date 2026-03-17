@@ -34,7 +34,7 @@ export function SignInModal() {
         }
         await registerAction(formData);
         setOpen(false);
-        router.push("/profile");
+        router.push("/auth/welcome?next=/profile");
       } else {
         const result = await signInWithCredentialsAction(formData);
         if (result?.error) {
