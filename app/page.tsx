@@ -1,4 +1,5 @@
 import { HomeBracketCards } from "@/components/HomeBracketCards";
+import { BracketErrorBoundary } from "@/components/BracketErrorBoundary";
 
 /** Avoid prerender at build time so Convex useQuery runs only when ConvexProvider is available (request-time or client). */
 export const dynamic = "force-dynamic";
@@ -10,7 +11,9 @@ export const dynamic = "force-dynamic";
 export default function HomePage() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
-      <HomeBracketCards />
+      <BracketErrorBoundary>
+        <HomeBracketCards />
+      </BracketErrorBoundary>
     </div>
   );
 }

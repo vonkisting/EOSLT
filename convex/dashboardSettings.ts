@@ -19,13 +19,18 @@ const uiCollapsedKeys = [
 /**
  * Get public tournament state for the home page (no auth). Returns the first
  * dashboard settings document so unauthenticated users see the same bracket/no-tournament as everyone else.
+ * Returns null on any error so the client never sees a Convex server error.
  */
 export const getPublic = query({
   args: {},
   handler: async (ctx) => {
-    const doc = await ctx.db.query("dashboardSettings").first();
-    if (!doc) return null;
-    return mapDocToSettings(doc);
+    try {
+      const doc = await ctx.db.query("dashboardSettings").first();
+      if (!doc) return null;
+      return mapDocToSettings(doc);
+    } catch {
+      return null;
+    }
   },
 });
 
