@@ -549,50 +549,55 @@ export function LiveScoringCard({
                     </tr>
                   </thead>
                   <tbody className="bg-white text-black">
-                    {Array.from({ length: GAME_COUNT }, (_, i) => (
-                      <Fragment key={i}>
-                        <tr>
-                          <td className="whitespace-nowrap border border-slate-300 px-3 py-1.5 font-medium">
-                            Game {i + 1}
-                          </td>
-                          <td className="border border-slate-300 p-0">
-                            <input
-                              type="text"
-                              inputMode="numeric"
-                              value={player1Scores[i]}
-                              onChange={(e) => handleScoreChange(0, i, e.target.value)}
-                              onBlur={() => handleScoreBlur(i)}
-                              disabled={totalsReached && (player1Scores[i] ?? "").trim() === ""}
-                              className="w-full min-w-[2.5rem] border-0 bg-white px-2 py-1.5 text-center text-black outline-none focus:ring-1 focus:ring-inset focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
-                              aria-label={`Game ${i + 1} ${player1Name}`}
-                            />
-                          </td>
-                          <td className="border border-slate-300 p-0">
-                            <input
-                              type="text"
-                              inputMode="numeric"
-                              value={player2Scores[i]}
-                              onChange={(e) => handleScoreChange(1, i, e.target.value)}
-                              onBlur={() => handleScoreBlur(i)}
-                              disabled={totalsReached && (player2Scores[i] ?? "").trim() === ""}
-                              className="w-full min-w-[2.5rem] border-0 bg-white px-2 py-1.5 text-center text-black outline-none focus:ring-1 focus:ring-inset focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
-                              aria-label={`Game ${i + 1} ${player2Name}`}
-                            />
-                          </td>
-                        </tr>
-                        {(() => {
-                          if (totalsReached) return null;
-                          const msg = getGameRowErrorMessage(player1Scores, player2Scores, i);
-                          return msg ? (
-                            <tr>
-                              <td colSpan={3} className="border border-slate-300 bg-red-50 px-3 py-1.5 text-center text-sm font-medium text-red-600">
-                                Game {i + 1}: {msg}
-                              </td>
-                            </tr>
-                          ) : null;
-                        })()}
-                      </Fragment>
-                    ))}
+                    {Array.from({ length: GAME_COUNT }, (_, i) => {
+                      const hasAnyValue =
+                        (player1Scores[i] ?? "").trim() !== "" || (player2Scores[i] ?? "").trim() !== "";
+                      if (totalsReached && !hasAnyValue) return null;
+                      return (
+                        <Fragment key={i}>
+                          <tr>
+                            <td className="whitespace-nowrap border border-slate-300 px-3 py-1.5 font-medium">
+                              Game {i + 1}
+                            </td>
+                            <td className="border border-slate-300 p-0">
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                value={player1Scores[i]}
+                                onChange={(e) => handleScoreChange(0, i, e.target.value)}
+                                onBlur={() => handleScoreBlur(i)}
+                                disabled={totalsReached && (player1Scores[i] ?? "").trim() === ""}
+                                className="w-full min-w-[2.5rem] border-0 bg-white px-2 py-1.5 text-center text-black outline-none focus:ring-1 focus:ring-inset focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
+                                aria-label={`Game ${i + 1} ${player1Name}`}
+                              />
+                            </td>
+                            <td className="border border-slate-300 p-0">
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                value={player2Scores[i]}
+                                onChange={(e) => handleScoreChange(1, i, e.target.value)}
+                                onBlur={() => handleScoreBlur(i)}
+                                disabled={totalsReached && (player2Scores[i] ?? "").trim() === ""}
+                                className="w-full min-w-[2.5rem] border-0 bg-white px-2 py-1.5 text-center text-black outline-none focus:ring-1 focus:ring-inset focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
+                                aria-label={`Game ${i + 1} ${player2Name}`}
+                              />
+                            </td>
+                          </tr>
+                          {(() => {
+                            if (totalsReached) return null;
+                            const msg = getGameRowErrorMessage(player1Scores, player2Scores, i);
+                            return msg ? (
+                              <tr>
+                                <td colSpan={3} className="border border-slate-300 bg-red-50 px-3 py-1.5 text-center text-sm font-medium text-red-600">
+                                  Game {i + 1}: {msg}
+                                </td>
+                              </tr>
+                            ) : null;
+                          })()}
+                        </Fragment>
+                      );
+                    })}
                   </tbody>
                   <tfoot>
                     <tr className="bg-slate-100 text-black">
@@ -616,14 +621,16 @@ export function LiveScoringCard({
                   </p>
                 )}
                 <div className="flex justify-center gap-3">
-                  {canSubmitScores && (
+                  {totalsReached && !bothHaveWinningTotals && (
                     <button
                       type="button"
                       onClick={() => {
+                        if (!canSubmitScores) return;
                         updateMatchStatus("Completed");
                         setSubmitSuccessModalOpen(true);
                       }}
-                      className="rounded-lg bg-gradient-to-r from-blue-700 to-blue-500 px-5 py-2.5 font-semibold text-white shadow transition-opacity hover:from-blue-600 hover:to-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-800"
+                      disabled={!legalWinConfirmed}
+                      className="rounded-lg bg-gradient-to-r from-blue-700 to-blue-500 px-5 py-2.5 font-semibold text-white shadow transition-opacity hover:from-blue-600 hover:to-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-800 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:from-blue-700 disabled:hover:to-blue-500"
                     >
                       Submit Scores
                     </button>
