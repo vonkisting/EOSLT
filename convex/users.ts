@@ -111,6 +111,23 @@ export const setPoolhubPlayerName = mutation({
 });
 
 /**
+ * Delete a single user by id. Used by the dashboard to remove an account from the users list.
+ * Clears the user's PoolHub player link first so that name can be claimed by another user.
+ * Does not remove the user from Auth.js; they may be re-created on next sign-in if using OAuth.
+ */
+export const deleteUser = mutation({
+  args: { userId: v.id("users") },
+  handler: async (ctx, { userId }) => {
+    const user = await ctx.db.get(userId);
+    if (user) {
+      await ctx.db.patch(userId, { poolhubPlayerName: undefined });
+    }
+    await ctx.db.delete(userId);
+    return { deleted: true };
+  },
+});
+
+/**
  * Delete all users (for resetting data). Run from Convex dashboard: Functions → users.deleteAllUsers → Run with {}.
  */
 export const deleteAllUsers = mutation({
