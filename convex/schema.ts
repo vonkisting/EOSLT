@@ -37,6 +37,8 @@ export default defineSchema({
     secondWeekLocation3: v.optional(v.string()),
     secondWeekLocation4: v.optional(v.string()),
     finalsLocation: v.optional(v.string()),
+    /** JSON: Record<locationKey, { startDate: string, startTime: string }>. Keys match LOCATION_KEYS. */
+    locationStartMeta: v.optional(v.string()),
     bracketSlot0: v.optional(v.string()),
     bracketSlot1: v.optional(v.string()),
     bracketSlot2: v.optional(v.string()),
@@ -328,6 +330,12 @@ export default defineSchema({
     liveScoreGames45: v.optional(v.string()),
     liveScoreGames46: v.optional(v.string()),
     liveScoreGames47: v.optional(v.string()),
+    /** Week 2 bracket: 4 cards × 12 slots. JSON: string[48]. */
+    week2BracketSlots: v.optional(v.string()),
+    /** Finals bracket: 4-person, 6 slots. JSON: string[6]. */
+    finalsBracketSlots: v.optional(v.string()),
+    /** Finals bracket scores. JSON: string[6] (same order as slots). */
+    finalsBracketScores: v.optional(v.string()),
     /** Collapsible UI state: restored on reload so sections stay open/closed. */
     uiUsersCardOpen: v.optional(v.boolean()),
     uiLeagueCardOpen: v.optional(v.boolean()),

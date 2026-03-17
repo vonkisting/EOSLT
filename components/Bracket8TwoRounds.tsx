@@ -65,7 +65,7 @@ function optionsForFirstRoundSlot(
  * Single match row with dropdowns for top/bottom names.
  * Slot indices identify which global slot each side uses for selection state.
  */
-function matchStatusClass(status: string | null | undefined): string {
+export function matchStatusClass(status: string | null | undefined): string {
   if (!status) return "";
   if (status === "In Progress...") return "match-status-in-progress";
   if (status === "Paused" || status === "Paused...") return "match-status-paused";
@@ -73,7 +73,7 @@ function matchStatusClass(status: string | null | undefined): string {
   return "";
 }
 
-function MatchWithDropdowns({
+export function MatchWithDropdowns({
   winner,
   topSlotIndex,
   bottomSlotIndex,
@@ -199,7 +199,7 @@ function MatchWithDropdowns({
  * Each matchup side has a dropdown; selecting a player removes them from other dropdowns.
  */
 /** Matches unnumbered or numbered bye labels (dashboard uses "-- Bye --", we display "-- Bye N --"). */
-function isBye(name: string): boolean {
+export function isBye(name: string): boolean {
   return (
     name === "-- Bye --" ||
     name === "— Bye —" ||
@@ -325,7 +325,7 @@ export function Bracket8TwoRounds({
       const useGlobalFirstRound =
         cardIndex != null &&
         allFirstRoundSelections != null &&
-        allFirstRoundSelections.length === 64 &&
+        (allFirstRoundSelections.length === 64 || allFirstRoundSelections.length === 32) &&
         slotIndex < FIRST_ROUND_SLOT_COUNT;
       if (useGlobalFirstRound)
         return optionsForFirstRoundSlot(

@@ -7,6 +7,7 @@ import { useSession } from "next-auth/react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Bracket8TwoRounds } from "@/components/Bracket8TwoRounds";
+import { formatLocationDate, formatLocationTime } from "@/lib/formatDateTime";
 
 const PLAYER_SLOTS = 64;
 const BYE_LABEL = "-- Bye --";
@@ -226,6 +227,38 @@ export function HomeBracketCards() {
     [settings]
   );
 
+  const getLocationStartDate = useCallback(
+    (key: (typeof WEEK_1_LOCATION_KEYS)[number]) => {
+      if (!settings || typeof settings !== "object") return "";
+      const raw = (settings as Record<string, unknown>).locationStartMeta;
+      if (typeof raw !== "string" || !raw.trim()) return "";
+      try {
+        const meta = JSON.parse(raw) as Record<string, { startDate?: string }>;
+        const entry = meta[key];
+        return (entry && typeof entry.startDate === "string") ? entry.startDate : "";
+      } catch {
+        return "";
+      }
+    },
+    [settings]
+  );
+
+  const getLocationStartTime = useCallback(
+    (key: (typeof WEEK_1_LOCATION_KEYS)[number]) => {
+      if (!settings || typeof settings !== "object") return "";
+      const raw = (settings as Record<string, unknown>).locationStartMeta;
+      if (typeof raw !== "string" || !raw.trim()) return "";
+      try {
+        const meta = JSON.parse(raw) as Record<string, { startTime?: string }>;
+        const entry = meta[key];
+        return (entry && typeof entry.startTime === "string") ? entry.startTime : "";
+      } catch {
+        return "";
+      }
+    },
+    [settings]
+  );
+
   const getInitialSlotsForCard = useCallback(
     (cardIndex: number) => {
       if (!settings || typeof settings !== "object") return undefined;
@@ -405,11 +438,14 @@ export function HomeBracketCards() {
             key={key}
             className="w-full min-w-0 max-w-[600px] overflow-hidden rounded-xl border border-white/40 bg-black text-foreground sm:min-w-[555px]"
           >
-            <div className="flex min-h-14 w-full flex-shrink-0 items-center justify-between gap-3 rounded-t-xl bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 px-5 py-4">
-              <h2 className="text-lg font-semibold tracking-tight text-blue-100">
-                {getLocationName(key)}
-              </h2>
-              {linkedName &&
+            <div className="flex min-h-14 w-full flex-shrink-0 flex-col gap-1 rounded-t-xl bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 px-5 py-4">
+              <div className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-3">
+                <div />
+                <h2 className="min-w-0 truncate pb-2 text-center text-[1.6875rem] font-semibold tracking-tight text-yellow-400">
+                  {getLocationName(key)}
+                </h2>
+                <div className="flex justify-end">
+                {linkedName &&
                 getMyMatchInCard(index) !== null &&
                 (getMyMatchStatusRaw(index) === "Paused" ||
                   getMyMatchStatusRaw(index) === "Paused..." ||
@@ -453,8 +489,19 @@ export function HomeBracketCards() {
                     ) : null)}
                 </div>
               )}
+                </div>
+              </div>
+              <div className="grid w-full grid-cols-3 items-center gap-2 border-t border-white/30 pt-3 text-sm font-medium text-blue-100/90">
+                <span className="text-left">Week 1</span>
+                <span className="text-center">
+                  {formatLocationDate(getLocationStartDate(key)) || "—"}
+                </span>
+                <span className="text-right">
+                  {formatLocationTime(getLocationStartTime(key)) || "—"}
+                </span>
+              </div>
             </div>
-            <div className="min-h-0 overflow-auto rounded-b-xl border-t border-white/40 bg-black pt-4 pl-4">
+            <div className="min-h-0 overflow-auto rounded-b-xl border-t border-white/40 bg-black pb-4 pt-4 pl-4">
               <Bracket8TwoRounds
                 players={playerDisplayNames}
                 playerRaceToMap={playerRaceToMap}

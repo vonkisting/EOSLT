@@ -13,7 +13,7 @@ export async function Header() {
   const showDashboardLink = canAccessDashboard(session?.user?.email);
 
   return (
-    <header className="sticky top-0 z-50">
+    <header className="sticky top-0 z-50 w-full">
       <div className="flex h-14 w-full items-center justify-between gap-4 border-b border-white/10 bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 px-4 shadow-lg sm:px-6">
         <Link
           href="/"

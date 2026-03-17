@@ -8,6 +8,76 @@
   background: #000;
 }
 
+/* 4-person bracket (e.g. Finals): same sizing and styling as bracket-8-two-rounds (Week 2 cards) */
+.home-bracket-root.bracket-4 {
+  min-height: 0;
+}
+.home-bracket-root.bracket-4 .theme {
+  position: static;
+  height: auto;
+}
+.home-bracket-root.bracket-4 .match {
+  width: 243px;
+  min-width: 243px;
+  max-width: 243px;
+  margin-top: 5px;
+  margin-bottom: 5px;
+}
+.home-bracket-root.bracket-4 .column:last-child .match {
+  margin-right: 15px;
+}
+/* Score cell: same width as race cell (30px) for consistent look */
+.home-bracket-root.bracket-4 .match .team .score,
+.home-bracket-root.bracket-4 .match .team .score-input {
+  width: 30px;
+  min-width: 30px;
+  max-width: 30px;
+  padding: 0 4px;
+  box-sizing: border-box;
+}
+.home-bracket-root.bracket-4 .bracket-slot-select {
+  width: 173px;
+  min-width: 173px;
+  max-width: 173px;
+  flex: 0 0 173px;
+  margin: 0 4px;
+  padding: 2px 6px;
+  font: inherit;
+  font-size: 13px;
+  text-transform: capitalize;
+  letter-spacing: 0.5px;
+  color: rgba(255, 255, 255, 0.7);
+  background-color: #000;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
+  cursor: pointer;
+}
+.home-bracket-root.bracket-4 .bracket-slot-select:not(.slot-filled) {
+  color: #9ca3af;
+  text-transform: capitalize;
+}
+.home-bracket-root.bracket-4 .bracket-slot-select:focus {
+  outline: none;
+  border-color: #60a5fa;
+}
+.home-bracket-root.bracket-4 .match .team.slot-filled {
+  background: linear-gradient(
+    135deg,
+    #1e2a3a 0%,
+    #162536 50%,
+    #0f1c2e 100%
+  );
+}
+.home-bracket-root.bracket-4 .bracket-slot-select.slot-filled {
+  background: linear-gradient(
+    135deg,
+    #1e2a3a 0%,
+    #162536 50%,
+    #0f1c2e 100%
+  ) !important;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
 .home-bracket-root .theme {
   height: 100%;
   width: 100%;
@@ -303,6 +373,17 @@
   text-align: center;
   min-width: 30px;
 }
+/* Score cells: same width as race cell (30px) when inside bracket-4 or bracket-8-two-rounds (override theme-dark-trendy) */
+.home-bracket-root.bracket-4 .theme-dark-trendy .match .team .score,
+.home-bracket-root.bracket-4 .theme-dark-trendy .match .team .score-input,
+.home-bracket-root.bracket-8-two-rounds .theme-dark-trendy .match .team .score,
+.home-bracket-root.bracket-8-two-rounds .theme-dark-trendy .match .team .score-input {
+  width: 30px;
+  min-width: 30px;
+  max-width: 30px;
+  padding: 0 4px;
+  box-sizing: border-box;
+}
 .home-bracket-root .theme-dark-trendy .match {
   margin-right: 48px;
 }
@@ -421,10 +502,13 @@
 .home-bracket-root.bracket-8-two-rounds .column:last-child .match {
   margin-right: 15px;
 }
-/* Score cell: same width as home so "10" and other scores are never cut off */
+/* Score cell: same width as race cell (30px) for consistent look */
 .home-bracket-root.bracket-8-two-rounds .match .team .score,
 .home-bracket-root.bracket-8-two-rounds .match .team .score-input {
-  min-width: 36px;
+  width: 30px;
+  min-width: 30px;
+  max-width: 30px;
+  padding: 0 4px;
   box-sizing: border-box;
 }
 /* Dropdown in matchup slot: match team styling */

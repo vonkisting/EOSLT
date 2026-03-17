@@ -38,6 +38,11 @@ export const get = query({
       const val = (doc as Record<string, unknown>)[key];
       out[key] = typeof val === "string" ? val : null;
     }
+    const locationStartMetaRaw = (doc as Record<string, unknown>).locationStartMeta;
+    out.locationStartMeta =
+      typeof locationStartMetaRaw === "string" && locationStartMetaRaw.trim() !== ""
+        ? locationStartMetaRaw
+        : null;
     for (let i = 0; i < 96; i++) {
       const key = `bracketSlot${i}`;
       const val = (doc as Record<string, unknown>)[key];
@@ -60,6 +65,12 @@ export const get = query({
       const val = (doc as Record<string, unknown>)[key];
       out[key] = typeof val === "string" ? val : null;
     }
+    const week2Raw = (doc as Record<string, unknown>).week2BracketSlots;
+    out.week2BracketSlots = typeof week2Raw === "string" ? week2Raw : null;
+    const finalsRaw = (doc as Record<string, unknown>).finalsBracketSlots;
+    out.finalsBracketSlots = typeof finalsRaw === "string" ? finalsRaw : null;
+    const finalsScoresRaw = (doc as Record<string, unknown>).finalsBracketScores;
+    out.finalsBracketScores = typeof finalsScoresRaw === "string" ? finalsScoresRaw : null;
     for (const key of uiCollapsedKeys) {
       const val = (doc as Record<string, unknown>)[key];
       out[key] = val === true;
@@ -70,7 +81,7 @@ export const get = query({
       leagueGuid: string | null;
       tournamentStarted: boolean;
       tournamentPaused: boolean;
-    } & Record<(typeof locationKeys)[number], string | null> & Record<`bracketSlot${number}`, string | null> & Record<`bracketMatchStatus${number}`, string | null> & Record<`bracketScoreTop${number}` | `bracketScoreBottom${number}`, string | null> & Record<`liveScoreGames${number}`, string | null> & Record<(typeof uiCollapsedKeys)[number], boolean>;
+    } & Record<(typeof locationKeys)[number], string | null> & { locationStartMeta: string | null } & Record<`bracketSlot${number}`, string | null> & Record<`bracketMatchStatus${number}`, string | null> & Record<`bracketScoreTop${number}` | `bracketScoreBottom${number}`, string | null> & Record<`liveScoreGames${number}`, string | null> & { week2BracketSlots: string | null; finalsBracketSlots: string | null; finalsBracketScores: string | null } & Record<(typeof uiCollapsedKeys)[number], boolean>;
   },
 });
 
@@ -143,10 +154,14 @@ export const set = mutation({
     tournamentStarted: v.optional(v.boolean()),
     tournamentPaused: v.optional(v.boolean()),
     ...locationArgs,
+    locationStartMeta: v.optional(v.string()),
     ...bracketSlotArgs,
     ...bracketMatchStatusArgs,
     ...bracketScoreArgs,
     ...liveScoreGamesArgs,
+    week2BracketSlots: v.optional(v.string()),
+    finalsBracketSlots: v.optional(v.string()),
+    finalsBracketScores: v.optional(v.string()),
     ...uiCollapsedArgs,
   },
   handler: async (ctx, args) => {
@@ -166,6 +181,9 @@ export const set = mutation({
       const v = (args as Record<string, unknown>)[key];
       if (v !== undefined) (patch as Record<string, string | boolean | undefined>)[key] = (v as string) || undefined;
     }
+    if ((args as Record<string, unknown>).locationStartMeta !== undefined) {
+      (patch as Record<string, string | boolean | undefined>).locationStartMeta = (args as Record<string, unknown>).locationStartMeta as string || undefined;
+    }
     for (const key of bracketSlotKeys) {
       const val = (args as Record<string, unknown>)[key];
       if (val !== undefined) (patch as Record<string, string | boolean | undefined>)[key] = (val as string);
@@ -182,6 +200,12 @@ export const set = mutation({
       const val = (args as Record<string, unknown>)[key];
       if (val !== undefined) (patch as Record<string, string | boolean | undefined>)[key] = (val as string);
     }
+    if ((args as Record<string, unknown>).week2BracketSlots !== undefined)
+      (patch as Record<string, string | boolean | undefined>).week2BracketSlots = (args as Record<string, unknown>).week2BracketSlots as string ?? undefined;
+    if ((args as Record<string, unknown>).finalsBracketSlots !== undefined)
+      (patch as Record<string, string | boolean | undefined>).finalsBracketSlots = (args as Record<string, unknown>).finalsBracketSlots as string ?? undefined;
+    if ((args as Record<string, unknown>).finalsBracketScores !== undefined)
+      (patch as Record<string, string | boolean | undefined>).finalsBracketScores = (args as Record<string, unknown>).finalsBracketScores as string ?? undefined;
     for (const key of uiCollapsedKeys) {
       const val = (args as Record<string, unknown>)[key];
       if (val !== undefined) (patch as Record<string, string | boolean | undefined>)[key] = val as boolean;
@@ -202,6 +226,9 @@ export const set = mutation({
       const v = (args as Record<string, unknown>)[key];
       insert[key] = (v as string) || undefined;
     }
+    if ((args as Record<string, unknown>).locationStartMeta !== undefined) {
+      insert.locationStartMeta = (args as Record<string, unknown>).locationStartMeta as string || undefined;
+    }
     for (const key of bracketSlotKeys) {
       const val = (args as Record<string, unknown>)[key];
       insert[key] = val !== undefined ? (val as string) : undefined;
@@ -218,6 +245,12 @@ export const set = mutation({
       const val = (args as Record<string, unknown>)[key];
       insert[key] = val !== undefined ? (val as string) : undefined;
     }
+    if ((args as Record<string, unknown>).week2BracketSlots !== undefined)
+      insert.week2BracketSlots = (args as Record<string, unknown>).week2BracketSlots as string ?? undefined;
+    if ((args as Record<string, unknown>).finalsBracketSlots !== undefined)
+      insert.finalsBracketSlots = (args as Record<string, unknown>).finalsBracketSlots as string ?? undefined;
+    if ((args as Record<string, unknown>).finalsBracketScores !== undefined)
+      insert.finalsBracketScores = (args as Record<string, unknown>).finalsBracketScores as string ?? undefined;
     for (const key of uiCollapsedKeys) {
       const val = (args as Record<string, unknown>)[key];
       insert[key] = val !== undefined ? (val as boolean) : undefined;

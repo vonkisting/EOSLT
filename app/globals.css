@@ -28,6 +28,18 @@ button,
   cursor: pointer;
 }
 
+/* Dark theme for dashboard inputs (date, time) to match location selects */
+input.input-dark,
+input.input-dark[type="date"],
+input.input-dark[type="time"] {
+  background-color: #000 !important;
+  color: #fff;
+}
+/* Native date/time controls (Chrome, etc.) can inherit dark background */
+input.input-dark::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+
 /* All dropdowns: white text, black background; selected option white text, blue background */
 select,
 select.select-dark {

@@ -1,11 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Bracket8TwoRounds } from "@/components/Bracket8TwoRounds";
+import { Bracket4 } from "@/components/Bracket4";
+import { isBye } from "@/components/Bracket8TwoRounds";
 import { Modal } from "@/components/ui/Modal";
+import { formatLocationDate, formatLocationTime } from "@/lib/formatDateTime";
 
 const PLAYER_SLOTS = 64;
 const BYE_LABEL = "-- Bye --";
@@ -147,6 +150,11 @@ export function DashboardContent() {
   const [week1SlotCardsOpen, setWeek1SlotCardsOpen] = useState<boolean[]>(
     () => Array(8).fill(false)
   );
+  const [week2SlotCardsOpen, setWeek2SlotCardsOpen] = useState<boolean[]>(
+    () => Array(4).fill(false)
+  );
+  const [finalsCardOpen, setFinalsCardOpen] = useState(false);
+  const [sidePanelOpen, setSidePanelOpen] = useState(true);
   const [week1SectionOpen, setWeek1SectionOpen] = useState(false);
   const [week2SectionOpen, setWeek2SectionOpen] = useState(false);
   const [finalsSectionOpen, setFinalsSectionOpen] = useState(false);
@@ -183,12 +191,89 @@ export function DashboardContent() {
     return allFirstRoundSelections.every((v) => typeof v === "string" && v.trim() !== "");
   }, [allFirstRoundSelections]);
 
+  /** Week 2 bracket slots: 4 cards × 12 slots = 48. Parsed from savedSettings.week2BracketSlots JSON. */
+  const week2BracketSlotsArray = useMemo(() => {
+    const raw = savedSettings && typeof savedSettings === "object"
+      ? (savedSettings as Record<string, unknown>).week2BracketSlots
+      : undefined;
+    if (typeof raw !== "string" || !raw.trim()) return Array(48).fill("") as string[];
+    try {
+      const arr = JSON.parse(raw) as unknown;
+      if (!Array.isArray(arr) || arr.length !== 48) return Array(48).fill("") as string[];
+      return arr.map((v) => (typeof v === "string" ? v : ""));
+    } catch {
+      return Array(48).fill("") as string[];
+    }
+  }, [savedSettings]);
+
+  /** First-round slot values for all 4 Week 2 cards (4×8=32). For dropdown exclusions. */
+  const allFirstRoundSelectionsWeek2 = useMemo(() => {
+    const out: string[] = [];
+    for (let c = 0; c < 4; c++) {
+      for (let i = 0; i < 8; i++) {
+        out.push(week2BracketSlotsArray[c * 12 + i] ?? "");
+      }
+    }
+    return out;
+  }, [week2BracketSlotsArray]);
+
+  /** Finals bracket slots: 6 (2 semis + 1 final). Parsed from savedSettings.finalsBracketSlots JSON. */
+  const finalsBracketSlotsArray = useMemo(() => {
+    const raw = savedSettings && typeof savedSettings === "object"
+      ? (savedSettings as Record<string, unknown>).finalsBracketSlots
+      : undefined;
+    if (typeof raw !== "string" || !raw.trim()) return Array(6).fill("") as string[];
+    try {
+      const arr = JSON.parse(raw) as unknown;
+      if (!Array.isArray(arr) || arr.length !== 6) return Array(6).fill("") as string[];
+      return arr.map((v) => (typeof v === "string" ? v : ""));
+    } catch {
+      return Array(6).fill("") as string[];
+    }
+  }, [savedSettings]);
+
+  /** Finals bracket scores: 6 (same order as slots). Parsed from savedSettings.finalsBracketScores JSON. */
+  const finalsBracketScoresArray = useMemo(() => {
+    const raw = savedSettings && typeof savedSettings === "object"
+      ? (savedSettings as Record<string, unknown>).finalsBracketScores
+      : undefined;
+    if (typeof raw !== "string" || !raw.trim()) return Array(6).fill("0") as string[];
+    try {
+      const arr = JSON.parse(raw) as unknown;
+      if (!Array.isArray(arr) || arr.length !== 6) return Array(6).fill("0") as string[];
+      return arr.map((v) => (typeof v === "string" ? v : "0"));
+    } catch {
+      return Array(6).fill("0") as string[];
+    }
+  }, [savedSettings]);
+
+  /** Champion of the Finals bracket: winner of the final match (slots 4 vs 5 by score), or null if no winner yet. */
+  const finalsChampion = useMemo(() => {
+    const slots = finalsBracketSlotsArray;
+    const scores = finalsBracketScoresArray;
+    const topScore = Number(scores[4]);
+    const bottomScore = Number(scores[5]);
+    const topName = (slots[4] ?? "").trim();
+    const bottomName = (slots[5] ?? "").trim();
+    if (!topName || !bottomName || isBye(topName) || isBye(bottomName)) return null;
+    if (Number.isNaN(topScore) || Number.isNaN(bottomScore)) return null;
+    if (topScore > bottomScore) return topName;
+    if (bottomScore > topScore) return bottomName;
+    return null;
+  }, [finalsBracketSlotsArray, finalsBracketScoresArray]);
+
   const tournamentStarted =
     (savedSettings && typeof savedSettings === "object" && (savedSettings as Record<string, unknown>).tournamentStarted === true) ?? false;
   const tournamentPaused =
     (savedSettings && typeof savedSettings === "object" && (savedSettings as Record<string, unknown>).tournamentPaused === true) ?? false;
 
   const [locations, setLocations] = useState<Record<LocationKey, string>>(() =>
+    Object.fromEntries(LOCATION_KEYS.map((k) => [k, ""])) as Record<LocationKey, string>
+  );
+  const [locationStartDates, setLocationStartDates] = useState<Record<LocationKey, string>>(() =>
+    Object.fromEntries(LOCATION_KEYS.map((k) => [k, ""])) as Record<LocationKey, string>
+  );
+  const [locationStartTimes, setLocationStartTimes] = useState<Record<LocationKey, string>>(() =>
     Object.fromEntries(LOCATION_KEYS.map((k) => [k, ""])) as Record<LocationKey, string>
   );
   const venueList = useQuery(api.venues.list, {});
@@ -274,6 +359,25 @@ export function DashboardContent() {
       if (typeof v === "string") locUpdate[key] = v;
     }
     if (Object.keys(locUpdate).length) setLocations((prev) => ({ ...prev, ...locUpdate }));
+    const metaRaw = (rest as Record<string, unknown>).locationStartMeta;
+    if (typeof metaRaw === "string" && metaRaw.trim() !== "") {
+      try {
+        const meta = JSON.parse(metaRaw) as Record<string, { startDate?: string; startTime?: string }>;
+        const dateUpdate: Partial<Record<LocationKey, string>> = {};
+        const timeUpdate: Partial<Record<LocationKey, string>> = {};
+        for (const key of LOCATION_KEYS) {
+          const entry = meta[key];
+          if (entry && typeof entry === "object") {
+            if (typeof entry.startDate === "string") dateUpdate[key] = entry.startDate;
+            if (typeof entry.startTime === "string") timeUpdate[key] = entry.startTime;
+          }
+        }
+        if (Object.keys(dateUpdate).length) setLocationStartDates((prev) => ({ ...prev, ...dateUpdate }));
+        if (Object.keys(timeUpdate).length) setLocationStartTimes((prev) => ({ ...prev, ...timeUpdate }));
+      } catch {
+        /* ignore invalid JSON */
+      }
+    }
     const ui = rest as Record<string, unknown>;
     if (ui.uiUsersCardOpen === true) setUsersCardOpen(true);
     if (ui.uiLeagueCardOpen === true) setLeagueCardOpen(true);
@@ -302,6 +406,34 @@ export function DashboardContent() {
     if (hasAnySlot) setBracketResetKey(0);
   }, [bracketResetKey, savedSettings]);
 
+  const locationStartMetaJson = useMemo(() => {
+    const meta: Record<string, { startDate: string; startTime: string }> = {};
+    for (const key of LOCATION_KEYS) {
+      meta[key] = {
+        startDate: locationStartDates[key] ?? "",
+        startTime: locationStartTimes[key] ?? "",
+      };
+    }
+    return JSON.stringify(meta);
+  }, [locationStartDates, locationStartTimes]);
+
+  /** Persist location start date/time to Convex immediately (e.g. on date/time input change). */
+  const saveLocationStartMeta = useCallback(
+    (metaJson: string) => {
+      if (!email || !selectedLeagueName || !selectedSeason) return;
+      setDashboardSettings({
+        email,
+        leagueName: selectedLeagueName,
+        season: selectedSeason,
+        tournamentStarted,
+        tournamentPaused,
+        ...locations,
+        locationStartMeta: metaJson,
+      } as Parameters<typeof setDashboardSettings>[0]);
+    },
+    [email, selectedLeagueName, selectedSeason, tournamentStarted, tournamentPaused, locations, setDashboardSettings]
+  );
+
   const saveLocations = useCallback(() => {
     if (!email) return;
     setDashboardSettings({
@@ -311,8 +443,9 @@ export function DashboardContent() {
       tournamentStarted,
       tournamentPaused,
       ...locations,
+      locationStartMeta: locationStartMetaJson,
     } as Parameters<typeof setDashboardSettings>[0]);
-  }, [email, selectedLeagueName, selectedSeason, tournamentStarted, tournamentPaused, locations, setDashboardSettings]);
+  }, [email, selectedLeagueName, selectedSeason, tournamentStarted, tournamentPaused, locations, locationStartMetaJson, setDashboardSettings]);
 
   /** Slot indices for a matchup: matchIndex 0->0,1; 1->2,3; ...; 5->10,11. */
   const slotIndicesForMatch = useCallback((matchIndex: number): [number, number] => {
@@ -352,6 +485,59 @@ export function DashboardContent() {
       } as Parameters<typeof setDashboardSettings>[0]);
     },
     [email, selectedLeagueName, selectedSeason, tournamentStarted, tournamentPaused, savedSettings, slotIndicesForMatch, setDashboardSettings]
+  );
+
+  /** Save the 12 bracket slots for one Week 2 card (cardIndex 0–3). Persists to week2BracketSlots JSON. */
+  const saveWeek2BracketSlots = useCallback(
+    (cardIndex: number, slots: string[]) => {
+      if (!email || slots.length !== 12 || cardIndex < 0 || cardIndex > 3) return;
+      const next = [...week2BracketSlotsArray];
+      for (let i = 0; i < 12; i++) next[cardIndex * 12 + i] = slots[i] ?? "";
+      setDashboardSettings({
+        email,
+        leagueName: selectedLeagueName,
+        season: selectedSeason,
+        tournamentStarted,
+        tournamentPaused,
+        week2BracketSlots: JSON.stringify(next),
+      } as Parameters<typeof setDashboardSettings>[0]);
+    },
+    [email, selectedLeagueName, selectedSeason, tournamentStarted, tournamentPaused, week2BracketSlotsArray, setDashboardSettings]
+  );
+
+  /** Save the 6 Finals bracket slots. Persists to finalsBracketSlots JSON. */
+  const saveFinalsBracketSlots = useCallback(
+    (slots: string[]) => {
+      if (!email || slots.length !== 6) return;
+      setDashboardSettings({
+        email,
+        leagueName: selectedLeagueName,
+        season: selectedSeason,
+        tournamentStarted,
+        tournamentPaused,
+        finalsBracketSlots: JSON.stringify(slots),
+      } as Parameters<typeof setDashboardSettings>[0]);
+    },
+    [email, selectedLeagueName, selectedSeason, tournamentStarted, tournamentPaused, setDashboardSettings]
+  );
+
+  /** Save one Finals bracket score (matchIndex 0–2, side "top"|"bottom"). Persists to finalsBracketScores JSON. */
+  const saveFinalsScoreChange = useCallback(
+    (matchIndex: number, side: "top" | "bottom", value: string) => {
+      if (!email || matchIndex < 0 || matchIndex > 2) return;
+      const scoreIndex = matchIndex * 2 + (side === "top" ? 0 : 1);
+      const next = [...finalsBracketScoresArray];
+      next[scoreIndex] = value;
+      setDashboardSettings({
+        email,
+        leagueName: selectedLeagueName,
+        season: selectedSeason,
+        tournamentStarted,
+        tournamentPaused,
+        finalsBracketScores: JSON.stringify(next),
+      } as Parameters<typeof setDashboardSettings>[0]);
+    },
+    [email, selectedLeagueName, selectedSeason, tournamentStarted, tournamentPaused, finalsBracketScoresArray, setDashboardSettings]
   );
 
   /** Save one score for one matchup (cardIndex 0–7, matchIndex 0–5, side "top"|"bottom"). */
@@ -452,7 +638,7 @@ export function DashboardContent() {
     [email, selectedLeagueName, selectedSeason, tournamentStarted, tournamentPaused, setDashboardSettings]
   );
 
-  // Debounced save when any location input changes (skip until we've applied initial settings from Convex so we don't overwrite with empty state)
+  // Debounced save when any location or start date/time input changes (skip until we've applied initial settings from Convex so we don't overwrite with empty state)
   useEffect(() => {
     if (!email || !settingsQueryHasReturned.current || !hasAppliedInitialSettings.current) return;
     if (!selectedLeagueName || !selectedSeason) return;
@@ -464,10 +650,11 @@ export function DashboardContent() {
         tournamentStarted,
         tournamentPaused,
         ...locations,
+        locationStartMeta: locationStartMetaJson,
       } as Parameters<typeof setDashboardSettings>[0]);
     }, 400);
     return () => clearTimeout(t);
-  }, [email, selectedLeagueName, selectedSeason, tournamentStarted, tournamentPaused, locations, setDashboardSettings]);
+  }, [email, selectedLeagueName, selectedSeason, tournamentStarted, tournamentPaused, locations, locationStartMetaJson, setDashboardSettings]);
 
   const loadPlayers = useCallback((leagueName: string, season: string) => {
     if (!leagueName || !season) {
@@ -606,11 +793,46 @@ export function DashboardContent() {
       });
   }, [selectedLeagueGuid]);
 
+  const SIDE_PANEL_TAB_WIDTH = 40;
+  const sidePanelRef = useRef<HTMLElement>(null);
+  const [sidePanelMeasuredWidth, setSidePanelMeasuredWidth] = useState(400);
+
+  useLayoutEffect(() => {
+    if (!sidePanelOpen || !sidePanelRef.current) return;
+    const el = sidePanelRef.current;
+    const update = () => {
+      const w = el.offsetWidth;
+      if (w > 0) setSidePanelMeasuredWidth(w);
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [sidePanelOpen]);
+
   return (
-    <div className="flex flex-wrap gap-6 items-start">
-      <div className="flex w-full min-w-0 flex-col gap-6 md:w-max md:min-w-[400px]">
+    <>
+      {/* Side panel: Users, Tournament Settings, Players – fixed to left, collapsible, width fits content */}
+      <aside
+        ref={sidePanelRef}
+        className="fixed left-0 top-14 z-30 h-[calc(100vh-3.5rem)] overflow-hidden border-r border-white/20 bg-gradient-to-b from-slate-900 to-slate-950 shadow-xl transition-[width] duration-200 ease-out"
+        style={{ width: sidePanelOpen ? "max-content" : 0 }}
+        aria-hidden={!sidePanelOpen}
+      >
+        <div className="flex h-full min-w-0 max-w-[min(100vw,600px)] flex-col gap-6 overflow-y-auto overflow-x-hidden p-4 pt-4">
+          <div className="flex items-center justify-between gap-2 pb-2">
+            <span className="pl-[5px] text-[1.4rem] font-medium text-blue-400">Tournament Setup</span>
+            <button
+              type="button"
+              onClick={() => setSidePanelOpen(false)}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-blue-100/80 transition-colors hover:bg-white/10 hover:text-blue-100"
+              aria-label="Collapse panel"
+            >
+              <span aria-hidden>◀</span>
+            </button>
+          </div>
       {/* Users card – list of Convex users */}
-      <div className="w-full min-w-0 overflow-hidden rounded-xl border border-[var(--surface-border)] bg-black text-foreground">
+      <div className="w-max min-w-0 overflow-hidden rounded-xl border border-[var(--surface-border)] bg-black text-foreground">
         <button
           type="button"
           onClick={() => {
@@ -682,7 +904,7 @@ export function DashboardContent() {
           No leagues loaded. Set <code className="rounded bg-white/10 px-1">POOLHUB_DATABASE_URL</code> in your deployment environment and ensure the database is reachable.
         </div>
       )}
-      <div className="w-full min-w-0 overflow-hidden rounded-xl border border-[var(--surface-border)] text-foreground">
+      <div className="w-max min-w-0 overflow-hidden rounded-xl border border-[var(--surface-border)] text-foreground">
         <button
           type="button"
           onClick={() => {
@@ -915,21 +1137,25 @@ export function DashboardContent() {
                 </button>
                 <div
                   id="league-card-week1-locations"
-                  className={`flex flex-col gap-3 overflow-hidden px-[5px] pb-[5px] transition-[max-height] duration-200 ease-out ${week1SectionOpen ? "max-h-[750px]" : "max-h-0"}`}
+                  className={`flex flex-col gap-3 overflow-hidden transition-[max-height] duration-200 ease-out ${week1SectionOpen ? "max-h-[1200px] px-[5px] pb-[5px]" : "max-h-0 px-0 pb-0 pt-0"}`}
                   aria-hidden={!week1SectionOpen}
                 >
                   {WEEK_1_KEYS.map((key) => (
-                    <label key={key} className="flex flex-col gap-1.5">
-                      <span className="text-sm font-medium opacity-90">{LOCATION_LABELS[key]}</span>
-                      <select
-                        value={locations[key]}
+                    <div
+                      key={key}
+                      className="rounded-lg border border-[var(--surface-border)] bg-slate-800/30 p-3"
+                    >
+                      <div className="grid grid-cols-[auto_1fr] items-center gap-x-6 gap-y-1.5">
+                        <span className="text-sm font-medium text-blue-400">{LOCATION_LABELS[key]}</span>
+                        <select
+                          value={locations[key]}
                         onChange={(e) => {
                           const v = e.target.value;
                           setLocations((prev) => ({ ...prev, [key]: v }));
                         }}
                         onBlur={saveLocations}
                         disabled={venuesLoading || tournamentStarted || tournamentPaused}
-                        className={`select-dark rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-800/70 disabled:text-slate-400 ${locations[key]?.trim() ? "slot-filled" : ""}`}
+                        className={`select-dark min-w-0 rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-800/70 disabled:text-slate-400 ${locations[key]?.trim() ? "slot-filled" : ""}`}
                         style={{ borderColor: "var(--surface-border)" }}
                         aria-label={LOCATION_LABELS[key]}
                       >
@@ -944,7 +1170,63 @@ export function DashboardContent() {
                           ));
                         })()}
                       </select>
-                    </label>
+                      <div />
+                      <div className="flex flex-col gap-2 sm:flex-row sm:flex-nowrap sm:items-center">
+                        <label className="flex shrink-0 items-center gap-2 sm:w-auto">
+                          <span className="text-xs opacity-80">Start Date</span>
+                          <input
+                            type="date"
+                            value={locationStartDates[key] ?? ""}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setLocationStartDates((prev) => ({ ...prev, [key]: v }));
+                              const meta = Object.fromEntries(
+                                LOCATION_KEYS.map((k) => [
+                                  k,
+                                  {
+                                    startDate: k === key ? v : locationStartDates[k] ?? "",
+                                    startTime: locationStartTimes[k] ?? "",
+                                  },
+                                ])
+                              );
+                              saveLocationStartMeta(JSON.stringify(meta));
+                            }}
+                            onBlur={saveLocations}
+                            disabled={tournamentStarted || tournamentPaused}
+                            className="input-dark min-w-0 flex-1 rounded-lg border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:bg-slate-800/70 disabled:text-slate-400 sm:flex-initial"
+                            style={{ borderColor: "var(--surface-border)" }}
+                            aria-label={`${LOCATION_LABELS[key]} start date`}
+                          />
+                        </label>
+                        <label className="flex shrink-0 items-center gap-2 sm:w-auto">
+                          <span className="text-xs opacity-80">Start Time</span>
+                          <input
+                            type="time"
+                            value={locationStartTimes[key] ?? ""}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setLocationStartTimes((prev) => ({ ...prev, [key]: v }));
+                              const meta = Object.fromEntries(
+                                LOCATION_KEYS.map((k) => [
+                                  k,
+                                  {
+                                    startDate: locationStartDates[k] ?? "",
+                                    startTime: k === key ? v : locationStartTimes[k] ?? "",
+                                  },
+                                ])
+                              );
+                              saveLocationStartMeta(JSON.stringify(meta));
+                            }}
+                            onBlur={saveLocations}
+                            disabled={tournamentStarted || tournamentPaused}
+                            className="input-dark min-w-0 flex-1 rounded-lg border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:bg-slate-800/70 disabled:text-slate-400 sm:flex-initial"
+                            style={{ borderColor: "var(--surface-border)" }}
+                            aria-label={`${LOCATION_LABELS[key]} start time`}
+                          />
+                        </label>
+                      </div>
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -971,21 +1253,25 @@ export function DashboardContent() {
                 </button>
                 <div
                   id="league-card-week2-locations"
-                  className={`flex flex-col gap-3 overflow-hidden px-[5px] pb-4 transition-[max-height] duration-200 ease-out ${week2SectionOpen ? "max-h-[320px]" : "max-h-0"}`}
+                  className={`flex flex-col gap-3 overflow-hidden transition-[max-height] duration-200 ease-out ${week2SectionOpen ? "max-h-[600px] px-[5px] pb-4" : "max-h-0 px-0 pb-0 pt-0"}`}
                   aria-hidden={!week2SectionOpen}
                 >
                   {week2SectionOpen && WEEK_2_KEYS.map((key) => (
-                    <label key={key} className="flex flex-col gap-1.5">
-                      <span className="text-sm font-medium opacity-90">{LOCATION_LABELS[key]}</span>
-                      <select
-                        value={locations[key]}
+                    <div
+                      key={key}
+                      className="rounded-lg border border-[var(--surface-border)] bg-slate-800/30 p-3"
+                    >
+                      <div className="grid grid-cols-[auto_1fr] items-center gap-x-6 gap-y-1.5">
+                        <span className="text-sm font-medium text-blue-400">{LOCATION_LABELS[key]}</span>
+                        <select
+                          value={locations[key]}
                         onChange={(e) => {
                           const v = e.target.value;
                           setLocations((prev) => ({ ...prev, [key]: v }));
                         }}
                         onBlur={saveLocations}
                         disabled={venuesLoading || tournamentStarted || tournamentPaused}
-                        className={`select-dark rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-800/70 disabled:text-slate-400 ${locations[key]?.trim() ? "slot-filled" : ""}`}
+                        className={`select-dark min-w-0 rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-800/70 disabled:text-slate-400 ${locations[key]?.trim() ? "slot-filled" : ""}`}
                         style={{ borderColor: "var(--surface-border)" }}
                         aria-label={LOCATION_LABELS[key]}
                       >
@@ -1000,7 +1286,63 @@ export function DashboardContent() {
                           ));
                         })()}
                       </select>
-                    </label>
+                      <div />
+                      <div className="flex flex-col gap-2 sm:flex-row sm:flex-nowrap sm:items-center">
+                        <label className="flex shrink-0 items-center gap-2 sm:w-auto">
+                          <span className="text-xs opacity-80">Start Date</span>
+                          <input
+                            type="date"
+                            value={locationStartDates[key] ?? ""}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setLocationStartDates((prev) => ({ ...prev, [key]: v }));
+                              const meta = Object.fromEntries(
+                                LOCATION_KEYS.map((k) => [
+                                  k,
+                                  {
+                                    startDate: k === key ? v : locationStartDates[k] ?? "",
+                                    startTime: locationStartTimes[k] ?? "",
+                                  },
+                                ])
+                              );
+                              saveLocationStartMeta(JSON.stringify(meta));
+                            }}
+                            onBlur={saveLocations}
+                            disabled={tournamentStarted || tournamentPaused}
+                            className="input-dark min-w-0 flex-1 rounded-lg border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:bg-slate-800/70 disabled:text-slate-400 sm:flex-initial"
+                            style={{ borderColor: "var(--surface-border)" }}
+                            aria-label={`${LOCATION_LABELS[key]} start date`}
+                          />
+                        </label>
+                        <label className="flex shrink-0 items-center gap-2 sm:w-auto">
+                          <span className="text-xs opacity-80">Start Time</span>
+                          <input
+                            type="time"
+                            value={locationStartTimes[key] ?? ""}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setLocationStartTimes((prev) => ({ ...prev, [key]: v }));
+                              const meta = Object.fromEntries(
+                                LOCATION_KEYS.map((k) => [
+                                  k,
+                                  {
+                                    startDate: locationStartDates[k] ?? "",
+                                    startTime: k === key ? v : locationStartTimes[k] ?? "",
+                                  },
+                                ])
+                              );
+                              saveLocationStartMeta(JSON.stringify(meta));
+                            }}
+                            onBlur={saveLocations}
+                            disabled={tournamentStarted || tournamentPaused}
+                            className="input-dark min-w-0 flex-1 rounded-lg border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:bg-slate-800/70 disabled:text-slate-400 sm:flex-initial"
+                            style={{ borderColor: "var(--surface-border)" }}
+                            aria-label={`${LOCATION_LABELS[key]} start time`}
+                          />
+                        </label>
+                      </div>
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -1027,12 +1369,13 @@ export function DashboardContent() {
                 </button>
                 <div
                   id="league-card-finals-location"
-                  className={`flex flex-col gap-3 overflow-hidden px-[5px] pb-[5px] transition-[max-height] duration-200 ease-out ${finalsSectionOpen ? "max-h-[120px]" : "max-h-0"}`}
+                  className={`flex flex-col gap-3 overflow-hidden transition-[max-height] duration-200 ease-out ${finalsSectionOpen ? "max-h-[200px] px-[5px] pb-[5px]" : "max-h-0 px-0 pb-0 pt-0"}`}
                   aria-hidden={!finalsSectionOpen}
                 >
-                  <label className="flex flex-col gap-1.5">
-                    <span className="text-sm font-medium opacity-90">{LOCATION_LABELS.finalsLocation}</span>
-                    <select
+                  <div className="rounded-lg border border-[var(--surface-border)] bg-slate-800/30 p-3">
+                    <div className="grid grid-cols-[auto_1fr] items-center gap-x-6 gap-y-1.5">
+                      <span className="text-sm font-medium text-blue-400">{LOCATION_LABELS.finalsLocation}</span>
+                      <select
                       value={locations.finalsLocation}
                       onChange={(e) => {
                         const v = e.target.value;
@@ -1040,7 +1383,7 @@ export function DashboardContent() {
                       }}
                       onBlur={saveLocations}
                       disabled={venuesLoading || tournamentStarted || tournamentPaused}
-                      className={`select-dark rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-800/70 disabled:text-slate-400 ${locations.finalsLocation?.trim() ? "slot-filled" : ""}`}
+                      className={`select-dark min-w-0 rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-800/70 disabled:text-slate-400 ${locations.finalsLocation?.trim() ? "slot-filled" : ""}`}
                       style={{ borderColor: "var(--surface-border)" }}
                       aria-label={LOCATION_LABELS.finalsLocation}
                     >
@@ -1055,7 +1398,63 @@ export function DashboardContent() {
                         ));
                       })()}
                     </select>
-                  </label>
+                    <div />
+                    <div className="flex flex-col gap-2 sm:flex-row sm:flex-nowrap sm:items-center">
+                      <label className="flex shrink-0 items-center gap-2 sm:w-auto">
+                        <span className="text-xs opacity-80">Start Date</span>
+                        <input
+                          type="date"
+                          value={locationStartDates.finalsLocation ?? ""}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setLocationStartDates((prev) => ({ ...prev, finalsLocation: v }));
+                            const meta = Object.fromEntries(
+                              LOCATION_KEYS.map((k) => [
+                                k,
+                                {
+                                  startDate: k === "finalsLocation" ? v : locationStartDates[k] ?? "",
+                                  startTime: locationStartTimes[k] ?? "",
+                                },
+                              ])
+                            );
+                            saveLocationStartMeta(JSON.stringify(meta));
+                          }}
+                          onBlur={saveLocations}
+                          disabled={tournamentStarted || tournamentPaused}
+                          className="input-dark min-w-0 flex-1 rounded-lg border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:bg-slate-800/70 disabled:text-slate-400 sm:flex-initial"
+                          style={{ borderColor: "var(--surface-border)" }}
+                          aria-label="Finals start date"
+                        />
+                      </label>
+                      <label className="flex shrink-0 items-center gap-2 sm:w-auto">
+                        <span className="text-xs opacity-80">Start Time</span>
+                        <input
+                          type="time"
+                          value={locationStartTimes.finalsLocation ?? ""}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setLocationStartTimes((prev) => ({ ...prev, finalsLocation: v }));
+                            const meta = Object.fromEntries(
+                              LOCATION_KEYS.map((k) => [
+                                k,
+                                {
+                                  startDate: locationStartDates[k] ?? "",
+                                  startTime: k === "finalsLocation" ? v : locationStartTimes[k] ?? "",
+                                },
+                              ])
+                            );
+                            saveLocationStartMeta(JSON.stringify(meta));
+                          }}
+                          onBlur={saveLocations}
+                          disabled={tournamentStarted || tournamentPaused}
+                          className="input-dark min-w-0 flex-1 rounded-lg border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:bg-slate-800/70 disabled:text-slate-400 sm:flex-initial"
+                          style={{ borderColor: "var(--surface-border)" }}
+                          aria-label="Finals start time"
+                        />
+                      </label>
+                    </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1064,7 +1463,7 @@ export function DashboardContent() {
       </div>
 
       {/* Players card – below League card, collapsible; same width as League card */}
-      <div className="w-full min-w-0 overflow-hidden rounded-xl border border-[var(--surface-border)] bg-black text-foreground">
+      <div className="w-max min-w-0 overflow-hidden rounded-xl border border-[var(--surface-border)] bg-black text-foreground">
         <div
           className="flex min-h-14 w-full flex-shrink-0 items-center justify-between gap-4 rounded-t-xl bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 px-5 py-4"
           id="players-card-heading"
@@ -1143,17 +1542,37 @@ export function DashboardContent() {
           </div>
         </div>
       </div>
-      </div>
+        </div>
+      </aside>
 
-      {/* Second column: Week 1 location slot cards */}
+      {/* Tab to re-open panel when collapsed */}
+      {!sidePanelOpen && (
+        <button
+          type="button"
+          onClick={() => setSidePanelOpen(true)}
+          className="fixed left-0 top-[calc(1.75rem+50vh)] z-40 flex h-24 w-10 -translate-y-1/2 items-center justify-center rounded-r-lg border border-l-0 border-white/30 bg-gradient-to-br from-slate-800 to-slate-900 text-blue-100/90 shadow-lg transition-colors hover:bg-slate-700 hover:text-blue-100"
+          aria-label="Open panel"
+        >
+          <span aria-hidden>▶</span>
+        </button>
+      )}
+
+      {/* Main content: bracket columns, with margin so they don’t sit under the panel/tab */}
+      <div
+        className="min-w-0 w-full overflow-x-hidden transition-[padding] duration-200 ease-out"
+        style={{ paddingLeft: sidePanelOpen ? sidePanelMeasuredWidth : SIDE_PANEL_TAB_WIDTH }}
+      >
+        <div className="min-w-0 overflow-x-auto">
+          <div className="flex min-w-max flex-wrap gap-6 items-start">
+      {/* Column 2: Week 1 location slot cards (8 cards) */}
       <div className="flex w-max min-w-0 flex-col gap-6">
         {WEEK_1_KEYS.map((key, index) => (
           <div
             key={key}
-            className="w-full min-w-0 max-w-[600px] overflow-hidden rounded-xl border border-white/40 bg-black text-foreground sm:min-w-[555px]"
+            className="w-max min-w-0 overflow-hidden rounded-xl border border-white/40 bg-black text-foreground"
           >
             <div
-              className={`flex min-h-14 w-full flex-shrink-0 items-center justify-between gap-3 px-5 py-4 ${week1SlotCardsOpen[index] ? "rounded-t-xl" : "rounded-xl"} bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900`}
+              className={`flex min-h-14 w-full flex-shrink-0 flex-col gap-1 px-5 py-4 ${week1SlotCardsOpen[index] ? "rounded-t-xl" : "rounded-xl"} bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900`}
               id={`week1-slot-${index}-heading`}
             >
               <button
@@ -1166,36 +1585,33 @@ export function DashboardContent() {
                     return next;
                   });
                 }}
-                className="flex flex-1 cursor-pointer items-center gap-3 text-left transition-opacity hover:opacity-90"
+                className="flex min-w-0 cursor-pointer items-center justify-center gap-4 text-left transition-opacity hover:opacity-90"
                 aria-expanded={week1SlotCardsOpen[index]}
                 aria-controls={`week1-slot-${index}-body`}
-              >
-                <h2 className="text-lg font-semibold tracking-tight text-blue-100">
-                  {locations[key]?.trim() || "TBD"}
-                </h2>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setWeek1SlotCardsOpen((prev) => {
-                    const next = [...prev];
-                    next[index] = !next[index];
-                    persistUiCollapsed({ [`uiWeek1Slot${index}Open`]: next[index] });
-                    return next;
-                  });
-                }}
-                className="cursor-pointer text-blue-100/80 transition-opacity hover:opacity-90"
-                aria-expanded={week1SlotCardsOpen[index]}
                 aria-label={week1SlotCardsOpen[index] ? "Collapse" : "Expand"}
               >
-                {week1SlotCardsOpen[index] ? "▼" : "▶"}
+                <h2 className="min-w-0 truncate text-[1.6875rem] font-semibold tracking-tight text-yellow-400">
+                  {locations[key]?.trim() || "TBD"}
+                </h2>
+                <span className="shrink-0 text-blue-100/80" aria-hidden>
+                  {week1SlotCardsOpen[index] ? "▼" : "▶"}
+                </span>
               </button>
+              <div className="grid w-full grid-cols-3 items-center gap-2 border-t border-white/30 pt-2 text-sm font-medium text-blue-100/90">
+                <span className="text-left">Week 1</span>
+                <span className="text-center">
+                  {formatLocationDate(locationStartDates[key] ?? "") || "—"}
+                </span>
+                <span className="text-right">
+                  {formatLocationTime(locationStartTimes[key] ?? "") || "—"}
+                </span>
+              </div>
             </div>
             {week1SlotCardsOpen[index] && (
               <div
                 id={`week1-slot-${index}-body`}
                 aria-labelledby={`week1-slot-${index}-heading`}
-                className="max-h-[70vh] min-h-0 overflow-auto rounded-b-xl border-t border-white/40 bg-black pt-2 pl-4"
+                className="w-fit overflow-visible rounded-b-xl border-t border-white/40 bg-black pb-2 pt-2 pl-4"
               >
                 <Bracket8TwoRounds
                   key={`${bracketResetKey}-${index}`}
@@ -1243,6 +1659,154 @@ export function DashboardContent() {
           </div>
         ))}
       </div>
-    </div>
+
+      {/* Column 3: Week 2 location slot cards (4 cards, 8-player brackets) */}
+      <div className="flex w-max min-w-0 flex-col gap-6">
+        {WEEK_2_KEYS.map((key, index) => (
+          <div
+            key={key}
+            className="w-max min-w-0 overflow-hidden rounded-xl border border-white/40 bg-black text-foreground"
+          >
+            <div
+              className={`flex min-h-14 w-full flex-shrink-0 flex-col gap-1 px-5 py-4 ${week2SlotCardsOpen[index] ? "rounded-t-xl" : "rounded-xl"} bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900`}
+              id={`week2-slot-${index}-heading`}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  setWeek2SlotCardsOpen((prev) => {
+                    const next = [...prev];
+                    next[index] = !next[index];
+                    return next;
+                  });
+                }}
+                className="flex min-w-0 cursor-pointer items-center justify-center gap-4 text-left transition-opacity hover:opacity-90"
+                aria-expanded={week2SlotCardsOpen[index]}
+                aria-controls={`week2-slot-${index}-body`}
+                aria-label={week2SlotCardsOpen[index] ? "Collapse" : "Expand"}
+              >
+                <h2 className="min-w-0 truncate text-[1.6875rem] font-semibold tracking-tight text-yellow-400">
+                  {locations[key]?.trim() || "TBD"}
+                </h2>
+                <span className="shrink-0 text-blue-100/80" aria-hidden>
+                  {week2SlotCardsOpen[index] ? "▼" : "▶"}
+                </span>
+              </button>
+              <div className="grid w-full grid-cols-3 items-center gap-2 border-t border-white/30 pt-2 text-sm font-medium text-blue-100/90">
+                <span className="text-left">Week 2</span>
+                <span className="text-center">
+                  {formatLocationDate(locationStartDates[key] ?? "") || "—"}
+                </span>
+                <span className="text-right">
+                  {formatLocationTime(locationStartTimes[key] ?? "") || "—"}
+                </span>
+              </div>
+            </div>
+            {week2SlotCardsOpen[index] && (
+              <div
+                id={`week2-slot-${index}-body`}
+                aria-labelledby={`week2-slot-${index}-heading`}
+                className="w-fit overflow-visible rounded-b-xl border-t border-white/40 bg-black pb-2 pt-2 pl-4"
+              >
+                <Bracket8TwoRounds
+                  players={playerDisplayNames}
+                  playerRaceToMap={Object.fromEntries(
+                    playerRows.map((r) => [r.playerName, r.raceTo])
+                  )}
+                  initialSlotSelections={(() => {
+                    const base = index * 12;
+                    let byeNum = 0;
+                    return Array.from({ length: 12 }, (_, i) => {
+                      const val = week2BracketSlotsArray[base + i] ?? "";
+                      if (val === BYE_LABEL) return `-- Bye ${++byeNum} --`;
+                      return val;
+                    });
+                  })()}
+                  onBracketSlotsChange={(slots) => saveWeek2BracketSlots(index, slots)}
+                  cardIndex={index}
+                  allFirstRoundSelections={allFirstRoundSelectionsWeek2}
+                  disabled={tournamentPaused}
+                />
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Column 4: Finals (1 card, 4-person bracket) – same structure and styling as Week 2 cards */}
+      <div className="flex w-max min-w-0 flex-col gap-6">
+        <div className="w-max min-w-0 overflow-hidden rounded-xl border border-white/40 bg-black text-foreground">
+          <div
+            className={`flex min-h-14 w-full flex-shrink-0 flex-col gap-1 px-5 py-4 ${finalsCardOpen ? "rounded-t-xl" : "rounded-xl"} bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900`}
+            id="finals-slot-heading"
+          >
+            <button
+              type="button"
+              onClick={() => setFinalsCardOpen((o) => !o)}
+              className="flex min-w-0 cursor-pointer items-center justify-center gap-4 text-left transition-opacity hover:opacity-90"
+              aria-expanded={finalsCardOpen}
+              aria-controls="finals-slot-body"
+              aria-label={finalsCardOpen ? "Collapse" : "Expand"}
+            >
+              <h2 className="min-w-0 truncate text-[1.6875rem] font-semibold tracking-tight text-yellow-400">
+                {locations.finalsLocation?.trim() || "TBD"}
+              </h2>
+              <span className="shrink-0 text-blue-100/80" aria-hidden>
+                {finalsCardOpen ? "▼" : "▶"}
+              </span>
+            </button>
+            <div className="grid w-full grid-cols-3 items-center gap-2 border-t border-white/30 pt-2 text-sm font-medium text-blue-100/90">
+              <span className="text-left">Finals</span>
+              <span className="text-center">
+                {formatLocationDate(locationStartDates.finalsLocation ?? "") || "—"}
+              </span>
+              <span className="text-right">
+                {formatLocationTime(locationStartTimes.finalsLocation ?? "") || "—"}
+              </span>
+            </div>
+          </div>
+          {finalsCardOpen && (
+            <div
+              id="finals-slot-body"
+              aria-labelledby="finals-slot-heading"
+              className="w-fit overflow-visible rounded-b-xl border-t border-white/40 bg-black pb-2 pt-2 pl-4"
+            >
+              <Bracket4
+                players={playerDisplayNames}
+                playerRaceToMap={Object.fromEntries(
+                  playerRows.map((r) => [r.playerName, r.raceTo])
+                )}
+                initialSlotSelections={(() => {
+                  let byeNum = 0;
+                  return finalsBracketSlotsArray.map((val) => {
+                    if (val === BYE_LABEL) return `-- Bye ${++byeNum} --`;
+                    return val;
+                  });
+                })()}
+                onBracketSlotsChange={saveFinalsBracketSlots}
+                initialScores={finalsBracketScoresArray}
+                onScoreChange={saveFinalsScoreChange}
+                disabled={tournamentPaused}
+              />
+              {finalsChampion != null && (
+                <>
+                  <div className="mt-4 border-t border-white/40 pt-4">
+                    <p className="text-center text-lg font-semibold text-yellow-400">
+                      Champion!!!
+                    </p>
+                    <p className="mt-1 text-center text-base font-medium text-blue-400">
+                      {finalsChampion}
+                    </p>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+        </div>
+        </div>
+      </div>
+    </>
   );
 }
