@@ -402,12 +402,12 @@ export function HomeBracketCards() {
     !hasLeagueAndSeason || !tournamentStarted || tournamentPaused;
   if (notSetupYet) {
     return (
-      <div className="flex min-h-[70vh] flex-col items-center justify-center gap-4 px-4 text-center">
+      <div className="flex flex-col items-center gap-4 px-4 text-center">
         <p className="text-2xl font-semibold text-yellow-400 sm:text-3xl">
-          Tournament hasn&apos;t been setup yet. Check back later.
+          Tournament hasn&apos;t been setup yet. The live brackets will appear once the tournament has started.
         </p>
         <p className="text-lg text-blue-200/90 sm:text-xl">
-          You can still create an account so you can live score your match once the tournament begins.
+          You can still create an account so you can live score your match once the tournament begins. To link your account to your PoolHub player, go to the Profile tab once you create an account.
         </p>
       </div>
     );
