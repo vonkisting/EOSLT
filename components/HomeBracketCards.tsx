@@ -394,14 +394,16 @@ export function HomeBracketCards() {
     );
   }
 
-  if (!hasLeagueAndSeason) {
+  const notSetupYet =
+    !hasLeagueAndSeason || !tournamentStarted || tournamentPaused;
+  if (notSetupYet) {
     return (
-      <div className="rounded-xl border border-[var(--surface-border)] bg-black/40 p-6 text-center">
-        <h1 className="text-xl font-semibold tracking-tight text-blue-100">
-          EOSLT
-        </h1>
-        <p className="mt-2 text-sm text-blue-200/80">
-          Use the navigation to open Dashboard or Profile.
+      <div className="flex min-h-[70vh] flex-col items-center justify-center gap-4 px-4 text-center">
+        <p className="text-2xl font-semibold text-yellow-400 sm:text-3xl">
+          Tournament hasn&apos;t been setup yet. Check back later.
+        </p>
+        <p className="text-lg text-blue-200/90 sm:text-xl">
+          You can still create an account so you can live score your match once the tournament begins.
         </p>
       </div>
     );

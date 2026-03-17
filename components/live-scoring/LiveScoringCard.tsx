@@ -656,34 +656,36 @@ export function LiveScoringCard({
         hideCloseButton
         closeOnEscape={false}
         closeOnBackdropClick={false}
+        footer={
+          <div className="flex flex-wrap justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setLegalWinModalOpen(false);
+                if (singleWinnerName === player1Name) setRequireStrictExceedPlayer1(true);
+                else if (singleWinnerName === player2Name) setRequireStrictExceedPlayer2(true);
+              }}
+              className="cursor-pointer rounded-lg border border-white/20 bg-transparent px-4 py-2.5 text-sm font-medium text-slate-200 transition-colors hover:bg-white/10"
+            >
+              No
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setLegalWinConfirmed(true);
+                setLegalWinModalOpen(false);
+              }}
+              className="cursor-pointer rounded-lg border border-emerald-400/50 bg-emerald-800/80 px-4 py-2.5 text-sm font-medium text-emerald-100 shadow-sm transition-colors hover:bg-emerald-700/80"
+              aria-label="Yes, winning ball was legal"
+            >
+              Yes
+            </button>
+          </div>
+        }
       >
-        <p className="mb-6 text-slate-200">
+        <p className="text-slate-200">
           Was the winning ball made legally by {singleWinnerName ?? "the winner"}?
         </p>
-        <div className="flex flex-wrap justify-end gap-3">
-          <button
-            type="button"
-            onClick={() => {
-              setLegalWinModalOpen(false);
-              if (singleWinnerName === player1Name) setRequireStrictExceedPlayer1(true);
-              else if (singleWinnerName === player2Name) setRequireStrictExceedPlayer2(true);
-            }}
-            className="cursor-pointer rounded-lg border border-white/20 bg-transparent px-4 py-2.5 text-sm font-medium text-slate-200 transition-colors hover:bg-white/10"
-          >
-            No
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setLegalWinConfirmed(true);
-              setLegalWinModalOpen(false);
-            }}
-            className="cursor-pointer rounded-lg border border-emerald-400/50 bg-emerald-800/80 px-4 py-2.5 text-sm font-medium text-emerald-100 shadow-sm transition-colors hover:bg-emerald-700/80"
-            aria-label="Yes, winning ball was legal"
-          >
-            Yes
-          </button>
-        </div>
       </Modal>
       <Modal
         open={submitSuccessModalOpen}
