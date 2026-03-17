@@ -819,7 +819,7 @@ export function DashboardContent() {
         style={{ width: sidePanelOpen ? "max-content" : 0 }}
         aria-hidden={!sidePanelOpen}
       >
-        <div className="flex h-full min-w-0 max-w-[min(100vw,600px)] flex-col gap-6 overflow-y-auto overflow-x-hidden p-4 pt-4">
+        <div className="flex h-full min-h-0 min-w-0 max-w-[min(100vw,600px)] flex-col gap-6 overflow-y-auto overflow-x-hidden p-4 pt-4">
           <div className="flex items-center justify-between gap-2 pb-2">
             <span className="pl-[5px] text-[1.4rem] font-medium text-blue-400">Tournament Setup</span>
             <button
@@ -832,7 +832,7 @@ export function DashboardContent() {
             </button>
           </div>
       {/* Users card – list of Convex users */}
-      <div className="w-max min-w-0 overflow-hidden rounded-xl border border-[var(--surface-border)] bg-black text-foreground">
+      <div className="w-full min-w-0 shrink-0 overflow-hidden rounded-xl border border-[var(--surface-border)] bg-black text-foreground">
         <button
           type="button"
           onClick={() => {
@@ -904,7 +904,7 @@ export function DashboardContent() {
           No leagues loaded. Set <code className="rounded bg-white/10 px-1">POOLHUB_DATABASE_URL</code> in your deployment environment and ensure the database is reachable.
         </div>
       )}
-      <div className="w-max min-w-0 overflow-hidden rounded-xl border border-[var(--surface-border)] text-foreground">
+      <div className="w-full min-w-0 shrink-0 overflow-hidden rounded-xl border border-[var(--surface-border)] text-foreground">
         <button
           type="button"
           onClick={() => {
@@ -1145,7 +1145,7 @@ export function DashboardContent() {
                       key={key}
                       className="rounded-lg border border-[var(--surface-border)] bg-slate-800/30 p-3"
                     >
-                      <div className="grid grid-cols-[auto_1fr] items-center gap-x-6 gap-y-1.5">
+                      <div className="grid grid-cols-[auto_1fr_auto_1fr] items-center gap-x-6 gap-y-3">
                         <span className="text-sm font-medium text-blue-400">{LOCATION_LABELS[key]}</span>
                         <select
                           value={locations[key]}
@@ -1155,7 +1155,7 @@ export function DashboardContent() {
                         }}
                         onBlur={saveLocations}
                         disabled={venuesLoading || tournamentStarted || tournamentPaused}
-                        className={`select-dark min-w-0 rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-800/70 disabled:text-slate-400 ${locations[key]?.trim() ? "slot-filled" : ""}`}
+                        className={`select-dark col-span-3 min-w-0 rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-800/70 disabled:text-slate-400 ${locations[key]?.trim() ? "slot-filled" : ""}`}
                         style={{ borderColor: "var(--surface-border)" }}
                         aria-label={LOCATION_LABELS[key]}
                       >
@@ -1170,61 +1170,54 @@ export function DashboardContent() {
                           ));
                         })()}
                       </select>
-                      <div />
-                      <div className="flex flex-col gap-2 sm:flex-row sm:flex-nowrap sm:items-center">
-                        <label className="flex shrink-0 items-center gap-2 sm:w-auto">
-                          <span className="text-xs opacity-80">Start Date</span>
-                          <input
-                            type="date"
-                            value={locationStartDates[key] ?? ""}
-                            onChange={(e) => {
-                              const v = e.target.value;
-                              setLocationStartDates((prev) => ({ ...prev, [key]: v }));
-                              const meta = Object.fromEntries(
-                                LOCATION_KEYS.map((k) => [
-                                  k,
-                                  {
-                                    startDate: k === key ? v : locationStartDates[k] ?? "",
-                                    startTime: locationStartTimes[k] ?? "",
-                                  },
-                                ])
-                              );
-                              saveLocationStartMeta(JSON.stringify(meta));
-                            }}
-                            onBlur={saveLocations}
-                            disabled={tournamentStarted || tournamentPaused}
-                            className="input-dark min-w-0 flex-1 rounded-lg border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:bg-slate-800/70 disabled:text-slate-400 sm:flex-initial"
-                            style={{ borderColor: "var(--surface-border)" }}
-                            aria-label={`${LOCATION_LABELS[key]} start date`}
-                          />
-                        </label>
-                        <label className="flex shrink-0 items-center gap-2 sm:w-auto">
-                          <span className="text-xs opacity-80">Start Time</span>
-                          <input
-                            type="time"
-                            value={locationStartTimes[key] ?? ""}
-                            onChange={(e) => {
-                              const v = e.target.value;
-                              setLocationStartTimes((prev) => ({ ...prev, [key]: v }));
-                              const meta = Object.fromEntries(
-                                LOCATION_KEYS.map((k) => [
-                                  k,
-                                  {
-                                    startDate: locationStartDates[k] ?? "",
-                                    startTime: k === key ? v : locationStartTimes[k] ?? "",
-                                  },
-                                ])
-                              );
-                              saveLocationStartMeta(JSON.stringify(meta));
-                            }}
-                            onBlur={saveLocations}
-                            disabled={tournamentStarted || tournamentPaused}
-                            className="input-dark min-w-0 flex-1 rounded-lg border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:bg-slate-800/70 disabled:text-slate-400 sm:flex-initial"
-                            style={{ borderColor: "var(--surface-border)" }}
-                            aria-label={`${LOCATION_LABELS[key]} start time`}
-                          />
-                        </label>
-                      </div>
+                        <span className="text-sm font-medium text-blue-400">Start Date</span>
+                        <input
+                          type="date"
+                          value={locationStartDates[key] ?? ""}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setLocationStartDates((prev) => ({ ...prev, [key]: v }));
+                            const meta = Object.fromEntries(
+                              LOCATION_KEYS.map((k) => [
+                                k,
+                                {
+                                  startDate: k === key ? v : locationStartDates[k] ?? "",
+                                  startTime: locationStartTimes[k] ?? "",
+                                },
+                              ])
+                            );
+                            saveLocationStartMeta(JSON.stringify(meta));
+                          }}
+                          onBlur={saveLocations}
+                          disabled={tournamentStarted || tournamentPaused}
+                          className="input-dark min-w-0 rounded-lg border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:bg-slate-800/70 disabled:text-slate-400"
+                          style={{ borderColor: "var(--surface-border)" }}
+                          aria-label={`${LOCATION_LABELS[key]} start date`}
+                        />
+                        <span className="text-sm font-medium text-blue-400">Start Time</span>
+                        <input
+                          type="time"
+                          value={locationStartTimes[key] ?? ""}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setLocationStartTimes((prev) => ({ ...prev, [key]: v }));
+                            const meta = Object.fromEntries(
+                              LOCATION_KEYS.map((k) => [
+                                k,
+                                {
+                                  startDate: locationStartDates[k] ?? "",
+                                  startTime: k === key ? v : locationStartTimes[k] ?? "",
+                                },
+                              ])
+                            );
+                            saveLocationStartMeta(JSON.stringify(meta));
+                          }}
+                          onBlur={saveLocations}
+                          disabled={tournamentStarted || tournamentPaused}
+                          className="input-dark min-w-0 rounded-lg border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:bg-slate-800/70 disabled:text-slate-400"
+                          style={{ borderColor: "var(--surface-border)" }}
+                          aria-label={`${LOCATION_LABELS[key]} start time`}
+                        />
                       </div>
                     </div>
                   ))}
@@ -1261,7 +1254,7 @@ export function DashboardContent() {
                       key={key}
                       className="rounded-lg border border-[var(--surface-border)] bg-slate-800/30 p-3"
                     >
-                      <div className="grid grid-cols-[auto_1fr] items-center gap-x-6 gap-y-1.5">
+                      <div className="grid grid-cols-[auto_1fr_auto_1fr] items-center gap-x-6 gap-y-3">
                         <span className="text-sm font-medium text-blue-400">{LOCATION_LABELS[key]}</span>
                         <select
                           value={locations[key]}
@@ -1271,7 +1264,7 @@ export function DashboardContent() {
                         }}
                         onBlur={saveLocations}
                         disabled={venuesLoading || tournamentStarted || tournamentPaused}
-                        className={`select-dark min-w-0 rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-800/70 disabled:text-slate-400 ${locations[key]?.trim() ? "slot-filled" : ""}`}
+                        className={`select-dark col-span-3 min-w-0 rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-800/70 disabled:text-slate-400 ${locations[key]?.trim() ? "slot-filled" : ""}`}
                         style={{ borderColor: "var(--surface-border)" }}
                         aria-label={LOCATION_LABELS[key]}
                       >
@@ -1286,61 +1279,54 @@ export function DashboardContent() {
                           ));
                         })()}
                       </select>
-                      <div />
-                      <div className="flex flex-col gap-2 sm:flex-row sm:flex-nowrap sm:items-center">
-                        <label className="flex shrink-0 items-center gap-2 sm:w-auto">
-                          <span className="text-xs opacity-80">Start Date</span>
-                          <input
-                            type="date"
-                            value={locationStartDates[key] ?? ""}
-                            onChange={(e) => {
-                              const v = e.target.value;
-                              setLocationStartDates((prev) => ({ ...prev, [key]: v }));
-                              const meta = Object.fromEntries(
-                                LOCATION_KEYS.map((k) => [
-                                  k,
-                                  {
-                                    startDate: k === key ? v : locationStartDates[k] ?? "",
-                                    startTime: locationStartTimes[k] ?? "",
-                                  },
-                                ])
-                              );
-                              saveLocationStartMeta(JSON.stringify(meta));
-                            }}
-                            onBlur={saveLocations}
-                            disabled={tournamentStarted || tournamentPaused}
-                            className="input-dark min-w-0 flex-1 rounded-lg border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:bg-slate-800/70 disabled:text-slate-400 sm:flex-initial"
-                            style={{ borderColor: "var(--surface-border)" }}
-                            aria-label={`${LOCATION_LABELS[key]} start date`}
-                          />
-                        </label>
-                        <label className="flex shrink-0 items-center gap-2 sm:w-auto">
-                          <span className="text-xs opacity-80">Start Time</span>
-                          <input
-                            type="time"
-                            value={locationStartTimes[key] ?? ""}
-                            onChange={(e) => {
-                              const v = e.target.value;
-                              setLocationStartTimes((prev) => ({ ...prev, [key]: v }));
-                              const meta = Object.fromEntries(
-                                LOCATION_KEYS.map((k) => [
-                                  k,
-                                  {
-                                    startDate: locationStartDates[k] ?? "",
-                                    startTime: k === key ? v : locationStartTimes[k] ?? "",
-                                  },
-                                ])
-                              );
-                              saveLocationStartMeta(JSON.stringify(meta));
-                            }}
-                            onBlur={saveLocations}
-                            disabled={tournamentStarted || tournamentPaused}
-                            className="input-dark min-w-0 flex-1 rounded-lg border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:bg-slate-800/70 disabled:text-slate-400 sm:flex-initial"
-                            style={{ borderColor: "var(--surface-border)" }}
-                            aria-label={`${LOCATION_LABELS[key]} start time`}
-                          />
-                        </label>
-                      </div>
+                        <span className="text-sm font-medium text-blue-400">Start Date</span>
+                        <input
+                          type="date"
+                          value={locationStartDates[key] ?? ""}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setLocationStartDates((prev) => ({ ...prev, [key]: v }));
+                            const meta = Object.fromEntries(
+                              LOCATION_KEYS.map((k) => [
+                                k,
+                                {
+                                  startDate: k === key ? v : locationStartDates[k] ?? "",
+                                  startTime: locationStartTimes[k] ?? "",
+                                },
+                              ])
+                            );
+                            saveLocationStartMeta(JSON.stringify(meta));
+                          }}
+                          onBlur={saveLocations}
+                          disabled={tournamentStarted || tournamentPaused}
+                          className="input-dark min-w-0 rounded-lg border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:bg-slate-800/70 disabled:text-slate-400"
+                          style={{ borderColor: "var(--surface-border)" }}
+                          aria-label={`${LOCATION_LABELS[key]} start date`}
+                        />
+                        <span className="text-sm font-medium text-blue-400">Start Time</span>
+                        <input
+                          type="time"
+                          value={locationStartTimes[key] ?? ""}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setLocationStartTimes((prev) => ({ ...prev, [key]: v }));
+                            const meta = Object.fromEntries(
+                              LOCATION_KEYS.map((k) => [
+                                k,
+                                {
+                                  startDate: locationStartDates[k] ?? "",
+                                  startTime: k === key ? v : locationStartTimes[k] ?? "",
+                                },
+                              ])
+                            );
+                            saveLocationStartMeta(JSON.stringify(meta));
+                          }}
+                          onBlur={saveLocations}
+                          disabled={tournamentStarted || tournamentPaused}
+                          className="input-dark min-w-0 rounded-lg border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:bg-slate-800/70 disabled:text-slate-400"
+                          style={{ borderColor: "var(--surface-border)" }}
+                          aria-label={`${LOCATION_LABELS[key]} start time`}
+                        />
                       </div>
                     </div>
                   ))}
@@ -1373,7 +1359,7 @@ export function DashboardContent() {
                   aria-hidden={!finalsSectionOpen}
                 >
                   <div className="rounded-lg border border-[var(--surface-border)] bg-slate-800/30 p-3">
-                    <div className="grid grid-cols-[auto_1fr] items-center gap-x-6 gap-y-1.5">
+                    <div className="grid grid-cols-[auto_1fr_auto_1fr] items-center gap-x-6 gap-y-3">
                       <span className="text-sm font-medium text-blue-400">{LOCATION_LABELS.finalsLocation}</span>
                       <select
                       value={locations.finalsLocation}
@@ -1383,7 +1369,7 @@ export function DashboardContent() {
                       }}
                       onBlur={saveLocations}
                       disabled={venuesLoading || tournamentStarted || tournamentPaused}
-                      className={`select-dark min-w-0 rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-800/70 disabled:text-slate-400 ${locations.finalsLocation?.trim() ? "slot-filled" : ""}`}
+                      className={`select-dark col-span-3 min-w-0 rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-800/70 disabled:text-slate-400 ${locations.finalsLocation?.trim() ? "slot-filled" : ""}`}
                       style={{ borderColor: "var(--surface-border)" }}
                       aria-label={LOCATION_LABELS.finalsLocation}
                     >
@@ -1398,61 +1384,54 @@ export function DashboardContent() {
                         ));
                       })()}
                     </select>
-                    <div />
-                    <div className="flex flex-col gap-2 sm:flex-row sm:flex-nowrap sm:items-center">
-                      <label className="flex shrink-0 items-center gap-2 sm:w-auto">
-                        <span className="text-xs opacity-80">Start Date</span>
-                        <input
-                          type="date"
-                          value={locationStartDates.finalsLocation ?? ""}
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            setLocationStartDates((prev) => ({ ...prev, finalsLocation: v }));
-                            const meta = Object.fromEntries(
-                              LOCATION_KEYS.map((k) => [
-                                k,
-                                {
-                                  startDate: k === "finalsLocation" ? v : locationStartDates[k] ?? "",
-                                  startTime: locationStartTimes[k] ?? "",
-                                },
-                              ])
-                            );
-                            saveLocationStartMeta(JSON.stringify(meta));
-                          }}
-                          onBlur={saveLocations}
-                          disabled={tournamentStarted || tournamentPaused}
-                          className="input-dark min-w-0 flex-1 rounded-lg border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:bg-slate-800/70 disabled:text-slate-400 sm:flex-initial"
-                          style={{ borderColor: "var(--surface-border)" }}
-                          aria-label="Finals start date"
-                        />
-                      </label>
-                      <label className="flex shrink-0 items-center gap-2 sm:w-auto">
-                        <span className="text-xs opacity-80">Start Time</span>
-                        <input
-                          type="time"
-                          value={locationStartTimes.finalsLocation ?? ""}
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            setLocationStartTimes((prev) => ({ ...prev, finalsLocation: v }));
-                            const meta = Object.fromEntries(
-                              LOCATION_KEYS.map((k) => [
-                                k,
-                                {
-                                  startDate: locationStartDates[k] ?? "",
-                                  startTime: k === "finalsLocation" ? v : locationStartTimes[k] ?? "",
-                                },
-                              ])
-                            );
-                            saveLocationStartMeta(JSON.stringify(meta));
-                          }}
-                          onBlur={saveLocations}
-                          disabled={tournamentStarted || tournamentPaused}
-                          className="input-dark min-w-0 flex-1 rounded-lg border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:bg-slate-800/70 disabled:text-slate-400 sm:flex-initial"
-                          style={{ borderColor: "var(--surface-border)" }}
-                          aria-label="Finals start time"
-                        />
-                      </label>
-                    </div>
+                      <span className="text-sm font-medium text-blue-400">Start Date</span>
+                      <input
+                        type="date"
+                        value={locationStartDates.finalsLocation ?? ""}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setLocationStartDates((prev) => ({ ...prev, finalsLocation: v }));
+                          const meta = Object.fromEntries(
+                            LOCATION_KEYS.map((k) => [
+                              k,
+                              {
+                                startDate: k === "finalsLocation" ? v : locationStartDates[k] ?? "",
+                                startTime: locationStartTimes[k] ?? "",
+                              },
+                            ])
+                          );
+                          saveLocationStartMeta(JSON.stringify(meta));
+                        }}
+                        onBlur={saveLocations}
+                        disabled={tournamentStarted || tournamentPaused}
+                        className="input-dark min-w-0 rounded-lg border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:bg-slate-800/70 disabled:text-slate-400"
+                        style={{ borderColor: "var(--surface-border)" }}
+                        aria-label="Finals start date"
+                      />
+                      <span className="text-sm font-medium text-blue-400">Start Time</span>
+                      <input
+                        type="time"
+                        value={locationStartTimes.finalsLocation ?? ""}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setLocationStartTimes((prev) => ({ ...prev, finalsLocation: v }));
+                          const meta = Object.fromEntries(
+                            LOCATION_KEYS.map((k) => [
+                              k,
+                              {
+                                startDate: locationStartDates[k] ?? "",
+                                startTime: k === "finalsLocation" ? v : locationStartTimes[k] ?? "",
+                              },
+                            ])
+                          );
+                          saveLocationStartMeta(JSON.stringify(meta));
+                        }}
+                        onBlur={saveLocations}
+                        disabled={tournamentStarted || tournamentPaused}
+                        className="input-dark min-w-0 rounded-lg border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:bg-slate-800/70 disabled:text-slate-400"
+                        style={{ borderColor: "var(--surface-border)" }}
+                        aria-label="Finals start time"
+                      />
                     </div>
                   </div>
                 </div>
@@ -1463,7 +1442,7 @@ export function DashboardContent() {
       </div>
 
       {/* Players card – below League card, collapsible; same width as League card */}
-      <div className="w-max min-w-0 overflow-hidden rounded-xl border border-[var(--surface-border)] bg-black text-foreground">
+      <div className="w-full min-w-0 shrink-0 overflow-hidden rounded-xl border border-[var(--surface-border)] bg-black text-foreground">
         <div
           className="flex min-h-14 w-full flex-shrink-0 items-center justify-between gap-4 rounded-t-xl bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 px-5 py-4"
           id="players-card-heading"
@@ -1505,9 +1484,9 @@ export function DashboardContent() {
         <div
           id="players-card-body"
           aria-labelledby="players-card-heading"
-          className={`transition-[max-height] duration-200 ease-out ${playersCardOpen ? "max-h-[70vh]" : "max-h-0 overflow-hidden"}`}
+          className={`transition-[max-height] duration-200 ease-out ${playersCardOpen ? "max-h-[4000px]" : "max-h-0 overflow-hidden"}`}
         >
-          <div className="max-h-[70vh] overflow-y-auto overflow-x-auto bg-gradient-to-br from-[#0c1220] via-[#0e1525] to-[#0c1220]">
+          <div className="overflow-x-auto bg-gradient-to-br from-[#0c1220] via-[#0e1525] to-[#0c1220]">
             <table className="w-max min-w-full border-collapse text-left text-sm">
               <thead>
                 <tr className="border-b border-slate-700 text-blue-100/90">
