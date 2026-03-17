@@ -6,12 +6,16 @@ import { createPortal } from "react-dom";
 /**
  * Reusable modal: theme-aware, focus trap, Escape to close, backdrop click to close.
  * Renders via portal into document.body so it overlays the full page (not constrained by header/layout).
+ *
+ * For professional confirmation modals, pass a `footer` prop. The modal will render three sections
+ * separated by line dividers: Header (title), Body (children), Footer (actions).
  */
 export function Modal({
   open,
   onClose,
   title,
   children,
+  footer,
   hideCloseButton = false,
   closeOnEscape = true,
   closeOnBackdropClick = true,
@@ -20,6 +24,8 @@ export function Modal({
   onClose: () => void;
   title: string;
   children: React.ReactNode;
+  /** When provided, modal uses 3-section layout with line separators: Header | Body | Footer. */
+  footer?: React.ReactNode;
   /** When true, the X button is hidden; user must use actions inside the modal (e.g. Yes/No). */
   hideCloseButton?: boolean;
   closeOnEscape?: boolean;
@@ -71,27 +77,32 @@ export function Modal({
           className="relative my-8 w-full max-w-md shrink-0 rounded-2xl border border-white/10 bg-[#2A204A]/95 p-6 shadow-2xl shadow-purple-950/50 backdrop-blur-md"
           onClick={(e) => e.stopPropagation()}
         >
-        <div className={`mb-4 flex items-center ${hideCloseButton ? "" : "justify-between"}`}>
-          <h2
-            id={titleId}
-            className="text-xl font-semibold text-white"
+          {/* Header / Title section */}
+          <div
+            className={`flex items-center ${hideCloseButton ? "" : "justify-between"} pb-4 ${footer != null ? "border-b border-white/10" : "mb-4"}`}
           >
-            {title}
-          </h2>
-          {!hideCloseButton && (
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg p-1 text-slate-400 hover:bg-white/10 hover:text-white transition-colors"
-              aria-label="Close"
-            >
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          )}
-        </div>
-        {children}
+            <h2 id={titleId} className="text-xl font-semibold capitalize text-blue-400">
+              {title}
+            </h2>
+            {!hideCloseButton && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-lg p-1 text-slate-400 hover:bg-white/10 hover:text-white transition-colors"
+                aria-label="Close"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+          {/* Body / Message section */}
+          <div className={footer != null ? "border-b border-white/10 py-4" : ""}>
+            {children}
+          </div>
+          {/* Footer / Button section (only when footer prop is provided) */}
+          {footer != null && <div className="pt-4">{footer}</div>}
         </div>
       </div>
     </div>
