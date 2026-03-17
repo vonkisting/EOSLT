@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useMutation, useQuery } from "convex/react";
+import type { Id } from "@/convex/_generated/dataModel";
 import { api } from "@/convex/_generated/api";
 import { Bracket8TwoRounds } from "@/components/Bracket8TwoRounds";
 import { Bracket4 } from "@/components/Bracket4";
@@ -300,6 +301,20 @@ export function DashboardContent() {
   }, [selectedLeagueName, selectedSeason, allLocationsFilled, allFirstRoundFilled]);
 
   const usersList = useQuery(api.users.list, {});
+  const deleteUserMutation = useMutation(api.users.deleteUser);
+  const setPoolhubPlayerNameMutation = useMutation(api.users.setPoolhubPlayerName);
+  const [userToDelete, setUserToDelete] = useState<{
+    _id: Id<"users">;
+    email: string;
+    name: string | null;
+  } | null>(null);
+  const [deletingUserId, setDeletingUserId] = useState<Id<"users"> | null>(null);
+  const [userToUnlink, setUserToUnlink] = useState<{
+    email: string;
+    name: string | null;
+    poolhubPlayerName: string;
+  } | null>(null);
+  const [unlinkingEmail, setUnlinkingEmail] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/leagues")
@@ -795,7 +810,23 @@ export function DashboardContent() {
 
   const SIDE_PANEL_TAB_WIDTH = 40;
   const sidePanelRef = useRef<HTMLElement>(null);
+  const setupScrollRef = useRef<HTMLDivElement>(null);
   const [sidePanelMeasuredWidth, setSidePanelMeasuredWidth] = useState(400);
+  const [setupScrollbarPadding, setSetupScrollbarPadding] = useState(0);
+
+  /** Page padding (matches dashboard page: px-4 py-6 md:p-[25px]) and header (h-14) for card positioning. */
+  const [pageInsets, setPageInsets] = useState({ left: 16, top: 80, bottom: 24 });
+  useEffect(() => {
+    const m = window.matchMedia("(min-width: 768px)");
+    const update = () => {
+      const left = m.matches ? 25 : 16;
+      const vertical = m.matches ? 25 : 24;
+      setPageInsets({ left, top: 56 + vertical, bottom: vertical });
+    };
+    update();
+    m.addEventListener("change", update);
+    return () => m.removeEventListener("change", update);
+  }, []);
 
   useLayoutEffect(() => {
     if (!sidePanelOpen || !sidePanelRef.current) return;
@@ -810,23 +841,46 @@ export function DashboardContent() {
     return () => ro.disconnect();
   }, [sidePanelOpen]);
 
+  useLayoutEffect(() => {
+    if (!sidePanelOpen || !setupScrollRef.current) return;
+    const el = setupScrollRef.current;
+    const update = () => {
+      const hasScrollbar = el.scrollHeight > el.clientHeight;
+      setSetupScrollbarPadding(hasScrollbar ? 12 : 0);
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [sidePanelOpen]);
+
   return (
     <>
-      {/* Side panel: Users, Tournament Settings, Players – fixed to left, collapsible, width fits content */}
+      {/* Side card: inset from page padding, collapsible */}
       <aside
         ref={sidePanelRef}
-        className="fixed left-0 top-14 z-30 h-[calc(100vh-3.5rem)] overflow-hidden border-r border-white/20 bg-gradient-to-b from-slate-900 to-slate-950 shadow-xl transition-[width] duration-200 ease-out"
-        style={{ width: sidePanelOpen ? "max-content" : 0 }}
+        className="fixed z-30 overflow-hidden rounded-2xl border border-white/20 bg-gradient-to-br from-slate-900 to-slate-950 shadow-2xl transition-[width] duration-200 ease-out"
+        style={{
+          left: pageInsets.left,
+          top: pageInsets.top,
+          bottom: pageInsets.bottom,
+          width: sidePanelOpen ? "max-content" : 0,
+          maxWidth: sidePanelOpen ? `calc(100vw - ${pageInsets.left * 2}px)` : undefined,
+        }}
         aria-hidden={!sidePanelOpen}
       >
-        <div className="flex h-full min-h-0 min-w-0 max-w-[min(100vw,600px)] flex-col gap-6 overflow-y-auto overflow-x-hidden p-4 pt-4">
+        <div
+          ref={setupScrollRef}
+          className="flex h-full min-h-0 min-w-0 max-w-full flex-col gap-6 overflow-y-auto overflow-x-hidden p-4 pt-4"
+          style={setupScrollbarPadding > 0 ? { paddingRight: 16 + setupScrollbarPadding } : undefined}
+        >
           <div className="flex items-center justify-between gap-2 pb-2">
             <span className="pl-[5px] text-[1.4rem] font-medium text-blue-400">Tournament Setup</span>
             <button
               type="button"
               onClick={() => setSidePanelOpen(false)}
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-blue-100/80 transition-colors hover:bg-white/10 hover:text-blue-100"
-              aria-label="Collapse panel"
+              aria-label="Collapse setup card"
             >
               <span aria-hidden>◀</span>
             </button>
@@ -871,6 +925,9 @@ export function DashboardContent() {
                     <th className="whitespace-nowrap px-4 py-2 font-semibold">Name</th>
                     <th className="whitespace-nowrap px-4 py-2 font-semibold">Email</th>
                     <th className="whitespace-nowrap px-4 py-2 font-semibold">PoolHub Player Name</th>
+                    <th className="w-20 whitespace-nowrap px-2 py-2 text-right font-semibold" scope="col">
+                      <span className="sr-only">Actions</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -882,6 +939,48 @@ export function DashboardContent() {
                       <td className="px-4 py-2">{u.name ?? "—"}</td>
                       <td className="px-4 py-2">{u.email || "—"}</td>
                       <td className="px-4 py-2">{u.poolhubPlayerName ?? "—"}</td>
+                      <td className="px-2 py-2 align-middle">
+                        <div className="flex items-center justify-end gap-1">
+                          {(u.poolhubPlayerName ?? "").trim() !== "" && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setUserToUnlink({
+                                  email: u.email ?? "",
+                                  name: u.name ?? null,
+                                  poolhubPlayerName: (u.poolhubPlayerName ?? "").trim(),
+                                })
+                              }
+                              disabled={unlinkingEmail === (u.email ?? "")}
+                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-amber-400 transition-colors hover:bg-amber-500/20 hover:text-amber-300 disabled:opacity-50"
+                              title="Unlink PoolHub player from this account"
+                              aria-label={`Unlink PoolHub player ${(u.poolhubPlayerName ?? "").trim()} from ${u.email || "user"}`}
+                            >
+                              <svg className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.829 6.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                              </svg>
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setUserToDelete({
+                                _id: u._id,
+                                email: u.email ?? "",
+                                name: u.name ?? null,
+                              })
+                            }
+                            disabled={deletingUserId === u._id}
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-red-400 transition-colors hover:bg-red-500/20 hover:text-red-300 disabled:opacity-50"
+                            title="Delete this account"
+                            aria-label={`Delete account for ${u.email || "user"}`}
+                          >
+                            <svg className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -890,6 +989,116 @@ export function DashboardContent() {
           </div>
         )}
       </div>
+
+      <Modal
+        open={userToDelete !== null}
+        onClose={() => setUserToDelete(null)}
+        title="Delete user account?"
+        hideCloseButton
+        closeOnBackdropClick={false}
+        footer={
+          userToDelete ? (
+            <div className="flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setUserToDelete(null)}
+                className="rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium text-slate-200 transition-colors hover:bg-white/20"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deletingUserId === userToDelete._id}
+                onClick={async () => {
+                  setDeletingUserId(userToDelete._id);
+                  try {
+                    await deleteUserMutation({ userId: userToDelete._id });
+                    setUserToDelete(null);
+                  } catch (e) {
+                    console.error("Failed to delete user:", e);
+                  } finally {
+                    setDeletingUserId(null);
+                  }
+                }}
+                className="rounded-lg border border-red-500/50 bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-500 disabled:opacity-50"
+              >
+                {deletingUserId === userToDelete._id ? "Deleting…" : "Delete account"}
+              </button>
+            </div>
+          ) : undefined
+        }
+      >
+        {userToDelete && (
+          <p className="text-slate-200">
+            Are you sure you want to permanently delete the account for{" "}
+            <strong className="text-white">{userToDelete.name ?? userToDelete.email}</strong>
+            {userToDelete.name && (
+              <span className="text-slate-300"> ({userToDelete.email})</span>
+            )}
+            ? This will remove them from the users list. They can sign up again later if needed.
+          </p>
+        )}
+      </Modal>
+
+      <Modal
+        open={userToUnlink !== null}
+        onClose={() => setUserToUnlink(null)}
+        title="Confirm unlink PoolHub player"
+        hideCloseButton
+        closeOnBackdropClick={false}
+        footer={
+          userToUnlink ? (
+            <div className="flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setUserToUnlink(null)}
+                className="rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium text-slate-200 transition-colors hover:bg-white/20"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={unlinkingEmail === userToUnlink.email}
+                onClick={async () => {
+                  setUnlinkingEmail(userToUnlink.email);
+                  try {
+                    await setPoolhubPlayerNameMutation({
+                      email: userToUnlink.email,
+                      poolhubPlayerName: "",
+                    });
+                    setUserToUnlink(null);
+                  } catch (e) {
+                    console.error("Failed to unlink PoolHub player:", e);
+                  } finally {
+                    setUnlinkingEmail(null);
+                  }
+                }}
+                className="rounded-lg border border-amber-500/50 bg-amber-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-500 disabled:opacity-50"
+              >
+                {unlinkingEmail === userToUnlink.email ? "Unlinking…" : "Confirm unlink"}
+              </button>
+            </div>
+          ) : undefined
+        }
+      >
+        {userToUnlink && (
+          <>
+            <p className="text-slate-200">
+              Remove the PoolHub player link from{" "}
+              <strong className="text-white">{userToUnlink.name ?? userToUnlink.email}</strong>
+              {userToUnlink.name && (
+                <span className="text-slate-300"> ({userToUnlink.email})</span>
+              )}
+              ? They are currently linked to{" "}
+              <strong className="text-amber-200">{userToUnlink.poolhubPlayerName}</strong>
+              .
+            </p>
+            <p className="mt-2 text-sm text-slate-400">
+              They can link again later from their profile. This change takes effect only when you confirm below.
+            </p>
+          </>
+        )}
+      </Modal>
 
       {/* League & Season card – content height only, collapsible; width matches wider card */}
       {leagueLoadError && (
@@ -1054,59 +1263,63 @@ export function DashboardContent() {
               open={resetTournamentModalOpen}
               onClose={() => setResetTournamentModalOpen(false)}
               title="Reset Match Scores?"
+              footer={
+                <div className="flex flex-wrap justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setResetTournamentModalOpen(false)}
+                    className="cursor-pointer rounded-lg border border-white/20 bg-transparent px-4 py-2.5 text-sm font-medium text-slate-200 transition-colors hover:bg-white/10"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      resetTournament();
+                      setResetTournamentModalOpen(false);
+                    }}
+                    className="cursor-pointer rounded-lg border border-red-400/50 bg-red-800/80 px-4 py-2.5 text-sm font-medium text-red-100 shadow-sm transition-colors hover:bg-red-700/80"
+                    aria-label="Confirm reset match scores"
+                  >
+                    Reset Match Scores
+                  </button>
+                </div>
+              }
             >
-              <p className="mb-6 text-slate-200">
+              <p className="text-slate-200">
                 All match scores will be cleared. The bracket and player assignments will stay the same. This cannot be undone.
               </p>
-              <div className="flex flex-wrap justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setResetTournamentModalOpen(false)}
-                  className="cursor-pointer rounded-lg border border-white/20 bg-transparent px-4 py-2.5 text-sm font-medium text-slate-200 transition-colors hover:bg-white/10"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    resetTournament();
-                    setResetTournamentModalOpen(false);
-                  }}
-                  className="cursor-pointer rounded-lg border border-red-400/50 bg-red-800/80 px-4 py-2.5 text-sm font-medium text-red-100 shadow-sm transition-colors hover:bg-red-700/80"
-                  aria-label="Confirm reset match scores"
-                >
-                  Reset Match Scores
-                </button>
-              </div>
             </Modal>
             <Modal
               open={resetBracketsModalOpen}
               onClose={() => setResetBracketsModalOpen(false)}
               title="Reset Brackets"
+              footer={
+                <div className="flex flex-wrap justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setResetBracketsModalOpen(false)}
+                    className="cursor-pointer rounded-lg border border-white/20 bg-transparent px-4 py-2.5 text-sm font-medium text-slate-200 transition-colors hover:bg-white/10"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      resetBracketPlayerSlotsOnly();
+                      setResetBracketsModalOpen(false);
+                    }}
+                    className="cursor-pointer rounded-lg border border-red-400/50 bg-red-800/80 px-4 py-2.5 text-sm font-medium text-red-100 shadow-sm transition-colors hover:bg-red-700/80"
+                    aria-label="Confirm reset brackets"
+                  >
+                    Reset Brackets
+                  </button>
+                </div>
+              }
             >
-              <p className="mb-6 text-slate-200">
+              <p className="text-slate-200">
                 Clear all player selections from every bracket slot (all 8 Week 1 cards)? Location and other tournament settings will not be changed.
               </p>
-              <div className="flex flex-wrap justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setResetBracketsModalOpen(false)}
-                  className="cursor-pointer rounded-lg border border-white/20 bg-transparent px-4 py-2.5 text-sm font-medium text-slate-200 transition-colors hover:bg-white/10"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    resetBracketPlayerSlotsOnly();
-                    setResetBracketsModalOpen(false);
-                  }}
-                  className="cursor-pointer rounded-lg border border-red-400/50 bg-red-800/80 px-4 py-2.5 text-sm font-medium text-red-100 shadow-sm transition-colors hover:bg-red-700/80"
-                  aria-label="Confirm reset brackets"
-                >
-                  Reset Brackets
-                </button>
-              </div>
             </Modal>
             <hr className="border-t border-[var(--surface-border)] my-4" aria-hidden />
             {venueSyncError && (
@@ -1145,7 +1358,7 @@ export function DashboardContent() {
                       key={key}
                       className="rounded-lg border border-[var(--surface-border)] bg-slate-800/30 p-3"
                     >
-                      <div className="grid grid-cols-[auto_1fr_auto_1fr] items-center gap-x-6 gap-y-3">
+                      <div className="grid grid-cols-[auto_1fr] items-center gap-x-6 gap-y-3">
                         <span className="text-sm font-medium text-blue-400">{LOCATION_LABELS[key]}</span>
                         <select
                           value={locations[key]}
@@ -1155,7 +1368,7 @@ export function DashboardContent() {
                         }}
                         onBlur={saveLocations}
                         disabled={venuesLoading || tournamentStarted || tournamentPaused}
-                        className={`select-dark col-span-3 min-w-0 rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-800/70 disabled:text-slate-400 ${locations[key]?.trim() ? "slot-filled" : ""}`}
+                        className={`select-dark min-w-0 rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-800/70 disabled:text-slate-400 ${locations[key]?.trim() ? "slot-filled" : ""}`}
                         style={{ borderColor: "var(--surface-border)" }}
                         aria-label={LOCATION_LABELS[key]}
                       >
@@ -1254,7 +1467,7 @@ export function DashboardContent() {
                       key={key}
                       className="rounded-lg border border-[var(--surface-border)] bg-slate-800/30 p-3"
                     >
-                      <div className="grid grid-cols-[auto_1fr_auto_1fr] items-center gap-x-6 gap-y-3">
+                      <div className="grid grid-cols-[auto_1fr] items-center gap-x-6 gap-y-3">
                         <span className="text-sm font-medium text-blue-400">{LOCATION_LABELS[key]}</span>
                         <select
                           value={locations[key]}
@@ -1264,7 +1477,7 @@ export function DashboardContent() {
                         }}
                         onBlur={saveLocations}
                         disabled={venuesLoading || tournamentStarted || tournamentPaused}
-                        className={`select-dark col-span-3 min-w-0 rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-800/70 disabled:text-slate-400 ${locations[key]?.trim() ? "slot-filled" : ""}`}
+                        className={`select-dark min-w-0 rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-800/70 disabled:text-slate-400 ${locations[key]?.trim() ? "slot-filled" : ""}`}
                         style={{ borderColor: "var(--surface-border)" }}
                         aria-label={LOCATION_LABELS[key]}
                       >
@@ -1359,7 +1572,7 @@ export function DashboardContent() {
                   aria-hidden={!finalsSectionOpen}
                 >
                   <div className="rounded-lg border border-[var(--surface-border)] bg-slate-800/30 p-3">
-                    <div className="grid grid-cols-[auto_1fr_auto_1fr] items-center gap-x-6 gap-y-3">
+                    <div className="grid grid-cols-[auto_1fr] items-center gap-x-6 gap-y-3">
                       <span className="text-sm font-medium text-blue-400">{LOCATION_LABELS.finalsLocation}</span>
                       <select
                       value={locations.finalsLocation}
@@ -1369,7 +1582,7 @@ export function DashboardContent() {
                       }}
                       onBlur={saveLocations}
                       disabled={venuesLoading || tournamentStarted || tournamentPaused}
-                      className={`select-dark col-span-3 min-w-0 rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-800/70 disabled:text-slate-400 ${locations.finalsLocation?.trim() ? "slot-filled" : ""}`}
+                      className={`select-dark min-w-0 rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-800/70 disabled:text-slate-400 ${locations.finalsLocation?.trim() ? "slot-filled" : ""}`}
                       style={{ borderColor: "var(--surface-border)" }}
                       aria-label={LOCATION_LABELS.finalsLocation}
                     >
@@ -1524,13 +1737,18 @@ export function DashboardContent() {
         </div>
       </aside>
 
-      {/* Tab to re-open panel when collapsed */}
+      {/* Tab to re-open side card when collapsed – same inset as card */}
       {!sidePanelOpen && (
         <button
           type="button"
           onClick={() => setSidePanelOpen(true)}
-          className="fixed left-0 top-[calc(1.75rem+50vh)] z-40 flex h-24 w-10 -translate-y-1/2 items-center justify-center rounded-r-lg border border-l-0 border-white/30 bg-gradient-to-br from-slate-800 to-slate-900 text-blue-100/90 shadow-lg transition-colors hover:bg-slate-700 hover:text-blue-100"
-          aria-label="Open panel"
+          className="fixed z-40 flex w-10 items-center justify-center rounded-xl border border-white/20 bg-gradient-to-br from-slate-900 to-slate-950 text-blue-100/90 shadow-2xl transition-colors hover:from-slate-800 hover:to-slate-900 hover:text-blue-100"
+          style={{
+            left: pageInsets.left,
+            top: pageInsets.top,
+            bottom: pageInsets.bottom,
+          }}
+          aria-label="Open setup card"
         >
           <span aria-hidden>▶</span>
         </button>
@@ -1539,16 +1757,19 @@ export function DashboardContent() {
       {/* Main content: bracket columns, with margin so they don’t sit under the panel/tab */}
       <div
         className="min-w-0 w-full overflow-x-hidden transition-[padding] duration-200 ease-out"
-        style={{ paddingLeft: sidePanelOpen ? sidePanelMeasuredWidth : SIDE_PANEL_TAB_WIDTH }}
+        style={{
+          paddingLeft:
+            pageInsets.left + (sidePanelOpen ? sidePanelMeasuredWidth : SIDE_PANEL_TAB_WIDTH),
+        }}
       >
         <div className="min-w-0 overflow-x-auto">
           <div className="flex min-w-max flex-wrap gap-6 items-start">
-      {/* Column 2: Week 1 location slot cards (8 cards) */}
+      {/* Column 2: Week 1 location slot cards (8 cards) – all cards match width of widest (expanded) card */}
       <div className="flex w-max min-w-0 flex-col gap-6">
         {WEEK_1_KEYS.map((key, index) => (
           <div
             key={key}
-            className="w-max min-w-0 overflow-hidden rounded-xl border border-white/40 bg-black text-foreground"
+            className="w-full min-w-0 overflow-hidden rounded-xl border border-white/40 bg-black text-foreground"
           >
             <div
               className={`flex min-h-14 w-full flex-shrink-0 flex-col gap-1 px-5 py-4 ${week1SlotCardsOpen[index] ? "rounded-t-xl" : "rounded-xl"} bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900`}
@@ -1639,12 +1860,12 @@ export function DashboardContent() {
         ))}
       </div>
 
-      {/* Column 3: Week 2 location slot cards (4 cards, 8-player brackets) */}
+      {/* Column 3: Week 2 location slot cards (4 cards, 8-player brackets) – all cards match width of widest (expanded) card */}
       <div className="flex w-max min-w-0 flex-col gap-6">
         {WEEK_2_KEYS.map((key, index) => (
           <div
             key={key}
-            className="w-max min-w-0 overflow-hidden rounded-xl border border-white/40 bg-black text-foreground"
+            className="w-full min-w-0 overflow-hidden rounded-xl border border-white/40 bg-black text-foreground"
           >
             <div
               className={`flex min-h-14 w-full flex-shrink-0 flex-col gap-1 px-5 py-4 ${week2SlotCardsOpen[index] ? "rounded-t-xl" : "rounded-xl"} bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900`}
