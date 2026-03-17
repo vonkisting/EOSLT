@@ -1,4 +1,5 @@
 import { mutation, query } from "./_generated/server";
+import type { Doc } from "./_generated/dataModel";
 import { v } from "convex/values";
 
 const locationKeys = [
@@ -16,6 +17,78 @@ const uiCollapsedKeys = [
 ] as const;
 
 /**
+ * Get public tournament state for the home page (no auth). Returns the first
+ * dashboard settings document so unauthenticated users see the same bracket/no-tournament as everyone else.
+ */
+export const getPublic = query({
+  args: {},
+  handler: async (ctx) => {
+    const doc = await ctx.db.query("dashboardSettings").first();
+    if (!doc) return null;
+    return mapDocToSettings(doc);
+  },
+});
+
+function mapDocToSettings(doc: Doc<"dashboardSettings">) {
+  const d = doc as Record<string, unknown>;
+  const out: Record<string, string | null | boolean> = {
+    leagueName: doc.leagueName,
+    season: doc.season,
+    leagueGuid: doc.leagueGuid ?? null,
+    tournamentStarted: doc.tournamentStarted === true,
+    tournamentPaused: doc.tournamentPaused === true,
+  };
+  for (const key of locationKeys) {
+    const val = d[key];
+    out[key] = typeof val === "string" ? val : null;
+  }
+  const locationStartMetaRaw = d.locationStartMeta;
+  out.locationStartMeta =
+    typeof locationStartMetaRaw === "string" && locationStartMetaRaw.trim() !== ""
+      ? locationStartMetaRaw
+      : null;
+  for (let i = 0; i < 96; i++) {
+    const key = `bracketSlot${i}`;
+    const val = d[key];
+    out[key] = typeof val === "string" ? val : null;
+  }
+  for (let i = 0; i < 48; i++) {
+    const key = `bracketMatchStatus${i}`;
+    const val = d[key];
+    out[key] = typeof val === "string" ? val : null;
+  }
+  for (let i = 0; i < 48; i++) {
+    for (const prefix of ["bracketScoreTop", "bracketScoreBottom"]) {
+      const key = `${prefix}${i}`;
+      const val = d[key];
+      out[key] = typeof val === "string" ? val : null;
+    }
+  }
+  for (let i = 0; i < 48; i++) {
+    const key = `liveScoreGames${i}`;
+    const val = d[key];
+    out[key] = typeof val === "string" ? val : null;
+  }
+  const week2Raw = d.week2BracketSlots;
+  out.week2BracketSlots = typeof week2Raw === "string" ? week2Raw : null;
+  const finalsRaw = d.finalsBracketSlots;
+  out.finalsBracketSlots = typeof finalsRaw === "string" ? finalsRaw : null;
+  const finalsScoresRaw = d.finalsBracketScores;
+  out.finalsBracketScores = typeof finalsScoresRaw === "string" ? finalsScoresRaw : null;
+  for (const key of uiCollapsedKeys) {
+    const val = d[key];
+    out[key] = val === true;
+  }
+  return out as {
+    leagueName: string;
+    season: string;
+    leagueGuid: string | null;
+    tournamentStarted: boolean;
+    tournamentPaused: boolean;
+  } & Record<(typeof locationKeys)[number], string | null> & { locationStartMeta: string | null } & Record<`bracketSlot${number}`, string | null> & Record<`bracketMatchStatus${number}`, string | null> & Record<`bracketScoreTop${number}` | `bracketScoreBottom${number}`, string | null> & Record<`liveScoreGames${number}`, string | null> & { week2BracketSlots: string | null; finalsBracketSlots: string | null; finalsBracketScores: string | null } & Record<(typeof uiCollapsedKeys)[number], boolean>;
+}
+
+/**
  * Get stored league name, season, league GUID, and location fields for the dashboard (by user email).
  */
 export const get = query({
@@ -27,61 +100,7 @@ export const get = query({
       .withIndex("by_email", (q) => q.eq("email", normalized))
       .unique();
     if (!doc) return null;
-    const out: Record<string, string | null | boolean> = {
-      leagueName: doc.leagueName,
-      season: doc.season,
-      leagueGuid: doc.leagueGuid ?? null,
-      tournamentStarted: (doc as Record<string, unknown>).tournamentStarted === true,
-      tournamentPaused: (doc as Record<string, unknown>).tournamentPaused === true,
-    };
-    for (const key of locationKeys) {
-      const val = (doc as Record<string, unknown>)[key];
-      out[key] = typeof val === "string" ? val : null;
-    }
-    const locationStartMetaRaw = (doc as Record<string, unknown>).locationStartMeta;
-    out.locationStartMeta =
-      typeof locationStartMetaRaw === "string" && locationStartMetaRaw.trim() !== ""
-        ? locationStartMetaRaw
-        : null;
-    for (let i = 0; i < 96; i++) {
-      const key = `bracketSlot${i}`;
-      const val = (doc as Record<string, unknown>)[key];
-      out[key] = typeof val === "string" ? val : null;
-    }
-    for (let i = 0; i < 48; i++) {
-      const key = `bracketMatchStatus${i}`;
-      const val = (doc as Record<string, unknown>)[key];
-      out[key] = typeof val === "string" ? val : null;
-    }
-    for (let i = 0; i < 48; i++) {
-      for (const prefix of ["bracketScoreTop", "bracketScoreBottom"]) {
-        const key = `${prefix}${i}`;
-        const val = (doc as Record<string, unknown>)[key];
-        out[key] = typeof val === "string" ? val : null;
-      }
-    }
-    for (let i = 0; i < 48; i++) {
-      const key = `liveScoreGames${i}`;
-      const val = (doc as Record<string, unknown>)[key];
-      out[key] = typeof val === "string" ? val : null;
-    }
-    const week2Raw = (doc as Record<string, unknown>).week2BracketSlots;
-    out.week2BracketSlots = typeof week2Raw === "string" ? week2Raw : null;
-    const finalsRaw = (doc as Record<string, unknown>).finalsBracketSlots;
-    out.finalsBracketSlots = typeof finalsRaw === "string" ? finalsRaw : null;
-    const finalsScoresRaw = (doc as Record<string, unknown>).finalsBracketScores;
-    out.finalsBracketScores = typeof finalsScoresRaw === "string" ? finalsScoresRaw : null;
-    for (const key of uiCollapsedKeys) {
-      const val = (doc as Record<string, unknown>)[key];
-      out[key] = val === true;
-    }
-    return out as {
-      leagueName: string;
-      season: string;
-      leagueGuid: string | null;
-      tournamentStarted: boolean;
-      tournamentPaused: boolean;
-    } & Record<(typeof locationKeys)[number], string | null> & { locationStartMeta: string | null } & Record<`bracketSlot${number}`, string | null> & Record<`bracketMatchStatus${number}`, string | null> & Record<`bracketScoreTop${number}` | `bracketScoreBottom${number}`, string | null> & Record<`liveScoreGames${number}`, string | null> & { week2BracketSlots: string | null; finalsBracketSlots: string | null; finalsBracketScores: string | null } & Record<(typeof uiCollapsedKeys)[number], boolean>;
+    return mapDocToSettings(doc);
   },
 });
 

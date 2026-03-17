@@ -60,10 +60,15 @@ export function HomeBracketCards() {
   const router = useRouter();
   const { data: session, status } = useSession();
   const email = session?.user?.email?.toLowerCase().trim();
-  const settings = useQuery(
+  const settingsByEmail = useQuery(
     api.dashboardSettings.get,
     email ? { email } : "skip"
   );
+  const settingsPublic = useQuery(
+    api.dashboardSettings.getPublic,
+    email ? "skip" : {}
+  );
+  const settings = email ? settingsByEmail : settingsPublic;
   const setDashboardSettings = useMutation(api.dashboardSettings.set);
   const convexUser = useQuery(
     api.users.getByEmail,
@@ -78,6 +83,7 @@ export function HomeBracketCards() {
   >([]);
   const [loadingPlayers, setLoadingPlayers] = useState(false);
   const [loadingTimedOut, setLoadingTimedOut] = useState(false);
+  const [bracketError, setBracketError] = useState(false);
 
   useEffect(() => {
     if (status !== "loading" && settings !== undefined) return;
@@ -135,9 +141,11 @@ export function HomeBracketCards() {
   useEffect(() => {
     if (!leagueGuid) {
       setPlayerRows([]);
+      setBracketError(false);
       return;
     }
     let cancelled = false;
+    setBracketError(false);
     setLoadingPlayers(true);
     fetch(`/api/overall-player-stats?leagueGuid=${encodeURIComponent(leagueGuid)}`)
       .then((r) => r.json())
@@ -181,6 +189,7 @@ export function HomeBracketCards() {
         if (!cancelled) {
           setPlayerRows([]);
           setLoadingPlayers(false);
+          setBracketError(true);
         }
       });
     return () => {
@@ -383,12 +392,7 @@ export function HomeBracketCards() {
           EOSLT
         </h1>
         <p className="mt-2 text-sm text-blue-200/80">
-          Taking longer than usual. Check that{" "}
-          <code className="rounded bg-white/10 px-1">NEXT_PUBLIC_CONVEX_URL</code>{" "}
-          is set in your deployment and Convex is deployed.
-        </p>
-        <p className="mt-2 text-sm text-blue-200/80">
-          Or use the navigation to open Dashboard or Profile.
+          Taking longer than usual. Please refresh the page or use the navigation to open Dashboard or Profile.
         </p>
       </div>
     );
@@ -413,6 +417,19 @@ export function HomeBracketCards() {
     return (
       <div className="rounded-xl border border-[var(--surface-border)] bg-black/40 p-6">
         <p className="text-sm text-blue-200/80">Loading bracket data…</p>
+      </div>
+    );
+  }
+
+  if (
+    bracketError ||
+    (hasLeagueAndSeason && tournamentStarted && !tournamentPaused && !loadingPlayers && playerRows.length === 0)
+  ) {
+    return (
+      <div className="flex min-h-[70vh] flex-col items-center justify-center gap-4 px-4 text-center">
+        <p className="text-xl font-semibold text-yellow-400 sm:text-2xl">
+          Oops, Something went wrong. Try again later.
+        </p>
       </div>
     );
   }
