@@ -22,15 +22,28 @@ const DEFAULT_CALLBACK = "/auth/landing";
 export async function registerAction(formData: FormData) {
   const email = formData.get("email");
   const password = formData.get("password");
+  const confirmPassword = formData.get("confirmPassword");
   const name = formData.get("name");
   const callbackUrl = formData.get("callbackUrl");
-  if (typeof email !== "string" || typeof password !== "string") {
-    throw new Error("Email and password required");
+  if (
+    typeof name !== "string" ||
+    typeof email !== "string" ||
+    typeof password !== "string" ||
+    typeof confirmPassword !== "string" ||
+    !name.trim() ||
+    !email.trim() ||
+    !password.trim() ||
+    !confirmPassword.trim()
+  ) {
+    throw new Error("Name, email, password, and confirm password are required");
+  }
+  if (password !== confirmPassword) {
+    throw new Error("Passwords do not match");
   }
   if (password.length < 8) {
     throw new Error("Password must be at least 8 characters");
   }
-  const nameStr = typeof name === "string" ? name.trim() || undefined : undefined;
+  const nameStr = name.trim();
   await registerUser(email, password, nameStr);
   await signIn("credentials", {
     email,

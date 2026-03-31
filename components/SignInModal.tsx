@@ -107,6 +107,7 @@ export function SignInModal() {
                   id="name"
                   name="name"
                   type="text"
+                  required
                   autoComplete="name"
                   className="w-full rounded-xl border border-white/20 bg-white/5 px-3 py-2.5 text-white placeholder-slate-500 focus:border-purple-400/50 focus:outline-none focus:ring-1 focus:ring-purple-400/50"
                   placeholder="Your name"
