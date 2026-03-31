@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import Link from "next/link";
 import type { Session } from "next-auth";
@@ -11,18 +11,44 @@ type ProfileCardProps = {
 };
 
 /**
- * Profile card content: avatar, name, email, PoolHub player (with Unlink when linked), and link warning when not linked.
+ * Profile card content: name, email, PoolHub player (with Unlink when linked), link warning when not linked, and View Bracket button.
  */
 export function ProfileCard({ user }: ProfileCardProps) {
   const convexUser = useQuery(
     api.users.getByEmail,
     user.email ? { email: user.email } : "skip"
   );
+  const setName = useMutation(api.users.setName);
   const setPoolhubPlayerName = useMutation(api.users.setPoolhubPlayerName);
+  const [name, setNameValue] = useState(user.name ?? "");
+  const [savingName, setSavingName] = useState(false);
+  const [nameMessage, setNameMessage] = useState<string | null>(null);
   const [unlinking, setUnlinking] = useState(false);
 
   const isLinked = Boolean(convexUser?.poolhubPlayerName);
   const linkedName = convexUser?.poolhubPlayerName?.trim() ?? "";
+  const resolvedName = convexUser?.name ?? user.name ?? "";
+
+  useEffect(() => {
+    setNameValue(resolvedName);
+  }, [resolvedName]);
+
+  const hasNameChanges = name.trim() !== resolvedName.trim();
+  const canUpdateName = hasNameChanges && name.trim().length > 0;
+
+  const handleSaveName = async () => {
+    if (!user.email || !canUpdateName) return;
+    setSavingName(true);
+    setNameMessage(null);
+    try {
+      await setName({ email: user.email, name: name.trim() });
+      setNameMessage("Name updated.");
+    } catch {
+      setNameMessage("Unable to update name right now.");
+    } finally {
+      setSavingName(false);
+    }
+  };
 
   const handleUnlink = async () => {
     if (!user.email || !linkedName) return;
@@ -36,19 +62,53 @@ export function ProfileCard({ user }: ProfileCardProps) {
 
   return (
     <>
-      {user.image && (
-        <img
-          src={user.image}
-          alt=""
-          className="h-16 w-16 rounded-full ring-2 ring-blue-400/30"
-        />
-      )}
       <div className="grid gap-4 sm:grid-cols-1">
         <div>
           <p className="text-xs font-medium uppercase tracking-wider text-blue-200/70">
             Name
           </p>
-          <p className="mt-1 text-foreground">{user.name ?? "—"}</p>
+          <div className="mt-1 space-y-3">
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => {
+                setNameValue(e.target.value);
+                setNameMessage(null);
+              }}
+              placeholder="Your name"
+              className="w-full rounded-lg border border-white/20 bg-white/5 px-3 py-2.5 text-foreground placeholder:text-slate-500 focus:border-blue-400/60 focus:outline-none focus:ring-1 focus:ring-blue-400/60"
+            />
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={handleSaveName}
+                disabled={savingName || !canUpdateName}
+                className="rounded-lg bg-gradient-to-r from-blue-700 to-blue-500 px-4 py-2 text-sm font-medium text-white shadow transition hover:from-blue-600 hover:to-blue-400 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {savingName ? "Updating..." : "Update Name"}
+              </button>
+              {hasNameChanges && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNameValue(resolvedName);
+                    setNameMessage(null);
+                  }}
+                  className="rounded-lg border border-white/20 bg-white/5 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-white/10"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+            {hasNameChanges && name.trim().length === 0 && (
+              <p className="text-sm text-amber-200/90">
+                Name cannot be empty.
+              </p>
+            )}
+            {nameMessage && (
+              <p className="text-sm text-blue-200/90">{nameMessage}</p>
+            )}
+          </div>
         </div>
         <div>
           <p className="text-xs font-medium uppercase tracking-wider text-blue-200/70">
@@ -90,6 +150,13 @@ export function ProfileCard({ user }: ProfileCardProps) {
           </Link>
         </div>
       )}
+
+      <Link
+        href="/"
+        className="mt-2 inline-flex w-full items-center justify-center rounded-lg border border-white/20 bg-gradient-to-b from-[#0c1628] via-[#1e3a5f] to-[#0c1628] px-4 py-2.5 text-sm font-medium text-white shadow transition-colors hover:opacity-95"
+      >
+        View Bracket
+      </Link>
     </>
   );
 }

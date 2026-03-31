@@ -111,6 +111,29 @@ export const setPoolhubPlayerName = mutation({
 });
 
 /**
+ * Set the display name for the user with the given email.
+ * Call only with the authenticated user's own email (enforced by UI / auth layer).
+ */
+export const setName = mutation({
+  args: {
+    email: v.string(),
+    name: v.string(),
+  },
+  handler: async (ctx, { email, name }) => {
+    const normalized = email.toLowerCase().trim();
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", normalized))
+      .unique();
+    if (!user) {
+      throw new Error("User not found");
+    }
+    await ctx.db.patch(user._id, { name: name.trim() || undefined });
+    return user._id;
+  },
+});
+
+/**
  * Delete a single user by id. Used by the dashboard to remove an account from the users list.
  * Clears the user's PoolHub player link first so that name can be claimed by another user.
  * Does not remove the user from Auth.js; they may be re-created on next sign-in if using OAuth.

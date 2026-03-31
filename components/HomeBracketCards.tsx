@@ -406,23 +406,25 @@ export function HomeBracketCards() {
         <p className="text-2xl font-semibold text-yellow-400 sm:text-3xl">
           Tournament hasn&apos;t been setup yet. Brackets will be posted once the drawing is complete and ready.
         </p>
-        <div className="text-lg text-blue-200/90 sm:text-xl space-y-3">
-          {email ? (
-            <p>To link your account to your PoolHub player, go to the Profile tab.</p>
-          ) : (
-            <>
-              <p>
-                If you are just viewing the bracket, then this page is all you need to view. If you are a player and plan to live score your match, you will need to create an account and link your PoolHub player to your new account. You can log in with Google (Recommended), or you can register with an email and password.
-              </p>
-              <p>
-                Once your account is created, go to the Profile page to link your new account to your PoolHub player. After that, you will be able to Live Score your Match!
-              </p>
-              <p>
-                The need for a new account and linking to PoolHub is to avoid using the same servers as PoolHub since we know that there are sometimes server issues. This will eliminate any issues because the new server is MUCH more reliable.
-              </p>
-            </>
-          )}
-        </div>
+        {(email && !linkedName) || !email ? (
+          <div className="text-lg text-blue-200/90 sm:text-xl space-y-3">
+            {email ? (
+              <p>To link your account to your PoolHub player, go to the Profile tab.</p>
+            ) : (
+              <>
+                <p>
+                  If you are just viewing the bracket, then this page is all you need to view. If you are a player and plan to live score your match, you will need to create an account and link your PoolHub player to your new account. You can log in with Google (Recommended), or you can register with an email and password.
+                </p>
+                <p>
+                  Once your account is created, go to the Profile page to link your new account to your PoolHub player. After that, you will be able to Live Score your Match!
+                </p>
+                <p>
+                  The need for a new account and linking to PoolHub is to avoid using the same servers as PoolHub since we know that there are sometimes server issues. This will eliminate any issues because the new server is MUCH more reliable.
+                </p>
+              </>
+            )}
+          </div>
+        ) : null}
       </div>
     );
   }

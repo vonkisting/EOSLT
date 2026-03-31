@@ -216,6 +216,11 @@ export function LinkPlayerList({ userEmail }: { userEmail: string }) {
       .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
   }, [playerRows]);
 
+  const unlinkedPlayerCount = useMemo(
+    () => playerNames.filter((name) => !linkedNames.has(name)).length,
+    [linkedNames, playerNames]
+  );
+
   if (!email) {
     return (
       <div className="text-sm text-blue-200/80">
@@ -280,6 +285,14 @@ export function LinkPlayerList({ userEmail }: { userEmail: string }) {
           ? "You are linked to a player. Use Un-Link to unlink, then you can link to a different player."
           : "Select your player name to link this account. Players already linked to another account do not show a Link button."}
       </p>
+      <div className="space-y-1">
+        <p className="text-sm font-semibold text-blue-300">
+          Players in list: {playerNames.length}
+        </p>
+        <p className="text-sm font-semibold text-blue-300">
+          Unlinked players: {unlinkedPlayerCount}
+        </p>
+      </div>
       <ul className="flex flex-col gap-2 rounded-lg border border-[var(--surface-border)] bg-black/40 p-3 max-h-[60vh] overflow-y-auto">
         {playerNames.map((name) => {
           const isLinkedToMe =
