@@ -45,6 +45,10 @@ export function SignInModal() {
         }
       }
     } catch (e) {
+      if (e instanceof Error && e.message === "Email already registered") {
+        setError("An account with that email already exists. Please sign in instead.");
+        return;
+      }
       setError(e instanceof Error ? e.message : "Something went wrong");
     }
   }
