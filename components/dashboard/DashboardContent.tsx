@@ -105,15 +105,6 @@ function toNumber(val: string | number | null | undefined): number | null {
 }
 
 /** Fisher–Yates shuffle; returns a new array. */
-function shuffle<T>(arr: T[]): T[] {
-  const out = [...arr];
-  for (let i = out.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [out[i], out[j]] = [out[j], out[i]];
-  }
-  return out;
-}
-
 export function DashboardContent() {
   const { data: session } = useSession();
   const email = session?.user?.email?.toLowerCase().trim();
@@ -161,6 +152,7 @@ export function DashboardContent() {
   const [finalsSectionOpen, setFinalsSectionOpen] = useState(false);
   const [bracketResetKey, setBracketResetKey] = useState(0);
   const [resetBracketsModalOpen, setResetBracketsModalOpen] = useState(false);
+  const [resetLocationsModalOpen, setResetLocationsModalOpen] = useState(false);
   const [resetTournamentModalOpen, setResetTournamentModalOpen] = useState(false);
 
   /** Player list with byes numbered as "-- Bye 1 --", "-- Bye 2 --", etc. for display and bracket. */
@@ -295,10 +287,8 @@ export function DashboardContent() {
   const startTournamentHintMessage = useMemo(() => {
     if (!selectedLeagueName?.trim()) return "Select a league.";
     if (!selectedSeason?.trim()) return "Select a season.";
-    if (!allLocationsFilled) return "Set all Week 1, Week 2, and Finals locations.";
-    if (!allFirstRoundFilled) return "Fill all 64 first-round bracket slots (expand each Week 1 card and assign players).";
     return null;
-  }, [selectedLeagueName, selectedSeason, allLocationsFilled, allFirstRoundFilled]);
+  }, [selectedLeagueName, selectedSeason]);
 
   const usersList = useQuery(api.users.list, {});
   const deleteUserMutation = useMutation(api.users.deleteUser);
@@ -588,6 +578,43 @@ export function DashboardContent() {
     } as Parameters<typeof setDashboardSettings>[0]);
     setBracketResetKey((k) => k + 1);
   }, [email, selectedLeagueName, selectedSeason, tournamentStarted, tournamentPaused, setDashboardSettings]);
+
+  /** Reset all Week 1, Week 2, and Finals locations plus their start date/time fields. */
+  const resetLocationsOnly = useCallback(() => {
+    if (!email) return;
+    const emptyLocations = Object.fromEntries(
+      LOCATION_KEYS.map((key) => [key, ""])
+    ) as Record<LocationKey, string>;
+    const emptyDates = Object.fromEntries(
+      LOCATION_KEYS.map((key) => [key, ""])
+    ) as Record<LocationKey, string>;
+    const emptyTimes = Object.fromEntries(
+      LOCATION_KEYS.map((key) => [key, ""])
+    ) as Record<LocationKey, string>;
+    setLocations(emptyLocations);
+    setLocationStartDates(emptyDates);
+    setLocationStartTimes(emptyTimes);
+    setDashboardSettings({
+      email,
+      leagueName: selectedLeagueName,
+      season: selectedSeason,
+      tournamentStarted,
+      tournamentPaused,
+      ...emptyLocations,
+      locationStartMeta: JSON.stringify(
+        Object.fromEntries(
+          LOCATION_KEYS.map((key) => [key, { startDate: "", startTime: "" }])
+        )
+      ),
+    } as Parameters<typeof setDashboardSettings>[0]);
+  }, [
+    email,
+    selectedLeagueName,
+    selectedSeason,
+    tournamentStarted,
+    tournamentPaused,
+    setDashboardSettings,
+  ]);
 
   const startTournament = useCallback(() => {
     if (!email) return;
@@ -1259,6 +1286,15 @@ export function DashboardContent() {
             >
               Reset Brackets
             </button>
+            <button
+              type="button"
+              onClick={() => setResetLocationsModalOpen(true)}
+              disabled={tournamentPaused}
+              className="mt-2 cursor-pointer rounded-lg border border-amber-400/50 bg-amber-800/60 px-3 py-2 text-sm font-medium text-amber-100 shadow-sm transition-colors hover:bg-amber-700/70 disabled:opacity-55 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-slate-700/80 disabled:border-slate-600"
+              aria-label="Reset Locations"
+            >
+              Reset Locations
+            </button>
             <Modal
               open={resetTournamentModalOpen}
               onClose={() => setResetTournamentModalOpen(false)}
@@ -1319,6 +1355,37 @@ export function DashboardContent() {
             >
               <p className="text-slate-200">
                 Clear all player selections from every bracket slot (all 8 Week 1 cards)? Location and other tournament settings will not be changed.
+              </p>
+            </Modal>
+            <Modal
+              open={resetLocationsModalOpen}
+              onClose={() => setResetLocationsModalOpen(false)}
+              title="Reset Locations"
+              footer={
+                <div className="flex flex-wrap justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setResetLocationsModalOpen(false)}
+                    className="cursor-pointer rounded-lg border border-white/20 bg-transparent px-4 py-2.5 text-sm font-medium text-slate-200 transition-colors hover:bg-white/10"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      resetLocationsOnly();
+                      setResetLocationsModalOpen(false);
+                    }}
+                    className="cursor-pointer rounded-lg border border-amber-400/50 bg-amber-800/80 px-4 py-2.5 text-sm font-medium text-amber-100 shadow-sm transition-colors hover:bg-amber-700/80"
+                    aria-label="Confirm reset locations"
+                  >
+                    Reset Locations
+                  </button>
+                </div>
+              }
+            >
+              <p className="text-slate-200">
+                Clear all Week 1, Week 2, and Finals locations plus their start date and start time fields? Brackets and scores will not be changed.
               </p>
             </Modal>
             <hr className="border-t border-[var(--surface-border)] my-4" aria-hidden />
@@ -1664,18 +1731,6 @@ export function DashboardContent() {
             <h2 className="text-lg font-semibold tracking-tight text-blue-100">
               Players ({playerRows.filter((r) => r.playerName !== BYE_LABEL).length})
             </h2>
-            <button
-              type="button"
-              onClick={() => {
-                const players = playerRows.filter((r) => r.playerName !== BYE_LABEL);
-                const byes = playerRows.filter((r) => r.playerName === BYE_LABEL);
-                setPlayerRows([...shuffle(players), ...byes].slice(0, PLAYER_SLOTS));
-              }}
-              disabled={tournamentStarted || tournamentPaused}
-              className="ml-auto cursor-pointer rounded-lg border border-blue-400/50 bg-gradient-to-r from-blue-800 to-blue-600 px-3 py-1.5 text-sm font-medium text-blue-100 shadow-sm transition-colors hover:from-blue-700 hover:to-blue-500 hover:border-blue-300/60 disabled:opacity-55 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-slate-700/80 disabled:border-slate-600"
-            >
-              Randomize Bracket
-            </button>
           </div>
           <button
             type="button"

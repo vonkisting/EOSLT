@@ -49,20 +49,21 @@ export function LinkPlayerList({ userEmail }: { userEmail: string }) {
   const router = useRouter();
   const email = userEmail?.trim() || null;
   const settings = useQuery(api.dashboardSettings.get, email ? { email } : "skip");
+  const publicSettings = useQuery(api.dashboardSettings.getPublic, {});
   const users = useQuery(api.users.list);
   const setPoolhubPlayerName = useMutation(api.users.setPoolhubPlayerName);
 
   const [leagueGuid, setLeagueGuid] = useState<string | null>(null);
   const [playerRows, setPlayerRows] = useState<OverallPlayerStatsRow[]>([]);
   const [loadingPlayers, setLoadingPlayers] = useState(false);
-  const [loadingFallback, setLoadingFallback] = useState(false);
   const [linkingName, setLinkingName] = useState<string | null>(null);
   const [unlinkingName, setUnlinkingName] = useState<string | null>(null);
 
   const normalizedEmail = email?.toLowerCase().trim() ?? "";
+  const sourceSettings = publicSettings;
 
   const hasUsableSettings = Boolean(
-    settings && settings.leagueName && settings.season
+    sourceSettings && sourceSettings.leagueName && sourceSettings.season
   );
 
   const linkedNames = useMemo(() => {
@@ -97,13 +98,13 @@ export function LinkPlayerList({ userEmail }: { userEmail: string }) {
       setPlayerRows([]);
       return;
     }
-    const guid = settings?.leagueGuid ?? null;
+    const guid = sourceSettings?.leagueGuid ?? null;
     if (guid) {
       setLeagueGuid(guid);
       return;
     }
-    const leagueName = settings!.leagueName;
-    const season = settings!.season;
+    const leagueName = sourceSettings!.leagueName;
+    const season = sourceSettings!.season;
     let cancelled = false;
     setLoadingPlayers(true);
     resolveLeagueGuid(leagueName, season).then((resolved) => {
@@ -114,47 +115,13 @@ export function LinkPlayerList({ userEmail }: { userEmail: string }) {
     return () => {
       cancelled = true;
     };
-  }, [hasUsableSettings, settings?.leagueGuid, settings?.leagueName, settings?.season, resolveLeagueGuid]);
-
-  useEffect(() => {
-    if (settings === undefined || hasUsableSettings) return;
-    let cancelled = false;
-    setLoadingFallback(true);
-    fetch("/api/leagues")
-      .then((r) => r.json())
-      .then((data: { leagues?: string[]; error?: string } | string[]) => {
-        if (cancelled) return;
-        const leagues = Array.isArray(data) ? data : (data?.leagues ?? []);
-        const firstLeague = leagues[0];
-        if (!firstLeague) {
-          setLoadingFallback(false);
-          return;
-        }
-        return fetch(`/api/seasons?leagueName=${encodeURIComponent(firstLeague)}`)
-          .then((r) => r.json())
-          .then((seasonsData: string[]) => {
-            if (cancelled) return;
-            const seasons = Array.isArray(seasonsData) ? seasonsData : [];
-            const firstSeason = seasons[0];
-            if (!firstSeason) {
-              setLoadingFallback(false);
-              return;
-            }
-            return resolveLeagueGuid(firstLeague, firstSeason);
-          });
-      })
-      .then((resolved) => {
-        if (cancelled) return;
-        if (resolved != null) setLeagueGuid(resolved);
-        setLoadingFallback(false);
-      })
-      .catch(() => {
-        if (!cancelled) setLoadingFallback(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [settings, hasUsableSettings, resolveLeagueGuid]);
+  }, [
+    hasUsableSettings,
+    sourceSettings?.leagueGuid,
+    sourceSettings?.leagueName,
+    sourceSettings?.season,
+    resolveLeagueGuid,
+  ]);
 
   useEffect(() => {
     if (!leagueGuid) {
@@ -230,9 +197,10 @@ export function LinkPlayerList({ userEmail }: { userEmail: string }) {
   }
 
   const settingsLoaded = settings !== undefined;
-  const noListYet = !leagueGuid && !loadingFallback && !loadingPlayers;
+  const sourceSettingsLoaded = publicSettings !== undefined;
+  const noListYet = !leagueGuid && !loadingPlayers;
   const showNeedDashboard =
-    settingsLoaded && !hasUsableSettings && noListYet;
+    sourceSettingsLoaded && !hasUsableSettings && noListYet;
 
   if (showNeedDashboard) {
     return (
@@ -252,7 +220,6 @@ export function LinkPlayerList({ userEmail }: { userEmail: string }) {
 
   const stillLoading =
     settings === undefined ||
-    loadingFallback ||
     (loadingPlayers && playerRows.length === 0);
   if (stillLoading) {
     return (
@@ -286,11 +253,11 @@ export function LinkPlayerList({ userEmail }: { userEmail: string }) {
           : "Select your player name to link this account. Players already linked to another account do not show a Link button."}
       </p>
       <div className="space-y-1">
-        <p className="text-sm font-semibold text-blue-300">
-          Players in list: {playerNames.length}
+        <p className="text-sm font-semibold text-yellow-300">
+          Players in List: {playerNames.length}
         </p>
-        <p className="text-sm font-semibold text-blue-300">
-          Unlinked players: {unlinkedPlayerCount}
+        <p className="text-sm font-semibold text-red-400">
+          Unlinked Players: {unlinkedPlayerCount}
         </p>
       </div>
       <ul className="flex flex-col gap-2 rounded-lg border border-[var(--surface-border)] bg-black/40 p-3 max-h-[60vh] overflow-y-auto">
