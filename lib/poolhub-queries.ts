@@ -71,7 +71,7 @@ export type PlayerRow = {
   LastName: string;
   Weeks: number | null;
   LegacyAve: number | null;
-  RaceTo: number | null;
+  Team: string | null;
 };
 
 /**
@@ -79,7 +79,7 @@ export type PlayerRow = {
  */
 export async function getPlayersByLeagueGuid(leagueGuid: string): Promise<PlayerRow[]> {
   const result = await poolhubQuery<PlayerRow>(
-    "SELECT FirstName, LastName, Weeks, LegacyAve, RaceTo FROM Players WHERE LeagueGUID = $1 ORDER BY LastName, FirstName",
+    "SELECT FirstName, LastName, WeeksPlayed AS Weeks, Average AS LegacyAve, Team FROM Players WHERE LeagueGuid = $1 ORDER BY LastName, FirstName",
     [leagueGuid]
   );
   return result?.rows ?? [];

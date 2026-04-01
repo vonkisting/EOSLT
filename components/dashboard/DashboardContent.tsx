@@ -71,7 +71,7 @@ type PlayerFromApi = {
   LastName: string;
   Weeks: number | null;
   LegacyAve: number | null;
-  RaceTo: number | null;
+  Team: string | null;
 };
 
 type PlayerTableRow = {
@@ -79,6 +79,7 @@ type PlayerTableRow = {
   weeks: number | null;
   legacyAve: number | null;
   raceTo: number | null;
+  teamName: string | null;
 };
 
 type OverallPlayerStatsRow = Record<string, string | number | null | undefined>;
@@ -105,7 +106,77 @@ function toNumber(val: string | number | null | undefined): number | null {
   return Number.isNaN(n) ? null : n;
 }
 
-/** Fisher–Yates shuffle; returns a new array. */
+function toTeamName(val: string | number | null | undefined): string | null {
+  if (val == null) return null;
+  const team = String(val).trim();
+  return team !== "" ? team : null;
+}
+
+function shuffleArray<T>(arr: T[]): T[] {
+  const out = [...arr];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+function canShareFirstRoundMatchup(
+  top: string,
+  bottom: string,
+  teamByPlayer: Map<string, string | null>
+): boolean {
+  if (isBye(top) && isBye(bottom)) return false;
+  if (isBye(top) || isBye(bottom)) return true;
+  const topTeam = teamByPlayer.get(top) ?? null;
+  const bottomTeam = teamByPlayer.get(bottom) ?? null;
+  if (!topTeam || !bottomTeam) return true;
+  return topTeam !== bottomTeam;
+}
+
+function buildRandomizedWeek1Slots(
+  rows: PlayerTableRow[],
+  playerSlotCount: number
+): string[] | null {
+  let byeNumber = 0;
+  const participants = rows.slice(0, playerSlotCount).map((row) => {
+    if (isBye(row.playerName)) {
+      byeNumber += 1;
+      return `-- Bye ${byeNumber} --`;
+    }
+    return row.playerName;
+  });
+  const teamByPlayer = new Map(
+    rows
+      .filter((row) => !isBye(row.playerName))
+      .map((row) => [row.playerName, row.teamName?.toLowerCase().trim() ?? null] as const)
+  );
+
+  for (let attempt = 0; attempt < 20000; attempt++) {
+    const shuffled = shuffleArray(participants);
+    let valid = true;
+
+    for (let bracketIndex = 0; bracketIndex < 8 && valid; bracketIndex++) {
+      const bracket = shuffled.slice(bracketIndex * 8, bracketIndex * 8 + 8);
+      const byeCount = bracket.filter((name) => isBye(name)).length;
+      if (byeCount > 1) {
+        valid = false;
+        break;
+      }
+      for (let slot = 0; slot < 8; slot += 2) {
+        if (!canShareFirstRoundMatchup(bracket[slot] ?? "", bracket[slot + 1] ?? "", teamByPlayer)) {
+          valid = false;
+          break;
+        }
+      }
+    }
+
+    if (valid) return shuffled;
+  }
+
+  return null;
+}
+
 export function DashboardContent() {
   const { data: session } = useSession();
   const email = session?.user?.email?.toLowerCase().trim();
@@ -124,6 +195,7 @@ export function DashboardContent() {
   const pendingSeasonFromSettings = useRef<string | null>(null);
   const [selectedLeagueGuid, setSelectedLeagueGuid] = useState<string | null>(null);
   const [overallPlayerStats, setOverallPlayerStats] = useState<OverallPlayerStatsRow[]>([]);
+  const [playersFromApi, setPlayersFromApi] = useState<PlayerFromApi[]>([]);
   const [loadingOverallStats, setLoadingOverallStats] = useState(false);
   const [playerRows, setPlayerRows] = useState<PlayerTableRow[]>(
     Array(PLAYER_SLOTS).fill(null).map(() => ({
@@ -131,6 +203,7 @@ export function DashboardContent() {
       weeks: null,
       legacyAve: null,
       raceTo: null,
+      teamName: null,
     }))
   );
   const [loadingLeagues, setLoadingLeagues] = useState(true);
@@ -154,7 +227,9 @@ export function DashboardContent() {
   const [bracketResetKey, setBracketResetKey] = useState(0);
   const [resetBracketsModalOpen, setResetBracketsModalOpen] = useState(false);
   const [resetLocationsModalOpen, setResetLocationsModalOpen] = useState(false);
+  const [randomizeBracketModalOpen, setRandomizeBracketModalOpen] = useState(false);
   const [resetTournamentModalOpen, setResetTournamentModalOpen] = useState(false);
+  const [randomizeBracketError, setRandomizeBracketError] = useState<string | null>(null);
 
   /** Player list with byes numbered as "-- Bye 1 --", "-- Bye 2 --", etc. for display and bracket. */
   const playerDisplayNames = useMemo(() => {
@@ -163,6 +238,33 @@ export function DashboardContent() {
       r.playerName === BYE_LABEL ? `-- Bye ${++byeNum} --` : r.playerName
     );
   }, [playerRows]);
+
+  const playerLabelMap = useMemo(
+    () =>
+      Object.fromEntries(
+        playerRows.map((row, index) => {
+          if (row.playerName === BYE_LABEL) {
+            return [playerDisplayNames[index], playerDisplayNames[index]];
+          }
+          const label = row.teamName
+            ? `${row.playerName} (${row.teamName})`
+            : row.playerName;
+          return [row.playerName, label];
+        })
+      ) as Record<string, string>,
+    [playerDisplayNames, playerRows]
+  );
+
+  const playerTeamMap = useMemo(
+    () =>
+      new Map(
+        playersFromApi.map((player) => [
+          `${player.FirstName ?? ""} ${player.LastName ?? ""}`.trim(),
+          toTeamName(player.Team),
+        ])
+      ),
+    [playersFromApi]
+  );
 
   /** First-round slot values for all 8 Week 1 cards (8×8=64). Used so each first-round dropdown excludes names selected in any other card’s first round. */
   const allFirstRoundSelections = useMemo(() => {
@@ -634,6 +736,53 @@ export function DashboardContent() {
     setDashboardSettings,
   ]);
 
+  const randomizeWeek1Brackets = useCallback(() => {
+    if (!email) return;
+    const randomizedFirstRound = buildRandomizedWeek1Slots(playerRows, PLAYER_SLOTS);
+    if (!randomizedFirstRound) {
+      setRandomizeBracketError(
+        "Unable to generate a valid Week 1 bracket with the current players while avoiding same-team first-round matchups and limiting byes to one per bracket."
+      );
+      return;
+    }
+
+    setRandomizeBracketError(null);
+    const slotEntries: [string, string][] = [];
+    for (let cardIndex = 0; cardIndex < 8; cardIndex++) {
+      const base = cardIndex * 12;
+      for (let i = 0; i < 8; i++) {
+        slotEntries.push([
+          `bracketSlot${base + i}`,
+          randomizedFirstRound[cardIndex * 8 + i] ?? "",
+        ]);
+      }
+      for (let i = 8; i < 12; i++) {
+        slotEntries.push([`bracketSlot${base + i}`, ""]);
+      }
+    }
+
+    setDashboardSettings({
+      email,
+      leagueName: selectedLeagueName,
+      season: selectedSeason,
+      tournamentStarted,
+      tournamentPaused,
+      ...Object.fromEntries(slotEntries),
+      ...Object.fromEntries(
+        Array.from({ length: 48 }, (_, i) => [`bracketMatchStatus${i}`, ""])
+      ),
+    } as Parameters<typeof setDashboardSettings>[0]);
+    setBracketResetKey(0);
+  }, [
+    email,
+    playerRows,
+    selectedLeagueName,
+    selectedSeason,
+    tournamentStarted,
+    tournamentPaused,
+    setDashboardSettings,
+  ]);
+
   const startTournament = useCallback(() => {
     if (!email) return;
     setDashboardSettings({
@@ -719,12 +868,14 @@ export function DashboardContent() {
   const loadPlayers = useCallback((leagueName: string, season: string) => {
     if (!leagueName || !season) {
       setSelectedLeagueGuid(null);
+      setPlayersFromApi([]);
       setPlayerRows(
         Array(PLAYER_SLOTS).fill(null).map(() => ({
           playerName: BYE_LABEL,
           weeks: null,
           legacyAve: null,
           raceTo: null,
+          teamName: null,
         }))
       );
       return;
@@ -738,6 +889,7 @@ export function DashboardContent() {
       .then((r) => r.json())
       .then((data: { leagueGuid: string | null; players: PlayerFromApi[] }) => {
         const guid = data.leagueGuid ?? null;
+        setPlayersFromApi(Array.isArray(data.players) ? data.players : []);
         setSelectedLeagueGuid(guid);
         if (email && guid) {
           setDashboardSettings({
@@ -753,12 +905,14 @@ export function DashboardContent() {
       })
       .catch(() => {
         setSelectedLeagueGuid(null);
+        setPlayersFromApi([]);
         setPlayerRows(
           Array(PLAYER_SLOTS).fill(null).map(() => ({
             playerName: BYE_LABEL,
             weeks: null,
             legacyAve: null,
             raceTo: null,
+            teamName: null,
           }))
         );
         setLoadingPlayers(false);
@@ -795,6 +949,7 @@ export function DashboardContent() {
           weeks: null,
           legacyAve: null,
           raceTo: null,
+          teamName: null,
         }))
       );
       return;
@@ -813,6 +968,7 @@ export function DashboardContent() {
             const legacyAverage = toNumber(
               getStatValue(row, "LegacyAverage", "LegacyAve", "legacyaverage", "legacyave", "Legacy_Average")
             );
+            const teamName = playerTeamMap.get(name) ?? null;
             const raceTo =
               legacyAverage != null ? Math.ceil(legacyAverage * 6) : null;
             return {
@@ -820,6 +976,7 @@ export function DashboardContent() {
               weeks,
               legacyAve: legacyAverage,
               raceTo,
+              teamName,
             };
           })
           .filter((r) => r.weeks != null && r.weeks > 7);
@@ -835,6 +992,7 @@ export function DashboardContent() {
             weeks: null,
             legacyAve: null,
             raceTo: null,
+            teamName: null,
           }));
         setPlayerRows([...rows, ...byeRows].slice(0, PLAYER_SLOTS));
         setLoadingOverallStats(false);
@@ -847,11 +1005,12 @@ export function DashboardContent() {
             weeks: null,
             legacyAve: null,
             raceTo: null,
+            teamName: null,
           }))
         );
         setLoadingOverallStats(false);
       });
-  }, [selectedLeagueGuid]);
+  }, [playerTeamMap, selectedLeagueGuid]);
 
   const SIDE_PANEL_TAB_WIDTH = 40;
   const sidePanelRef = useRef<HTMLElement>(null);
@@ -1308,6 +1467,16 @@ export function DashboardContent() {
                   : "Currently Running"
                 : "Reset"}
             </p>
+            {!tournamentStarted && !tournamentPaused && (
+              <button
+                type="button"
+                onClick={() => setRandomizeBracketModalOpen(true)}
+                className="mt-2 cursor-pointer rounded-lg border border-purple-400/50 bg-purple-800/60 px-3 py-2 text-sm font-medium text-purple-100 shadow-sm transition-colors hover:bg-purple-700/70"
+                aria-label="Randomize Bracket"
+              >
+                Randomize Bracket
+              </button>
+            )}
             {!tournamentStarted && !tournamentPaused && anyFirstRoundFilled && (
               <button
                 type="button"
@@ -1328,6 +1497,37 @@ export function DashboardContent() {
                 Reset Locations
               </button>
             )}
+            <Modal
+              open={randomizeBracketModalOpen}
+              onClose={() => setRandomizeBracketModalOpen(false)}
+              title="Randomize Bracket"
+              footer={
+                <div className="flex flex-wrap justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setRandomizeBracketModalOpen(false)}
+                    className="cursor-pointer rounded-lg border border-white/20 bg-transparent px-4 py-2.5 text-sm font-medium text-slate-200 transition-colors hover:bg-white/10"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      randomizeWeek1Brackets();
+                      setRandomizeBracketModalOpen(false);
+                    }}
+                    className="cursor-pointer rounded-lg border border-purple-400/50 bg-purple-800/80 px-4 py-2.5 text-sm font-medium text-purple-100 shadow-sm transition-colors hover:bg-purple-700/80"
+                    aria-label="Confirm randomize bracket"
+                  >
+                    Randomize Bracket
+                  </button>
+                </div>
+              }
+            >
+              <p className="text-slate-200">
+                Randomly fill all Week 1 first-round brackets using the current player list? This will allow at most one bye per bracket, prevent bye-vs-bye matchups, and avoid first-round matchups between players on the same team.
+              </p>
+            </Modal>
             <Modal
               open={resetTournamentModalOpen}
               onClose={() => setResetTournamentModalOpen(false)}
@@ -1422,6 +1622,11 @@ export function DashboardContent() {
               </p>
             </Modal>
             <hr className="border-t border-[var(--surface-border)] my-4" aria-hidden />
+            {randomizeBracketError && (
+              <p className="rounded-lg border border-red-500/50 bg-red-950/30 px-3 py-2 text-sm text-red-200" role="alert">
+                {randomizeBracketError}
+              </p>
+            )}
             {venueSyncError && (
               <p className="rounded-lg border border-amber-500/50 bg-amber-950/30 px-3 py-2 text-sm text-amber-200" role="alert">
                 {venueSyncError}
@@ -1907,6 +2112,7 @@ export function DashboardContent() {
                   playerRaceToMap={Object.fromEntries(
                     playerRows.map((r) => [r.playerName, r.raceTo])
                   )}
+                  playerLabelMap={playerLabelMap}
                   initialSlotSelections={
                     bracketResetKey > 0
                       ? Array(12).fill("")
