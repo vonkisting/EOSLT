@@ -469,58 +469,57 @@ export function HomeBracketCards() {
             className="w-full min-w-0 max-w-[600px] overflow-hidden rounded-xl border border-white/40 bg-black text-foreground sm:min-w-[555px]"
           >
             <div className="flex min-h-14 w-full flex-shrink-0 flex-col gap-1 rounded-t-xl bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 px-5 py-4">
-              <div className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-3">
-                <div />
+              <div className="w-full">
                 <h2 className="min-w-0 truncate pb-2 text-center text-[1.6875rem] font-semibold tracking-tight text-yellow-400">
                   {getLocationName(key)}
                 </h2>
-                <div className="flex justify-end">
-                {linkedName &&
-                getMyMatchInCard(index) !== null &&
-                (getMyMatchStatusRaw(index) === "Paused" ||
-                  getMyMatchStatusRaw(index) === "Paused..." ||
-                  (tournamentInProgress && getMyMatchStatusRaw(index) !== "Completed")) && (
-                <div className="flex shrink-0 items-center gap-3">
-                  {getMyMatchStatusRaw(index) !== "Completed" &&
-                    (getMyMatchStatusRaw(index) === "Paused" || getMyMatchStatusRaw(index) === "Paused..." ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const matchIndex = getMyMatchInCard(index);
-                          if (matchIndex === null) return;
-                          router.push(`/live-scoring?card=${index}&match=${matchIndex}`);
-                        }}
-                        className="rounded-lg bg-gradient-to-r from-emerald-600 to-green-500 px-3 py-1.5 text-sm font-semibold text-white shadow transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-slate-900"
-                      >
-                        Resume Match
-                      </button>
-                    ) : tournamentInProgress ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const matchIndex = getMyMatchInCard(index);
-                          if (matchIndex === null || !email || !settings || typeof settings !== "object") return;
-                          const s = settings as Record<string, unknown>;
-                          const statusKey = `bracketMatchStatus${index * 6 + matchIndex}`;
-                          setDashboardSettings({
-                            email,
-                            leagueName: String(s.leagueName ?? ""),
-                            season: String(s.season ?? ""),
-                            tournamentStarted: s.tournamentStarted === true,
-                            tournamentPaused: s.tournamentPaused === true,
-                            [statusKey]: "In Progress...",
-                          } as Parameters<typeof setDashboardSettings>[0]);
-                          router.push(`/live-scoring?card=${index}&match=${matchIndex}`);
-                        }}
-                        className="rounded-lg bg-gradient-to-r from-purple-600 to-violet-600 px-3 py-1.5 text-sm font-semibold text-white shadow transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-2 focus:ring-offset-slate-900"
-                      >
-                        Live Score My Match
-                      </button>
-                    ) : null)}
+              </div>
+              {linkedName &&
+              getMyMatchInCard(index) !== null &&
+              (getMyMatchStatusRaw(index) === "Paused" ||
+                getMyMatchStatusRaw(index) === "Paused..." ||
+                (tournamentInProgress && getMyMatchStatusRaw(index) !== "Completed")) && (
+                <div className="w-full pb-2">
+                  <div className="flex w-full">
+                    {getMyMatchStatusRaw(index) !== "Completed" &&
+                      (getMyMatchStatusRaw(index) === "Paused" || getMyMatchStatusRaw(index) === "Paused..." ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const matchIndex = getMyMatchInCard(index);
+                            if (matchIndex === null) return;
+                            router.push(`/live-scoring?card=${index}&match=${matchIndex}`);
+                          }}
+                          className="w-full rounded-lg bg-gradient-to-r from-emerald-600 to-green-500 px-3 py-2 text-sm font-semibold text-white shadow transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-slate-900"
+                        >
+                          Resume Match
+                        </button>
+                      ) : tournamentInProgress ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const matchIndex = getMyMatchInCard(index);
+                            if (matchIndex === null || !email || !settings || typeof settings !== "object") return;
+                            const s = settings as Record<string, unknown>;
+                            const statusKey = `bracketMatchStatus${index * 6 + matchIndex}`;
+                            setDashboardSettings({
+                              email,
+                              leagueName: String(s.leagueName ?? ""),
+                              season: String(s.season ?? ""),
+                              tournamentStarted: s.tournamentStarted === true,
+                              tournamentPaused: s.tournamentPaused === true,
+                              [statusKey]: "In Progress...",
+                            } as Parameters<typeof setDashboardSettings>[0]);
+                            router.push(`/live-scoring?card=${index}&match=${matchIndex}`);
+                          }}
+                          className="w-full rounded-lg bg-gradient-to-r from-purple-600 to-violet-600 px-3 py-2 text-sm font-semibold text-white shadow transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-2 focus:ring-offset-slate-900"
+                        >
+                          Live Score My Match
+                        </button>
+                      ) : null)}
+                  </div>
                 </div>
               )}
-                </div>
-              </div>
               <div className="grid w-full grid-cols-3 items-center gap-2 border-t border-white/30 pt-3 text-sm font-medium text-blue-100/90">
                 <span className="text-left">Week 1</span>
                 <span className="text-center">

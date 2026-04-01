@@ -567,7 +567,7 @@ export function LiveScoringCard({
                                 onChange={(e) => handleScoreChange(0, i, e.target.value)}
                                 onBlur={() => handleScoreBlur(i)}
                                 disabled={totalsReached && (player1Scores[i] ?? "").trim() === ""}
-                                className="w-full min-w-[2.5rem] border-0 bg-white px-2 py-1.5 text-center text-black outline-none focus:ring-1 focus:ring-inset focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
+                                className="w-full min-w-[2.5rem] border-0 bg-white px-2 py-1.5 text-center text-[16px] text-black outline-none focus:ring-1 focus:ring-inset focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 sm:text-base"
                                 aria-label={`Game ${i + 1} ${player1Name}`}
                               />
                             </td>
@@ -579,7 +579,7 @@ export function LiveScoringCard({
                                 onChange={(e) => handleScoreChange(1, i, e.target.value)}
                                 onBlur={() => handleScoreBlur(i)}
                                 disabled={totalsReached && (player2Scores[i] ?? "").trim() === ""}
-                                className="w-full min-w-[2.5rem] border-0 bg-white px-2 py-1.5 text-center text-black outline-none focus:ring-1 focus:ring-inset focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
+                                className="w-full min-w-[2.5rem] border-0 bg-white px-2 py-1.5 text-center text-[16px] text-black outline-none focus:ring-1 focus:ring-inset focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 sm:text-base"
                                 aria-label={`Game ${i + 1} ${player2Name}`}
                               />
                             </td>
