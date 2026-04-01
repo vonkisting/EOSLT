@@ -86,6 +86,8 @@ export function HomeBracketCards() {
   const [loadingPlayers, setLoadingPlayers] = useState(false);
   const [loadingTimedOut, setLoadingTimedOut] = useState(false);
   const [bracketError, setBracketError] = useState(false);
+  const [collapsedWeek1Cards, setCollapsedWeek1Cards] = useState<Record<string, boolean>>({});
+  const [finalsCollapsed, setFinalsCollapsed] = useState(false);
 
   useEffect(() => {
     if (status !== "loading" && settings !== undefined) return;
@@ -551,8 +553,8 @@ export function HomeBracketCards() {
   const settingsRecord = settings as Record<string, unknown>;
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="rounded-xl border border-[var(--surface-border)] bg-gradient-to-br from-purple-950 via-violet-900 to-purple-950 px-5 py-4 text-center">
+    <div className="flex w-full flex-col gap-6">
+      <div className="mx-auto w-full max-w-5xl rounded-xl border border-[var(--surface-border)] bg-gradient-to-br from-purple-950 via-violet-900 to-purple-950 px-5 py-4 text-center">
         <h1 className="text-xl font-semibold tracking-tight text-blue-100">
           {String(settingsRecord.leagueName)} – {String(settingsRecord.season)}
         </h1>
@@ -565,8 +567,8 @@ export function HomeBracketCards() {
             : "Reset"}
         </p>
       </div>
-      <div className="min-w-0 overflow-x-auto">
-        <div className="flex min-w-max flex-wrap items-start gap-6">
+      <div className="w-full overflow-x-auto">
+        <div className="mx-auto flex min-w-full w-max items-start justify-center gap-6">
           <div className="flex w-max min-w-0 flex-col gap-6">
             {WEEK_1_LOCATION_KEYS.map((key, index) => (
           <div
@@ -574,10 +576,23 @@ export function HomeBracketCards() {
             className="w-full min-w-0 max-w-[600px] overflow-hidden rounded-xl border border-white/40 bg-black text-foreground sm:min-w-[555px]"
           >
             <div className="flex min-h-14 w-full flex-shrink-0 flex-col gap-1 rounded-t-xl bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 px-5 py-4">
-              <div className="w-full">
-                <h2 className="min-w-0 truncate pb-2 text-center text-[1.6875rem] font-semibold tracking-tight text-yellow-400">
-                  {getLocationName(key)}
-                </h2>
+              <div className="flex w-full items-start gap-3">
+                <div className="min-w-0 flex-1">
+                  <h2 className="min-w-0 truncate pb-2 text-center text-[1.6875rem] font-semibold tracking-tight text-yellow-400">
+                    {getLocationName(key)}
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCollapsedWeek1Cards((prev) => ({ ...prev, [key]: !prev[key] }))
+                  }
+                  aria-expanded={collapsedWeek1Cards[key] !== true}
+                  aria-label={`${collapsedWeek1Cards[key] ? "Expand" : "Collapse"} ${getLocationName(key)}`}
+                  className="rounded-md border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-blue-100 transition hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-2 focus:ring-offset-slate-900"
+                >
+                  {collapsedWeek1Cards[key] ? "Show" : "Hide"}
+                </button>
               </div>
               {linkedName &&
               getMyMatchInCard(index) !== null &&
@@ -635,19 +650,21 @@ export function HomeBracketCards() {
                 </span>
               </div>
             </div>
-            <div className="min-h-0 overflow-auto rounded-b-xl border-t border-white/40 bg-black pb-4 pt-4 pl-4">
-              <Bracket8TwoRounds
-                players={playerDisplayNames}
-                playerRaceToMap={playerRaceToMap}
-                initialSlotSelections={getInitialSlotsForCard(index)}
-                initialScores={getInitialScoresForCard(index)}
-                cardIndex={index}
-                allFirstRoundSelections={allFirstRoundSelections}
-                disabled
-                placeholderText="TBD..."
-                matchStatusByIndex={getMatchStatusByIndex(index)}
-              />
-            </div>
+            {!collapsedWeek1Cards[key] ? (
+              <div className="min-h-0 overflow-auto rounded-b-xl border-t border-white/40 bg-black pb-4 pt-4 pl-4">
+                <Bracket8TwoRounds
+                  players={playerDisplayNames}
+                  playerRaceToMap={playerRaceToMap}
+                  initialSlotSelections={getInitialSlotsForCard(index)}
+                  initialScores={getInitialScoresForCard(index)}
+                  cardIndex={index}
+                  allFirstRoundSelections={allFirstRoundSelections}
+                  disabled
+                  placeholderText="TBD..."
+                  matchStatusByIndex={getMatchStatusByIndex(index)}
+                />
+              </div>
+            ) : null}
           </div>
             ))}
           </div>
@@ -699,10 +716,21 @@ export function HomeBracketCards() {
           <div className="flex w-max min-w-0 flex-col gap-6">
             <div className="w-full min-w-0 max-w-[600px] overflow-hidden rounded-xl border border-white/40 bg-black text-foreground sm:min-w-[555px]">
               <div className="flex min-h-14 w-full flex-shrink-0 flex-col gap-1 rounded-t-xl bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 px-5 py-4">
-                <div className="w-full">
-                  <h2 className="min-w-0 truncate pb-2 text-center text-[1.6875rem] font-semibold tracking-tight text-yellow-400">
-                    {getLocationName(FINALS_LOCATION_KEY)}
-                  </h2>
+                <div className="flex w-full items-start gap-3">
+                  <div className="min-w-0 flex-1">
+                    <h2 className="min-w-0 truncate pb-2 text-center text-[1.6875rem] font-semibold tracking-tight text-yellow-400">
+                      {getLocationName(FINALS_LOCATION_KEY)}
+                    </h2>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFinalsCollapsed((prev) => !prev)}
+                    aria-expanded={!finalsCollapsed}
+                    aria-label={`${finalsCollapsed ? "Expand" : "Collapse"} ${getLocationName(FINALS_LOCATION_KEY)}`}
+                    className="rounded-md border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-blue-100 transition hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-2 focus:ring-offset-slate-900"
+                  >
+                    {finalsCollapsed ? "Show" : "Hide"}
+                  </button>
                 </div>
                 <div className="grid w-full grid-cols-3 items-center gap-2 border-t border-white/30 pt-3 text-sm font-medium text-blue-100/90">
                   <span className="text-left">Finals</span>
@@ -714,23 +742,25 @@ export function HomeBracketCards() {
                   </span>
                 </div>
               </div>
-              <div className="min-h-0 overflow-auto rounded-b-xl border-t border-white/40 bg-black pb-4 pt-4 pl-4">
-                <Bracket4
-                  players={playerDisplayNames}
-                  playerRaceToMap={playerRaceToMap}
-                  initialSlotSelections={(() => {
-                    let byeNum = 0;
-                    return finalsBracketSlotsArray.map((val) => {
-                      if (val === BYE_LABEL) return `-- Bye ${++byeNum} --`;
-                      return val;
-                    });
-                  })()}
-                  initialScores={finalsBracketScoresArray}
-                  disabled
-                  placeholderText="TBD..."
-                  matchStatusByIndex={getFinalsMatchStatusByIndex()}
-                />
-              </div>
+              {!finalsCollapsed ? (
+                <div className="min-h-0 overflow-auto rounded-b-xl border-t border-white/40 bg-black pb-4 pt-4 pl-4">
+                  <Bracket4
+                    players={playerDisplayNames}
+                    playerRaceToMap={playerRaceToMap}
+                    initialSlotSelections={(() => {
+                      let byeNum = 0;
+                      return finalsBracketSlotsArray.map((val) => {
+                        if (val === BYE_LABEL) return `-- Bye ${++byeNum} --`;
+                        return val;
+                      });
+                    })()}
+                    initialScores={finalsBracketScoresArray}
+                    disabled
+                    placeholderText="TBD..."
+                    matchStatusByIndex={getFinalsMatchStatusByIndex()}
+                  />
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
