@@ -60,15 +60,7 @@ export function HomeBracketCards() {
   const router = useRouter();
   const { data: session, status } = useSession();
   const email = session?.user?.email?.toLowerCase().trim();
-  const settingsByEmail = useQuery(
-    api.dashboardSettings.get,
-    email ? { email } : "skip"
-  );
-  const settingsPublic = useQuery(
-    api.dashboardSettings.getPublic,
-    email ? "skip" : {}
-  );
-  const settings = email ? settingsByEmail : settingsPublic;
+  const settings = useQuery(api.dashboardSettings.getPublic, {});
   const setDashboardSettings = useMutation(api.dashboardSettings.set);
   const convexUser = useQuery(
     api.users.getByEmail,

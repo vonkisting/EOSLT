@@ -16,6 +16,11 @@ const uiCollapsedKeys = [
   "uiWeek1Slot4Open", "uiWeek1Slot5Open", "uiWeek1Slot6Open", "uiWeek1Slot7Open",
 ] as const;
 
+const publicDashboardEmails = [
+  "kjkisting@gmail.com",
+  "bradkujo@gmail.com",
+] as const;
+
 /**
  * Get public tournament state for the home page (no auth). Returns the first
  * dashboard settings document so unauthenticated users see the same bracket/no-tournament as everyone else.
@@ -25,6 +30,13 @@ export const getPublic = query({
   args: {},
   handler: async (ctx) => {
     try {
+      for (const email of publicDashboardEmails) {
+        const doc = await ctx.db
+          .query("dashboardSettings")
+          .withIndex("by_email", (q) => q.eq("email", email))
+          .unique();
+        if (doc) return mapDocToSettings(doc);
+      }
       const doc = await ctx.db.query("dashboardSettings").first();
       if (!doc) return null;
       return mapDocToSettings(doc);
@@ -80,6 +92,7 @@ function mapDocToSettings(doc: Doc<"dashboardSettings">) {
   out.finalsBracketSlots = typeof finalsRaw === "string" ? finalsRaw : null;
   const finalsScoresRaw = d.finalsBracketScores;
   out.finalsBracketScores = typeof finalsScoresRaw === "string" ? finalsScoresRaw : null;
+  out.week1BracketsRandomized = d.week1BracketsRandomized === true;
   for (const key of uiCollapsedKeys) {
     const val = d[key];
     out[key] = val === true;
@@ -90,7 +103,7 @@ function mapDocToSettings(doc: Doc<"dashboardSettings">) {
     leagueGuid: string | null;
     tournamentStarted: boolean;
     tournamentPaused: boolean;
-  } & Record<(typeof locationKeys)[number], string | null> & { locationStartMeta: string | null } & Record<`bracketSlot${number}`, string | null> & Record<`bracketMatchStatus${number}`, string | null> & Record<`bracketScoreTop${number}` | `bracketScoreBottom${number}`, string | null> & Record<`liveScoreGames${number}`, string | null> & { week2BracketSlots: string | null; finalsBracketSlots: string | null; finalsBracketScores: string | null } & Record<(typeof uiCollapsedKeys)[number], boolean>;
+  } & Record<(typeof locationKeys)[number], string | null> & { locationStartMeta: string | null } & Record<`bracketSlot${number}`, string | null> & Record<`bracketMatchStatus${number}`, string | null> & Record<`bracketScoreTop${number}` | `bracketScoreBottom${number}`, string | null> & Record<`liveScoreGames${number}`, string | null> & { week2BracketSlots: string | null; finalsBracketSlots: string | null; finalsBracketScores: string | null; week1BracketsRandomized: boolean } & Record<(typeof uiCollapsedKeys)[number], boolean>;
 }
 
 /**
@@ -186,6 +199,7 @@ export const set = mutation({
     week2BracketSlots: v.optional(v.string()),
     finalsBracketSlots: v.optional(v.string()),
     finalsBracketScores: v.optional(v.string()),
+    week1BracketsRandomized: v.optional(v.boolean()),
     ...uiCollapsedArgs,
   },
   handler: async (ctx, args) => {
@@ -230,6 +244,8 @@ export const set = mutation({
       (patch as Record<string, string | boolean | undefined>).finalsBracketSlots = (args as Record<string, unknown>).finalsBracketSlots as string ?? undefined;
     if ((args as Record<string, unknown>).finalsBracketScores !== undefined)
       (patch as Record<string, string | boolean | undefined>).finalsBracketScores = (args as Record<string, unknown>).finalsBracketScores as string ?? undefined;
+    if ((args as Record<string, unknown>).week1BracketsRandomized !== undefined)
+      (patch as Record<string, string | boolean | undefined>).week1BracketsRandomized = (args as Record<string, unknown>).week1BracketsRandomized as boolean;
     for (const key of uiCollapsedKeys) {
       const val = (args as Record<string, unknown>)[key];
       if (val !== undefined) (patch as Record<string, string | boolean | undefined>)[key] = val as boolean;
@@ -275,6 +291,8 @@ export const set = mutation({
       insert.finalsBracketSlots = (args as Record<string, unknown>).finalsBracketSlots as string ?? undefined;
     if ((args as Record<string, unknown>).finalsBracketScores !== undefined)
       insert.finalsBracketScores = (args as Record<string, unknown>).finalsBracketScores as string ?? undefined;
+    if ((args as Record<string, unknown>).week1BracketsRandomized !== undefined)
+      insert.week1BracketsRandomized = (args as Record<string, unknown>).week1BracketsRandomized as boolean;
     for (const key of uiCollapsedKeys) {
       const val = (args as Record<string, unknown>)[key];
       insert[key] = val !== undefined ? (val as boolean) : undefined;

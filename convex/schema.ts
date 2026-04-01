@@ -135,6 +135,8 @@ export default defineSchema({
     bracketSlot93: v.optional(v.string()),
     bracketSlot94: v.optional(v.string()),
     bracketSlot95: v.optional(v.string()),
+    /** True after Week 1 has been randomized at least once since the last bracket reset. */
+    week1BracketsRandomized: v.optional(v.boolean()),
     /** Per-matchup status: 8 cards × 6 matchups. Index = cardIndex*6 + matchIndex. Values: "" | "Player 1 Scoring" | "Player 2 Scoring". */
     bracketMatchStatus0: v.optional(v.string()),
     bracketMatchStatus1: v.optional(v.string()),

@@ -351,6 +351,10 @@ export function DashboardContent() {
     (savedSettings && typeof savedSettings === "object" && (savedSettings as Record<string, unknown>).tournamentStarted === true) ?? false;
   const tournamentPaused =
     (savedSettings && typeof savedSettings === "object" && (savedSettings as Record<string, unknown>).tournamentPaused === true) ?? false;
+  const week1BracketsRandomized =
+    (savedSettings &&
+      typeof savedSettings === "object" &&
+      (savedSettings as Record<string, unknown>).week1BracketsRandomized === true) ?? false;
 
   const [locations, setLocations] = useState<Record<LocationKey, string>>(() =>
     Object.fromEntries(LOCATION_KEYS.map((k) => [k, ""])) as Record<LocationKey, string>
@@ -676,6 +680,7 @@ export function DashboardContent() {
       season: selectedSeason,
       tournamentStarted,
       tournamentPaused,
+      week1BracketsRandomized: false,
       ...Object.fromEntries(
         Array.from({ length: 96 }, (_, i) => [`bracketSlot${i}`, ""])
       ),
@@ -751,6 +756,7 @@ export function DashboardContent() {
       season: selectedSeason,
       tournamentStarted,
       tournamentPaused,
+      week1BracketsRandomized: true,
       ...Object.fromEntries(slotEntries),
       ...Object.fromEntries(
         Array.from({ length: 48 }, (_, i) => [`bracketMatchStatus${i}`, ""])
@@ -799,11 +805,20 @@ export function DashboardContent() {
       season: selectedSeason,
       tournamentStarted: false,
       tournamentPaused: false,
+      week1BracketsRandomized: false,
       ...statusReset,
       ...scoreReset,
       ...liveScoreReset,
     } as Parameters<typeof setDashboardSettings>[0]);
   }, [email, selectedLeagueName, selectedSeason, setDashboardSettings]);
+
+  const handleRandomizeButtonClick = useCallback(() => {
+    if (week1BracketsRandomized) {
+      randomizeWeek1Brackets();
+      return;
+    }
+    setRandomizeBracketModalOpen(true);
+  }, [week1BracketsRandomized, randomizeWeek1Brackets]);
 
   const togglePauseTournament = useCallback(() => {
     if (!email) return;
@@ -1349,7 +1364,7 @@ export function DashboardContent() {
                 onChange={(e) => {
                   const v = e.target.value;
                   setSelectedLeagueName(v);
-                  if (email) setDashboardSettings({ email, leagueName: v, season: "", tournamentStarted, tournamentPaused } as Parameters<typeof setDashboardSettings>[0]);
+                  if (email) setDashboardSettings({ email, leagueName: v, season: "", tournamentStarted, tournamentPaused, week1BracketsRandomized: false } as Parameters<typeof setDashboardSettings>[0]);
                 }}
                 disabled={loadingLeagues || tournamentStarted || tournamentPaused}
                 className="select-dark rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-800/70 disabled:text-slate-400"
@@ -1372,7 +1387,7 @@ export function DashboardContent() {
                 onChange={(e) => {
                   const v = e.target.value;
                   setSelectedSeason(v);
-                  if (email) setDashboardSettings({ email, leagueName: selectedLeagueName, season: v, tournamentStarted, tournamentPaused } as Parameters<typeof setDashboardSettings>[0]);
+                  if (email) setDashboardSettings({ email, leagueName: selectedLeagueName, season: v, tournamentStarted, tournamentPaused, week1BracketsRandomized: false } as Parameters<typeof setDashboardSettings>[0]);
                 }}
                 disabled={!selectedLeagueName || loadingSeasons || tournamentStarted || tournamentPaused}
                 className="select-dark rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-800/70 disabled:text-slate-400"
@@ -1454,7 +1469,7 @@ export function DashboardContent() {
             {!tournamentStarted && !tournamentPaused && (
               <button
                 type="button"
-                onClick={() => setRandomizeBracketModalOpen(true)}
+                onClick={handleRandomizeButtonClick}
                 className="mt-2 cursor-pointer rounded-lg border border-purple-400/50 bg-purple-800/60 px-3 py-2 text-sm font-medium text-purple-100 shadow-sm transition-colors hover:bg-purple-700/70"
                 aria-label="Randomize Bracket"
               >
