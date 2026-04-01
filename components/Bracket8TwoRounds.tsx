@@ -90,6 +90,7 @@ export function MatchWithDropdowns({
   onBottomScoreChange,
   status,
   placeholderText = "Select Player...",
+  onMatchClick,
 }: {
   winner: "top" | "bottom";
   topSlotIndex: number;
@@ -110,6 +111,7 @@ export function MatchWithDropdowns({
   /** Matchup status for race cell background: "In Progress...", "Paused", "Completed". */
   status?: string | null;
   placeholderText?: string;
+  onMatchClick?: () => void;
 }) {
   const winnerClass = winner === "top" ? "winner-top" : "winner-bottom";
   const topValue = slotSelections[topSlotIndex] ?? "";
@@ -120,6 +122,7 @@ export function MatchWithDropdowns({
     v != null && v !== "" ? String(v) : "0";
   const canEditScores = !disabled && (onTopScoreChange != null || onBottomScoreChange != null);
   const statusClass = matchStatusClass(status);
+  const canOpenMatch = disabled && onMatchClick != null;
 
   return (
     <div className={`match ${winnerClass}${hasBye ? " match-has-bye" : ""} ${statusClass}`.trim()}>
@@ -127,20 +130,32 @@ export function MatchWithDropdowns({
           <span className="image" />
           <span className="seed" />
           <span className="race">{formatRace(topRaceTo)}</span>
-          <select
-            className={`name bracket-slot-select ${topValue ? "slot-filled" : ""}`}
-            value={topValue}
-            onChange={(e) => setSlotSelection(topSlotIndex, e.target.value)}
-            disabled={disabled}
-            aria-label="Top player"
-          >
-            <option value="">{placeholderText}</option>
-            {topOptions.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
+          {canOpenMatch ? (
+            <button
+              type="button"
+              className={`name bracket-slot-select text-left ${topValue ? "slot-filled" : ""}`}
+              onClick={onMatchClick}
+              disabled={!topValue}
+              aria-label={topValue ? `View scorecard for ${topValue}` : "No player selected"}
+            >
+              {topValue || placeholderText}
+            </button>
+          ) : (
+            <select
+              className={`name bracket-slot-select ${topValue ? "slot-filled" : ""}`}
+              value={topValue}
+              onChange={(e) => setSlotSelection(topSlotIndex, e.target.value)}
+              disabled={disabled}
+              aria-label="Top player"
+            >
+              <option value="">{placeholderText}</option>
+              {topOptions.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          )}
         {canEditScores && onTopScoreChange ? (
           <input
             type="text"
@@ -158,20 +173,32 @@ export function MatchWithDropdowns({
           <span className="image" />
           <span className="seed" />
           <span className="race">{formatRace(bottomRaceTo)}</span>
-          <select
-            className={`name bracket-slot-select ${bottomValue ? "slot-filled" : ""}`}
-            value={bottomValue}
-            onChange={(e) => setSlotSelection(bottomSlotIndex, e.target.value)}
-            disabled={disabled}
-            aria-label="Bottom player"
-          >
-            <option value="">{placeholderText}</option>
-            {bottomOptions.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
+          {canOpenMatch ? (
+            <button
+              type="button"
+              className={`name bracket-slot-select text-left ${bottomValue ? "slot-filled" : ""}`}
+              onClick={onMatchClick}
+              disabled={!bottomValue}
+              aria-label={bottomValue ? `View scorecard for ${bottomValue}` : "No player selected"}
+            >
+              {bottomValue || placeholderText}
+            </button>
+          ) : (
+            <select
+              className={`name bracket-slot-select ${bottomValue ? "slot-filled" : ""}`}
+              value={bottomValue}
+              onChange={(e) => setSlotSelection(bottomSlotIndex, e.target.value)}
+              disabled={disabled}
+              aria-label="Bottom player"
+            >
+              <option value="">{placeholderText}</option>
+              {bottomOptions.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          )}
         {canEditScores && onBottomScoreChange ? (
           <input
             type="text"
@@ -249,6 +276,7 @@ export function Bracket8TwoRounds({
   disabled,
   matchStatusByIndex,
   placeholderText,
+  onMatchClickByIndex,
 }: {
   players: string[];
   playerRaceToMap?: Record<string, number | null>;
@@ -265,6 +293,7 @@ export function Bracket8TwoRounds({
   /** Per-matchup status (length 6) for race cell background: "In Progress...", "Paused", "Completed". */
   matchStatusByIndex?: (string | null)[];
   placeholderText?: string;
+  onMatchClickByIndex?: (matchIndex: number) => void;
 }) {
   const pool = useMemo(() => {
     const filtered = players.filter((n) => n != null && n !== "");
@@ -384,6 +413,7 @@ export function Bracket8TwoRounds({
                 disabled={disabled}
                 hasBye={disabled && matchupHasBye(0, 1)}
                 placeholderText={placeholderText}
+                onMatchClick={onMatchClickByIndex ? () => onMatchClickByIndex(0) : undefined}
                 onTopScoreChange={onScoreChange ? (v) => handleScoreChange(0, "top", v) : undefined}
                 onBottomScoreChange={onScoreChange ? (v) => handleScoreChange(0, "bottom", v) : undefined}
               />
@@ -402,6 +432,7 @@ export function Bracket8TwoRounds({
                 disabled={disabled}
                 hasBye={disabled && matchupHasBye(2, 3)}
                 placeholderText={placeholderText}
+                onMatchClick={onMatchClickByIndex ? () => onMatchClickByIndex(1) : undefined}
                 onTopScoreChange={onScoreChange ? (v) => handleScoreChange(1, "top", v) : undefined}
                 onBottomScoreChange={onScoreChange ? (v) => handleScoreChange(1, "bottom", v) : undefined}
               />
@@ -420,6 +451,7 @@ export function Bracket8TwoRounds({
                 disabled={disabled}
                 hasBye={disabled && matchupHasBye(4, 5)}
                 placeholderText={placeholderText}
+                onMatchClick={onMatchClickByIndex ? () => onMatchClickByIndex(2) : undefined}
                 onTopScoreChange={onScoreChange ? (v) => handleScoreChange(2, "top", v) : undefined}
                 onBottomScoreChange={onScoreChange ? (v) => handleScoreChange(2, "bottom", v) : undefined}
               />
@@ -438,6 +470,7 @@ export function Bracket8TwoRounds({
                 disabled={disabled}
                 hasBye={disabled && matchupHasBye(6, 7)}
                 placeholderText={placeholderText}
+                onMatchClick={onMatchClickByIndex ? () => onMatchClickByIndex(3) : undefined}
                 onTopScoreChange={onScoreChange ? (v) => handleScoreChange(3, "top", v) : undefined}
                 onBottomScoreChange={onScoreChange ? (v) => handleScoreChange(3, "bottom", v) : undefined}
               />
@@ -458,6 +491,7 @@ export function Bracket8TwoRounds({
                 disabled={disabled}
                 hasBye={disabled && matchupHasBye(8, 9)}
                 placeholderText={placeholderText}
+                onMatchClick={onMatchClickByIndex ? () => onMatchClickByIndex(4) : undefined}
                 onTopScoreChange={onScoreChange ? (v) => handleScoreChange(4, "top", v) : undefined}
                 onBottomScoreChange={onScoreChange ? (v) => handleScoreChange(4, "bottom", v) : undefined}
               />
@@ -476,6 +510,7 @@ export function Bracket8TwoRounds({
                 disabled={disabled}
                 hasBye={disabled && matchupHasBye(10, 11)}
                 placeholderText={placeholderText}
+                onMatchClick={onMatchClickByIndex ? () => onMatchClickByIndex(5) : undefined}
                 onTopScoreChange={onScoreChange ? (v) => handleScoreChange(5, "top", v) : undefined}
                 onBottomScoreChange={onScoreChange ? (v) => handleScoreChange(5, "bottom", v) : undefined}
               />

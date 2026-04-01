@@ -89,6 +89,15 @@ export function HomeBracketCards() {
   const [week2CardsOpen, setWeek2CardsOpen] = useState<boolean[]>(() => Array(4).fill(true));
   const [finalsCardOpen, setFinalsCardOpen] = useState(true);
 
+  const openReadOnlyScorecard = useCallback(
+    (stage: "week1" | "week2" | "finals", cardIndex: number, matchIndex: number) => {
+      router.push(
+        `/live-scoring?stage=${stage}&card=${cardIndex}&match=${matchIndex}&readonly=1`
+      );
+    },
+    [router]
+  );
+
   useEffect(() => {
     if (status !== "loading" && settings !== undefined) return;
     const t = setTimeout(() => setLoadingTimedOut(true), 10000);
@@ -648,6 +657,9 @@ export function HomeBracketCards() {
                 disabled
                 placeholderText="TBD..."
                 matchStatusByIndex={getMatchStatusByIndex(index)}
+                onMatchClickByIndex={(matchIndex) =>
+                  openReadOnlyScorecard("week1", index, matchIndex)
+                }
               />
             </div>
           </div>
@@ -717,6 +729,9 @@ export function HomeBracketCards() {
                       disabled
                       placeholderText="TBD..."
                       matchStatusByIndex={getWeek2MatchStatusByIndex(index)}
+                    onMatchClickByIndex={(matchIndex) =>
+                      openReadOnlyScorecard("week2", index, matchIndex)
+                    }
                     />
                   </div>
                 ) : null}
@@ -774,6 +789,9 @@ export function HomeBracketCards() {
                     disabled
                     placeholderText="TBD..."
                     matchStatusByIndex={getFinalsMatchStatusByIndex()}
+                    onMatchClickByIndex={(matchIndex) =>
+                      openReadOnlyScorecard("finals", 0, matchIndex)
+                    }
                   />
                 </div>
               ) : null}

@@ -31,6 +31,11 @@ function slotIndicesForMatch(matchIndex: number): [number, number] {
 
 const GAME_COUNT = 11;
 const EMPTY_ROW = Array.from({ length: GAME_COUNT }, () => "");
+type BracketStage = "week1" | "week2" | "finals";
+
+function isBracketStage(value: string | null | undefined): value is BracketStage {
+  return value === "week1" || value === "week2" || value === "finals";
+}
 
 /**
  * Sum each row only when both players have a value in that game cell.
@@ -127,12 +132,21 @@ function isGameRowInvalid(
 export function LiveScoringCard({
   cardIndex,
   matchIndex,
+  stage = "week1",
+  readOnly = false,
 }: {
   cardIndex: number;
   matchIndex: number;
+  stage?: BracketStage;
+  readOnly?: boolean;
 }) {
-  const validCard = cardIndex >= 0 && cardIndex <= 7;
-  const validMatch = matchIndex >= 0 && matchIndex <= 5;
+  const validCard =
+    stage === "week1"
+      ? cardIndex >= 0 && cardIndex <= 7
+      : stage === "week2"
+        ? cardIndex >= 0 && cardIndex <= 3
+        : cardIndex === 0;
+  const validMatch = matchIndex >= 0 && matchIndex <= (stage === "finals" ? 2 : 5);
 
   const router = useRouter();
   const email = useSession().data?.user?.email?.toLowerCase().trim();
@@ -147,8 +161,8 @@ export function LiveScoringCard({
 
   useEffect(() => {
     if (settings === undefined) return;
-    if (!tournamentInProgress) router.replace("/");
-  }, [settings, tournamentInProgress, router]);
+    if (!readOnly && !tournamentInProgress) router.replace("/");
+  }, [settings, tournamentInProgress, router, readOnly]);
 
   const [player1Scores, setPlayer1Scores] = useState<string[]>(() => [...EMPTY_ROW]);
   const [player2Scores, setPlayer2Scores] = useState<string[]>(() => [...EMPTY_ROW]);
@@ -162,10 +176,10 @@ export function LiveScoringCard({
   useEffect(() => {
     lastSyncedRawRef.current = null;
     lastWrittenRawRef.current = null;
-  }, [cardIndex, matchIndex]);
+  }, [cardIndex, matchIndex, stage]);
 
   useEffect(() => {
-    if (!validCard || !validMatch || !settings || typeof settings !== "object") return;
+    if (!validCard || !validMatch || !settings || typeof settings !== "object" || stage !== "week1") return;
     const key = cardIndex * 6 + matchIndex;
     const s = settings as Record<string, unknown>;
     const raw = s[`liveScoreGames${key}`];
@@ -196,7 +210,7 @@ export function LiveScoringCard({
       }
       return;
     }
-    if (!email) return;
+    if (!email || readOnly) return;
     const emptyGames = JSON.stringify({
       p1: Array.from({ length: GAME_COUNT }, () => ""),
       p2: Array.from({ length: GAME_COUNT }, () => ""),
@@ -212,7 +226,7 @@ export function LiveScoringCard({
       [`bracketScoreTop${key}`]: "0",
       [`bracketScoreBottom${key}`]: "0",
     } as Parameters<typeof setDashboardSettings>[0]);
-  }, [settings, cardIndex, matchIndex, validCard, validMatch, email, setDashboardSettings]);
+  }, [settings, cardIndex, matchIndex, validCard, validMatch, email, setDashboardSettings, stage, readOnly]);
 
   const updateScore = useCallback(
     (playerIndex: 0 | 1, gameIndex: number, value: string) => {
@@ -235,7 +249,17 @@ export function LiveScoringCard({
 
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    if (!email || !settings || typeof settings !== "object" || !validCard || !validMatch) return;
+    if (
+      readOnly ||
+      stage !== "week1" ||
+      !email ||
+      !settings ||
+      typeof settings !== "object" ||
+      !validCard ||
+      !validMatch
+    ) {
+      return;
+    }
     if (skipNextSaveRef.current) {
       skipNextSaveRef.current = false;
       return;
@@ -267,11 +291,21 @@ export function LiveScoringCard({
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
-  }, [email, settings, validCard, validMatch, cardIndex, matchIndex, player1Scores, player2Scores, setDashboardSettings]);
+  }, [email, settings, validCard, validMatch, cardIndex, matchIndex, player1Scores, player2Scores, setDashboardSettings, readOnly, stage]);
 
   const updateMatchStatus = useCallback(
     (status: string) => {
-      if (!email || !settings || typeof settings !== "object" || !validCard || !validMatch) return;
+      if (
+        readOnly ||
+        !email ||
+        !settings ||
+        typeof settings !== "object" ||
+        !validCard ||
+        !validMatch ||
+        stage !== "week1"
+      ) {
+        return;
+      }
       const s = settings as Record<string, unknown>;
       const statusKey = `bracketMatchStatus${cardIndex * 6 + matchIndex}`;
       setDashboardSettings({
@@ -283,23 +317,73 @@ export function LiveScoringCard({
         [statusKey]: status,
       } as Parameters<typeof setDashboardSettings>[0]);
     },
-    [email, settings, validCard, validMatch, cardIndex, matchIndex, setDashboardSettings]
+    [email, settings, validCard, validMatch, cardIndex, matchIndex, setDashboardSettings, readOnly, stage]
   );
 
-  const { player1Name, player2Name } = useMemo(() => {
+  const { player1Name, player2Name, storedTopScore, storedBottomScore } = useMemo(() => {
     const s = settings as Record<string, unknown> | undefined;
     if (s == null || !validCard || !validMatch) {
-      return { player1Name: "—", player2Name: "—" };
+      return { player1Name: "—", player2Name: "—", storedTopScore: "0", storedBottomScore: "0" };
     }
-    const base = cardIndex * 12;
     const [topSlot, bottomSlot] = slotIndicesForMatch(matchIndex);
-    const p1 = (s[`bracketSlot${base + topSlot}`] as string) ?? "";
-    const p2 = (s[`bracketSlot${base + bottomSlot}`] as string) ?? "";
+    let p1 = "";
+    let p2 = "";
+    let topScore = "0";
+    let bottomScore = "0";
+    if (stage === "week1") {
+      const base = cardIndex * 12;
+      p1 = ((s[`bracketSlot${base + topSlot}`] as string) ?? "").trim();
+      p2 = ((s[`bracketSlot${base + bottomSlot}`] as string) ?? "").trim();
+      const globalIndex = cardIndex * 6 + matchIndex;
+      topScore = ((s[`bracketScoreTop${globalIndex}`] as string) ?? "0").trim() || "0";
+      bottomScore = ((s[`bracketScoreBottom${globalIndex}`] as string) ?? "0").trim() || "0";
+    } else if (stage === "week2") {
+      const raw = s.week2BracketSlots;
+      if (typeof raw === "string" && raw.trim()) {
+        try {
+          const arr = JSON.parse(raw) as unknown[];
+          const base = cardIndex * 12;
+          p1 = typeof arr[base + topSlot] === "string" ? String(arr[base + topSlot]).trim() : "";
+          p2 = typeof arr[base + bottomSlot] === "string" ? String(arr[base + bottomSlot]).trim() : "";
+        } catch {
+          p1 = "";
+          p2 = "";
+        }
+      }
+    } else {
+      const rawSlots = s.finalsBracketSlots;
+      const rawScores = s.finalsBracketScores;
+      if (typeof rawSlots === "string" && rawSlots.trim()) {
+        try {
+          const arr = JSON.parse(rawSlots) as unknown[];
+          p1 = typeof arr[topSlot] === "string" ? String(arr[topSlot]).trim() : "";
+          p2 = typeof arr[bottomSlot] === "string" ? String(arr[bottomSlot]).trim() : "";
+        } catch {
+          p1 = "";
+          p2 = "";
+        }
+      }
+      if (typeof rawScores === "string" && rawScores.trim()) {
+        try {
+          const arr = JSON.parse(rawScores) as unknown[];
+          topScore = typeof arr[matchIndex * 2] === "string" ? String(arr[matchIndex * 2]).trim() || "0" : "0";
+          bottomScore =
+            typeof arr[matchIndex * 2 + 1] === "string"
+              ? String(arr[matchIndex * 2 + 1]).trim() || "0"
+              : "0";
+        } catch {
+          topScore = "0";
+          bottomScore = "0";
+        }
+      }
+    }
     return {
-      player1Name: (p1 || "").trim() || "—",
-      player2Name: (p2 || "").trim() || "—",
+      player1Name: p1 || "—",
+      player2Name: p2 || "—",
+      storedTopScore: topScore,
+      storedBottomScore: bottomScore,
     };
-  }, [settings, cardIndex, matchIndex, validCard, validMatch]);
+  }, [settings, cardIndex, matchIndex, validCard, validMatch, stage]);
 
   const [raceToMap, setRaceToMap] = useState<Record<string, number | null>>({});
   const leagueGuid = (settings as Record<string, unknown> | undefined)?.leagueGuid as string | undefined;
@@ -346,6 +430,8 @@ export function LiveScoringCard({
     () => sumScoresWhenBothPresent(player1Scores, player2Scores),
     [player1Scores, player2Scores]
   );
+  const displayTotal1 = readOnly ? Number.parseInt(storedTopScore, 10) || 0 : total1;
+  const displayTotal2 = readOnly ? Number.parseInt(storedBottomScore, 10) || 0 : total2;
 
   const [legalWinConfirmed, setLegalWinConfirmed] = useState(false);
   const [requireStrictExceedPlayer1, setRequireStrictExceedPlayer1] = useState(false);
@@ -353,20 +439,21 @@ export function LiveScoringCard({
   const [legalWinModalOpen, setLegalWinModalOpen] = useState(false);
 
   useEffect(() => {
+    if (readOnly) return;
     setLegalWinConfirmed(false);
-  }, [total1, total2]);
+  }, [total1, total2, readOnly]);
 
   const p1Won = useMemo(
     () =>
       player1RaceTo != null &&
-      (requireStrictExceedPlayer1 ? total1 > player1RaceTo : total1 >= player1RaceTo),
-    [player1RaceTo, total1, requireStrictExceedPlayer1]
+      (requireStrictExceedPlayer1 ? displayTotal1 > player1RaceTo : displayTotal1 >= player1RaceTo),
+    [player1RaceTo, displayTotal1, requireStrictExceedPlayer1]
   );
   const p2Won = useMemo(
     () =>
       player2RaceTo != null &&
-      (requireStrictExceedPlayer2 ? total2 > player2RaceTo : total2 >= player2RaceTo),
-    [player2RaceTo, total2, requireStrictExceedPlayer2]
+      (requireStrictExceedPlayer2 ? displayTotal2 > player2RaceTo : displayTotal2 >= player2RaceTo),
+    [player2RaceTo, displayTotal2, requireStrictExceedPlayer2]
   );
 
   const totalsReached = useMemo(() => p1Won || p2Won, [p1Won, p2Won]);
@@ -391,6 +478,7 @@ export function LiveScoringCard({
   const winningBallDelayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    if (readOnly) return;
     if (!winningGameHasBothScores) {
       if (winningBallDelayRef.current != null) {
         clearTimeout(winningBallDelayRef.current);
@@ -410,7 +498,7 @@ export function LiveScoringCard({
         winningBallDelayRef.current = null;
       }
     };
-  }, [singleWinnerName, legalWinConfirmed, winningGameHasBothScores]);
+  }, [singleWinnerName, legalWinConfirmed, winningGameHasBothScores, readOnly]);
 
   const handleScoreChange = useCallback(
     (playerIndex: 0 | 1, gameIndex: number, value: string) => {
@@ -424,13 +512,13 @@ export function LiveScoringCard({
         updateScore(playerIndex, gameIndex, "");
         return;
       }
-      if (totalsReached) {
+      if (readOnly || totalsReached) {
         updateScore(playerIndex, gameIndex, digitsOnly);
         return;
       }
       updateScore(playerIndex, gameIndex, digitsOnly);
     },
-    [totalsReached, updateScore]
+    [totalsReached, updateScore, readOnly]
   );
 
   const handleScoreBlur = useCallback(
@@ -558,32 +646,44 @@ export function LiveScoringCard({
                               Game {i + 1}
                             </td>
                             <td className="border border-slate-300 p-0">
-                              <input
-                                type="text"
-                                inputMode="numeric"
-                                value={player1Scores[i]}
-                                onChange={(e) => handleScoreChange(0, i, e.target.value)}
-                                onBlur={() => handleScoreBlur(i)}
-                                disabled={totalsReached && (player1Scores[i] ?? "").trim() === ""}
-                                className="w-full min-w-[2.5rem] border-0 bg-white px-2 py-1.5 text-center text-[16px] text-black outline-none focus:ring-1 focus:ring-inset focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 sm:text-base"
-                                aria-label={`Game ${i + 1} ${player1Name}`}
-                              />
+                              {readOnly ? (
+                                <div className="w-full min-w-[2.5rem] bg-white px-2 py-1.5 text-center text-black">
+                                  {player1Scores[i] || "—"}
+                                </div>
+                              ) : (
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  value={player1Scores[i]}
+                                  onChange={(e) => handleScoreChange(0, i, e.target.value)}
+                                  onBlur={() => handleScoreBlur(i)}
+                                  disabled={totalsReached && (player1Scores[i] ?? "").trim() === ""}
+                                  className="w-full min-w-[2.5rem] border-0 bg-white px-2 py-1.5 text-center text-[16px] text-black outline-none focus:ring-1 focus:ring-inset focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 sm:text-base"
+                                  aria-label={`Game ${i + 1} ${player1Name}`}
+                                />
+                              )}
                             </td>
                             <td className="border border-slate-300 p-0">
-                              <input
-                                type="text"
-                                inputMode="numeric"
-                                value={player2Scores[i]}
-                                onChange={(e) => handleScoreChange(1, i, e.target.value)}
-                                onBlur={() => handleScoreBlur(i)}
-                                disabled={totalsReached && (player2Scores[i] ?? "").trim() === ""}
-                                className="w-full min-w-[2.5rem] border-0 bg-white px-2 py-1.5 text-center text-[16px] text-black outline-none focus:ring-1 focus:ring-inset focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 sm:text-base"
-                                aria-label={`Game ${i + 1} ${player2Name}`}
-                              />
+                              {readOnly ? (
+                                <div className="w-full min-w-[2.5rem] bg-white px-2 py-1.5 text-center text-black">
+                                  {player2Scores[i] || "—"}
+                                </div>
+                              ) : (
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  value={player2Scores[i]}
+                                  onChange={(e) => handleScoreChange(1, i, e.target.value)}
+                                  onBlur={() => handleScoreBlur(i)}
+                                  disabled={totalsReached && (player2Scores[i] ?? "").trim() === ""}
+                                  className="w-full min-w-[2.5rem] border-0 bg-white px-2 py-1.5 text-center text-[16px] text-black outline-none focus:ring-1 focus:ring-inset focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 sm:text-base"
+                                  aria-label={`Game ${i + 1} ${player2Name}`}
+                                />
+                              )}
                             </td>
                           </tr>
                           {(() => {
-                            if (totalsReached) return null;
+                            if (readOnly || totalsReached) return null;
                             const msg = getGameRowErrorMessage(player1Scores, player2Scores, i);
                             return msg ? (
                               <tr>
@@ -603,23 +703,23 @@ export function LiveScoringCard({
                         Total
                       </td>
                       <td className={total1CellClass}>
-                        {total1}
+                        {displayTotal1}
                       </td>
                       <td className={total2CellClass}>
-                        {total2}
+                        {displayTotal2}
                       </td>
                     </tr>
                   </tfoot>
                 </table>
               </div>
               <div className="mt-3 flex flex-col gap-3">
-                {bothHaveWinningTotals && (
+                {!readOnly && bothHaveWinningTotals && (
                   <p className="w-full rounded-lg border border-amber-500/60 bg-amber-950/40 px-4 py-3 text-center text-sm font-medium text-amber-200" role="alert">
                     Both players can&apos;t have winning totals. Adjust the scores to represent who won first.
                   </p>
                 )}
                 <div className="flex justify-center gap-3">
-                  {totalsReached && !bothHaveWinningTotals && (
+                  {!readOnly && totalsReached && !bothHaveWinningTotals && (
                     <button
                       type="button"
                       onClick={() => {
@@ -633,13 +733,13 @@ export function LiveScoringCard({
                       Submit Scores
                     </button>
                   )}
-                  <button
+                    <button
                     type="button"
                     onClick={() => router.push("/")}
                     className="rounded-lg bg-gradient-to-r from-red-700 to-red-500 px-5 py-2.5 font-semibold text-white shadow transition-opacity hover:from-red-600 hover:to-red-400 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-2 focus:ring-offset-slate-800"
                     aria-label="Exit live scoring and return home"
                   >
-                    Exit
+                    {readOnly ? "Back to Home" : "Exit"}
                   </button>
                 </div>
               </div>
@@ -647,7 +747,7 @@ export function LiveScoringCard({
           )}
         </div>
       </div>
-      <Modal
+      {!readOnly ? <Modal
         open={legalWinModalOpen}
         onClose={() => setLegalWinModalOpen(false)}
         title="Confirm winning ball"
@@ -684,8 +784,8 @@ export function LiveScoringCard({
         <p className="text-slate-200">
           Was the winning ball made legally by {singleWinnerName ?? "the winner"}?
         </p>
-      </Modal>
-      <Modal
+      </Modal> : null}
+      {!readOnly ? <Modal
         open={submitSuccessModalOpen}
         onClose={() => {
           setSubmitSuccessModalOpen(false);
@@ -699,7 +799,7 @@ export function LiveScoringCard({
         <p className="mt-2 text-sm text-slate-400">
           Redirecting to home…
         </p>
-      </Modal>
+      </Modal> : null}
       </div>
   );
 }

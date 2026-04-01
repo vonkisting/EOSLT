@@ -73,6 +73,7 @@ export function Bracket4({
   disabled,
   matchStatusByIndex,
   placeholderText,
+  onMatchClickByIndex,
 }: {
   players: string[];
   playerRaceToMap?: Record<string, number | null>;
@@ -85,6 +86,7 @@ export function Bracket4({
   /** Per-matchup status (length 3) for race cell background: "In Progress...", "Paused", "Completed". */
   matchStatusByIndex?: (string | null)[];
   placeholderText?: string;
+  onMatchClickByIndex?: (matchIndex: number) => void;
 }) {
   const pool = useMemo(() => {
     const filtered = players.filter((n) => n != null && n !== "");
@@ -192,6 +194,7 @@ export function Bracket4({
                 disabled={disabled}
                 hasBye={disabled && matchupHasBye(0, 1)}
                 placeholderText={placeholderText}
+                onMatchClick={onMatchClickByIndex ? () => onMatchClickByIndex(0) : undefined}
                 onTopScoreChange={onScoreChange ? (v) => handleScoreChange(0, "top", v) : undefined}
                 onBottomScoreChange={onScoreChange ? (v) => handleScoreChange(0, "bottom", v) : undefined}
               />
@@ -210,6 +213,7 @@ export function Bracket4({
                 disabled={disabled}
                 hasBye={disabled && matchupHasBye(2, 3)}
                 placeholderText={placeholderText}
+                onMatchClick={onMatchClickByIndex ? () => onMatchClickByIndex(1) : undefined}
                 onTopScoreChange={onScoreChange ? (v) => handleScoreChange(1, "top", v) : undefined}
                 onBottomScoreChange={onScoreChange ? (v) => handleScoreChange(1, "bottom", v) : undefined}
               />
@@ -230,6 +234,7 @@ export function Bracket4({
                 disabled={disabled}
                 hasBye={disabled && matchupHasBye(4, 5)}
                 placeholderText={placeholderText}
+                onMatchClick={onMatchClickByIndex ? () => onMatchClickByIndex(2) : undefined}
                 onTopScoreChange={onScoreChange ? (v) => handleScoreChange(2, "top", v) : undefined}
                 onBottomScoreChange={onScoreChange ? (v) => handleScoreChange(2, "bottom", v) : undefined}
               />
