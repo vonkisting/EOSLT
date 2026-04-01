@@ -185,6 +185,11 @@ export function DashboardContent() {
     return allFirstRoundSelections.every((v) => typeof v === "string" && v.trim() !== "");
   }, [allFirstRoundSelections]);
 
+  /** True when any Week 1 first-round bracket slot has a selected player name. */
+  const anyFirstRoundFilled = useMemo(() => {
+    return allFirstRoundSelections.some((v) => typeof v === "string" && v.trim() !== "");
+  }, [allFirstRoundSelections]);
+
   /** Week 2 bracket slots: 4 cards × 12 slots = 48. Parsed from savedSettings.week2BracketSlots JSON. */
   const week2BracketSlotsArray = useMemo(() => {
     const raw = savedSettings && typeof savedSettings === "object"
@@ -281,6 +286,18 @@ export function DashboardContent() {
   /** True when all location dropdowns (Week 1, Week 2, Finals) have a value. */
   const allLocationsFilled = useMemo(
     () => LOCATION_KEYS.every((key) => (locations[key] ?? "").trim() !== ""),
+    [locations]
+  );
+
+  /** True when all Week 1 location dropdowns have a value. */
+  const allWeek1LocationsFilled = useMemo(
+    () => WEEK_1_KEYS.every((key) => (locations[key] ?? "").trim() !== ""),
+    [locations]
+  );
+
+  /** True when any Week 1 location dropdown has a value. */
+  const anyWeek1LocationsFilled = useMemo(
+    () => WEEK_1_KEYS.some((key) => (locations[key] ?? "").trim() !== ""),
     [locations]
   );
 
@@ -966,7 +983,6 @@ export function DashboardContent() {
                     >
                       <td className="px-4 py-2">
                         <span className="inline-flex items-center gap-2">
-                          <span>{u.name ?? "—"}</span>
                           {canAccessDashboard(u.email) && (
                             <span
                               className="text-yellow-300"
@@ -976,6 +992,7 @@ export function DashboardContent() {
                               ★
                             </span>
                           )}
+                          <span>{u.name ?? "—"}</span>
                         </span>
                       </td>
                       <td className="px-4 py-2">{u.email || "—"}</td>
@@ -1291,24 +1308,26 @@ export function DashboardContent() {
                   : "Currently Running"
                 : "Reset"}
             </p>
-            <button
-              type="button"
-              onClick={() => setResetBracketsModalOpen(true)}
-              disabled={tournamentPaused}
-              className="mt-2 cursor-pointer rounded-lg border border-blue-400/50 bg-blue-800/60 px-3 py-2 text-sm font-medium text-blue-100 shadow-sm transition-colors hover:bg-blue-700/70 disabled:opacity-55 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-slate-700/80 disabled:border-slate-600"
-              aria-label="Reset Brackets"
-            >
-              Reset Brackets
-            </button>
-            <button
-              type="button"
-              onClick={() => setResetLocationsModalOpen(true)}
-              disabled={tournamentPaused}
-              className="mt-2 cursor-pointer rounded-lg border border-amber-400/50 bg-amber-800/60 px-3 py-2 text-sm font-medium text-amber-100 shadow-sm transition-colors hover:bg-amber-700/70 disabled:opacity-55 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-slate-700/80 disabled:border-slate-600"
-              aria-label="Reset Locations"
-            >
-              Reset Locations
-            </button>
+            {!tournamentStarted && !tournamentPaused && anyFirstRoundFilled && (
+              <button
+                type="button"
+                onClick={() => setResetBracketsModalOpen(true)}
+                className="mt-2 cursor-pointer rounded-lg border border-blue-400/50 bg-blue-800/60 px-3 py-2 text-sm font-medium text-blue-100 shadow-sm transition-colors hover:bg-blue-700/70"
+                aria-label="Reset Brackets"
+              >
+                Reset Brackets
+              </button>
+            )}
+            {!tournamentStarted && !tournamentPaused && anyWeek1LocationsFilled && (
+              <button
+                type="button"
+                onClick={() => setResetLocationsModalOpen(true)}
+                className="mt-2 cursor-pointer rounded-lg border border-amber-400/50 bg-amber-800/60 px-3 py-2 text-sm font-medium text-amber-100 shadow-sm transition-colors hover:bg-amber-700/70"
+                aria-label="Reset Locations"
+              >
+                Reset Locations
+              </button>
+            )}
             <Modal
               open={resetTournamentModalOpen}
               onClose={() => setResetTournamentModalOpen(false)}

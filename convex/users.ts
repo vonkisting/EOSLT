@@ -126,7 +126,10 @@ export const setName = mutation({
       .withIndex("by_email", (q) => q.eq("email", normalized))
       .unique();
     if (!user) {
-      throw new Error("User not found");
+      return await ctx.db.insert("users", {
+        email: normalized,
+        name: name.trim() || undefined,
+      });
     }
     await ctx.db.patch(user._id, { name: name.trim() || undefined });
     return user._id;
