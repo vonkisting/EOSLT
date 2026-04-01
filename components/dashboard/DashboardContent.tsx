@@ -239,22 +239,6 @@ export function DashboardContent() {
     );
   }, [playerRows]);
 
-  const playerLabelMap = useMemo(
-    () =>
-      Object.fromEntries(
-        playerRows.map((row, index) => {
-          if (row.playerName === BYE_LABEL) {
-            return [playerDisplayNames[index], playerDisplayNames[index]];
-          }
-          const label = row.teamName
-            ? `${row.playerName} (${row.teamName})`
-            : row.playerName;
-          return [row.playerName, label];
-        })
-      ) as Record<string, string>,
-    [playerDisplayNames, playerRows]
-  );
-
   const playerTeamMap = useMemo(
     () =>
       new Map(
@@ -2112,7 +2096,6 @@ export function DashboardContent() {
                   playerRaceToMap={Object.fromEntries(
                     playerRows.map((r) => [r.playerName, r.raceTo])
                   )}
-                  playerLabelMap={playerLabelMap}
                   initialSlotSelections={
                     bracketResetKey > 0
                       ? Array(12).fill("")
