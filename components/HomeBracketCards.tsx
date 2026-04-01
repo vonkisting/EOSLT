@@ -32,6 +32,7 @@ const WEEK_2_LOCATION_KEYS = [
 ] as const;
 
 const FINALS_LOCATION_KEY = "finalsLocation" as const;
+const HOME_COLLAPSE_STATE_KEY = "eoslt:home-bracket-collapse";
 
 type OverallPlayerStatsRow = Record<string, string | number | null | undefined>;
 
@@ -97,12 +98,54 @@ export function HomeBracketCards() {
     },
     [router]
   );
+  const collapseStorageKey = useMemo(() => {
+    if (!settings || typeof settings !== "object") return HOME_COLLAPSE_STATE_KEY;
+    const s = settings as Record<string, unknown>;
+    const leagueName = typeof s.leagueName === "string" ? s.leagueName.trim() : "";
+    const season = typeof s.season === "string" ? s.season.trim() : "";
+    return leagueName && season
+      ? `${HOME_COLLAPSE_STATE_KEY}:${leagueName}:${season}`
+      : HOME_COLLAPSE_STATE_KEY;
+  }, [settings]);
 
   useEffect(() => {
     if (status !== "loading" && settings !== undefined) return;
     const t = setTimeout(() => setLoadingTimedOut(true), 10000);
     return () => clearTimeout(t);
   }, [status, settings]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(collapseStorageKey);
+      if (!raw) {
+        setWeek2CardsOpen(Array(4).fill(true));
+        setFinalsCardOpen(true);
+        return;
+      }
+      const parsed = JSON.parse(raw) as {
+        week2CardsOpen?: unknown;
+        finalsCardOpen?: unknown;
+      };
+      setWeek2CardsOpen(
+        Array.isArray(parsed.week2CardsOpen) && parsed.week2CardsOpen.length === 4
+          ? parsed.week2CardsOpen.map((value) => value === true)
+          : Array(4).fill(true)
+      );
+      setFinalsCardOpen(parsed.finalsCardOpen === false ? false : true);
+    } catch {
+      setWeek2CardsOpen(Array(4).fill(true));
+      setFinalsCardOpen(true);
+    }
+  }, [collapseStorageKey]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(
+      collapseStorageKey,
+      JSON.stringify({ week2CardsOpen, finalsCardOpen })
+    );
+  }, [collapseStorageKey, week2CardsOpen, finalsCardOpen]);
 
   const hasLeagueAndSeason =
     settings &&
@@ -119,7 +162,6 @@ export function HomeBracketCards() {
     settings &&
     typeof settings === "object" &&
     (settings as Record<string, unknown>).showBracketsOnHomeScreen === true;
-
   const resolveLeagueGuid = useCallback(
     async (leagueName: string, season: string) => {
       const res = await fetch(
@@ -577,7 +619,7 @@ export function HomeBracketCards() {
         </p>
       </div>
       <div className="w-full overflow-x-auto">
-        <div className="mx-auto flex min-w-full w-max items-start justify-center gap-6">
+        <div className="mx-auto flex min-w-full w-max items-start justify-center gap-6 pb-16">
           <div className="flex w-max min-w-0 flex-col gap-6">
             {WEEK_1_LOCATION_KEYS.map((key, index) => (
           <div
