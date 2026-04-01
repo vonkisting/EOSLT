@@ -7,6 +7,7 @@ import { useSession } from "next-auth/react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Bracket8TwoRounds } from "@/components/Bracket8TwoRounds";
+import { Bracket4 } from "@/components/Bracket4";
 import { formatLocationDate, formatLocationTime } from "@/lib/formatDateTime";
 
 const PLAYER_SLOTS = 64;
@@ -22,6 +23,15 @@ const WEEK_1_LOCATION_KEYS = [
   "firstWeekLocation7",
   "firstWeekLocation8",
 ] as const;
+
+const WEEK_2_LOCATION_KEYS = [
+  "secondWeekLocation1",
+  "secondWeekLocation2",
+  "secondWeekLocation3",
+  "secondWeekLocation4",
+] as const;
+
+const FINALS_LOCATION_KEY = "finalsLocation" as const;
 
 type OverallPlayerStatsRow = Record<string, string | number | null | undefined>;
 
@@ -223,7 +233,12 @@ export function HomeBracketCards() {
   }, [settings]);
 
   const getLocationName = useCallback(
-    (key: (typeof WEEK_1_LOCATION_KEYS)[number]) => {
+    (
+      key:
+        | (typeof WEEK_1_LOCATION_KEYS)[number]
+        | (typeof WEEK_2_LOCATION_KEYS)[number]
+        | typeof FINALS_LOCATION_KEY
+    ) => {
       if (!settings || typeof settings !== "object") return "TBD";
       const v = (settings as Record<string, unknown>)[key];
       const s = typeof v === "string" ? v.trim() : "";
@@ -233,7 +248,12 @@ export function HomeBracketCards() {
   );
 
   const getLocationStartDate = useCallback(
-    (key: (typeof WEEK_1_LOCATION_KEYS)[number]) => {
+    (
+      key:
+        | (typeof WEEK_1_LOCATION_KEYS)[number]
+        | (typeof WEEK_2_LOCATION_KEYS)[number]
+        | typeof FINALS_LOCATION_KEY
+    ) => {
       if (!settings || typeof settings !== "object") return "";
       const raw = (settings as Record<string, unknown>).locationStartMeta;
       if (typeof raw !== "string" || !raw.trim()) return "";
@@ -249,7 +269,12 @@ export function HomeBracketCards() {
   );
 
   const getLocationStartTime = useCallback(
-    (key: (typeof WEEK_1_LOCATION_KEYS)[number]) => {
+    (
+      key:
+        | (typeof WEEK_1_LOCATION_KEYS)[number]
+        | (typeof WEEK_2_LOCATION_KEYS)[number]
+        | typeof FINALS_LOCATION_KEY
+    ) => {
       if (!settings || typeof settings !== "object") return "";
       const raw = (settings as Record<string, unknown>).locationStartMeta;
       if (typeof raw !== "string" || !raw.trim()) return "";
@@ -372,6 +397,84 @@ export function HomeBracketCards() {
     },
     [settings]
   );
+
+  const week2BracketSlotsArray = useMemo(() => {
+    const raw =
+      settings && typeof settings === "object"
+        ? (settings as Record<string, unknown>).week2BracketSlots
+        : undefined;
+    if (typeof raw !== "string" || !raw.trim()) return Array(48).fill("") as string[];
+    try {
+      const arr = JSON.parse(raw) as unknown;
+      if (!Array.isArray(arr) || arr.length !== 48) return Array(48).fill("") as string[];
+      return arr.map((v) => (typeof v === "string" ? v : ""));
+    } catch {
+      return Array(48).fill("") as string[];
+    }
+  }, [settings]);
+
+  const finalsBracketSlotsArray = useMemo(() => {
+    const raw =
+      settings && typeof settings === "object"
+        ? (settings as Record<string, unknown>).finalsBracketSlots
+        : undefined;
+    if (typeof raw !== "string" || !raw.trim()) return Array(6).fill("") as string[];
+    try {
+      const arr = JSON.parse(raw) as unknown;
+      if (!Array.isArray(arr) || arr.length !== 6) return Array(6).fill("") as string[];
+      return arr.map((v) => (typeof v === "string" ? v : ""));
+    } catch {
+      return Array(6).fill("") as string[];
+    }
+  }, [settings]);
+
+  const finalsBracketScoresArray = useMemo(() => {
+    const raw =
+      settings && typeof settings === "object"
+        ? (settings as Record<string, unknown>).finalsBracketScores
+        : undefined;
+    if (typeof raw !== "string" || !raw.trim()) return Array(6).fill("0") as string[];
+    try {
+      const arr = JSON.parse(raw) as unknown;
+      if (!Array.isArray(arr) || arr.length !== 6) return Array(6).fill("0") as string[];
+      return arr.map((v) => (typeof v === "string" ? v : "0"));
+    } catch {
+      return Array(6).fill("0") as string[];
+    }
+  }, [settings]);
+
+  const allFirstRoundSelectionsWeek2 = useMemo(() => {
+    const out: string[] = [];
+    for (let c = 0; c < 4; c++) {
+      for (let i = 0; i < 8; i++) {
+        out.push(week2BracketSlotsArray[c * 12 + i] ?? "");
+      }
+    }
+    return out;
+  }, [week2BracketSlotsArray]);
+
+  const getWeek2MatchStatusByIndex = useCallback(
+    (cardIndex: number): (string | null)[] => {
+      if (!settings || typeof settings !== "object") return Array(6).fill(null);
+      const s = settings as Record<string, unknown>;
+      const base = 48 + cardIndex * 6;
+      return Array.from({ length: 6 }, (_, i) => {
+        const val = (s[`bracketMatchStatus${base + i}`] as string) ?? "";
+        return val.trim() || null;
+      });
+    },
+    [settings]
+  );
+
+  const getFinalsMatchStatusByIndex = useCallback((): (string | null)[] => {
+    if (!settings || typeof settings !== "object") return Array(3).fill(null);
+    const s = settings as Record<string, unknown>;
+    const base = 72;
+    return Array.from({ length: 3 }, (_, i) => {
+      const val = (s[`bracketMatchStatus${base + i}`] as string) ?? "";
+      return val.trim() || null;
+    });
+  }, [settings]);
 
   if (!loadingTimedOut && (status === "loading" || settings === undefined)) {
     return (
@@ -544,6 +647,86 @@ export function HomeBracketCards() {
             </div>
           </div>
         ))}
+      </div>
+      <div className="flex flex-wrap gap-x-6 gap-y-[4.5rem]">
+        {WEEK_2_LOCATION_KEYS.map((key, index) => (
+          <div
+            key={key}
+            className="w-full min-w-0 max-w-[600px] overflow-hidden rounded-xl border border-white/40 bg-black text-foreground sm:min-w-[555px]"
+          >
+            <div className="flex min-h-14 w-full flex-shrink-0 flex-col gap-1 rounded-t-xl bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 px-5 py-4">
+              <div className="w-full">
+                <h2 className="min-w-0 truncate pb-2 text-center text-[1.6875rem] font-semibold tracking-tight text-yellow-400">
+                  {getLocationName(key)}
+                </h2>
+              </div>
+              <div className="grid w-full grid-cols-3 items-center gap-2 border-t border-white/30 pt-3 text-sm font-medium text-blue-100/90">
+                <span className="text-left">Week 2</span>
+                <span className="text-center">
+                  {formatLocationDate(getLocationStartDate(key)) || "—"}
+                </span>
+                <span className="text-right">
+                  {formatLocationTime(getLocationStartTime(key)) || "—"}
+                </span>
+              </div>
+            </div>
+            <div className="min-h-0 overflow-auto rounded-b-xl border-t border-white/40 bg-black pb-4 pt-4 pl-4">
+              <Bracket8TwoRounds
+                players={playerDisplayNames}
+                playerRaceToMap={playerRaceToMap}
+                initialSlotSelections={(() => {
+                  const base = index * 12;
+                  let byeNum = 0;
+                  return Array.from({ length: 12 }, (_, i) => {
+                    const val = week2BracketSlotsArray[base + i] ?? "";
+                    if (val === BYE_LABEL) return `-- Bye ${++byeNum} --`;
+                    return val;
+                  });
+                })()}
+                cardIndex={index}
+                allFirstRoundSelections={allFirstRoundSelectionsWeek2}
+                disabled
+                matchStatusByIndex={getWeek2MatchStatusByIndex(index)}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-x-6 gap-y-[4.5rem]">
+        <div className="w-full min-w-0 max-w-[600px] overflow-hidden rounded-xl border border-white/40 bg-black text-foreground sm:min-w-[555px]">
+          <div className="flex min-h-14 w-full flex-shrink-0 flex-col gap-1 rounded-t-xl bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 px-5 py-4">
+            <div className="w-full">
+              <h2 className="min-w-0 truncate pb-2 text-center text-[1.6875rem] font-semibold tracking-tight text-yellow-400">
+                {getLocationName(FINALS_LOCATION_KEY)}
+              </h2>
+            </div>
+            <div className="grid w-full grid-cols-3 items-center gap-2 border-t border-white/30 pt-3 text-sm font-medium text-blue-100/90">
+              <span className="text-left">Finals</span>
+              <span className="text-center">
+                {formatLocationDate(getLocationStartDate(FINALS_LOCATION_KEY)) || "—"}
+              </span>
+              <span className="text-right">
+                {formatLocationTime(getLocationStartTime(FINALS_LOCATION_KEY)) || "—"}
+              </span>
+            </div>
+          </div>
+          <div className="min-h-0 overflow-auto rounded-b-xl border-t border-white/40 bg-black pb-4 pt-4 pl-4">
+            <Bracket4
+              players={playerDisplayNames}
+              playerRaceToMap={playerRaceToMap}
+              initialSlotSelections={(() => {
+                let byeNum = 0;
+                return finalsBracketSlotsArray.map((val) => {
+                  if (val === BYE_LABEL) return `-- Bye ${++byeNum} --`;
+                  return val;
+                });
+              })()}
+              initialScores={finalsBracketScoresArray}
+              disabled
+              matchStatusByIndex={getFinalsMatchStatusByIndex()}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );

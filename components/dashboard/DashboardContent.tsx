@@ -356,6 +356,41 @@ export function DashboardContent() {
     return null;
   }, [finalsBracketSlotsArray, finalsBracketScoresArray]);
 
+  const getMatchStatusByIndex = useCallback(
+    (cardIndex: number): (string | null)[] => {
+      if (!savedSettings || typeof savedSettings !== "object") return Array(6).fill(null);
+      const s = savedSettings as Record<string, unknown>;
+      return Array.from({ length: 6 }, (_, i) => {
+        const val = (s[`bracketMatchStatus${cardIndex * 6 + i}`] as string) ?? "";
+        return val.trim() || null;
+      });
+    },
+    [savedSettings]
+  );
+
+  const getWeek2MatchStatusByIndex = useCallback(
+    (cardIndex: number): (string | null)[] => {
+      if (!savedSettings || typeof savedSettings !== "object") return Array(6).fill(null);
+      const s = savedSettings as Record<string, unknown>;
+      const base = 48 + cardIndex * 6;
+      return Array.from({ length: 6 }, (_, i) => {
+        const val = (s[`bracketMatchStatus${base + i}`] as string) ?? "";
+        return val.trim() || null;
+      });
+    },
+    [savedSettings]
+  );
+
+  const getFinalsMatchStatusByIndex = useCallback((): (string | null)[] => {
+    if (!savedSettings || typeof savedSettings !== "object") return Array(3).fill(null);
+    const s = savedSettings as Record<string, unknown>;
+    const base = 72;
+    return Array.from({ length: 3 }, (_, i) => {
+      const val = (s[`bracketMatchStatus${base + i}`] as string) ?? "";
+      return val.trim() || null;
+    });
+  }, [savedSettings]);
+
   const tournamentStarted =
     (savedSettings && typeof savedSettings === "object" && (savedSettings as Record<string, unknown>).tournamentStarted === true) ?? false;
   const tournamentPaused =
@@ -2176,6 +2211,7 @@ export function DashboardContent() {
                   cardIndex={index}
                   allFirstRoundSelections={allFirstRoundSelections}
                   disabled={tournamentPaused}
+                  matchStatusByIndex={getMatchStatusByIndex(index)}
                 />
               </div>
             )}
@@ -2249,6 +2285,7 @@ export function DashboardContent() {
                   cardIndex={index}
                   allFirstRoundSelections={allFirstRoundSelectionsWeek2}
                   disabled={tournamentPaused}
+                  matchStatusByIndex={getWeek2MatchStatusByIndex(index)}
                 />
               </div>
             )}
@@ -2310,6 +2347,7 @@ export function DashboardContent() {
                 initialScores={finalsBracketScoresArray}
                 onScoreChange={saveFinalsScoreChange}
                 disabled={tournamentPaused}
+                matchStatusByIndex={getFinalsMatchStatusByIndex()}
               />
               {finalsChampion != null && (
                 <>

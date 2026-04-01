@@ -442,14 +442,15 @@ export function LiveScoringCard({
   );
 
   const { total1CellClass, total2CellClass } = useMemo(() => {
-    const base = "border border-slate-300 px-3 py-1.5 text-center tabular-nums";
-    const green = "bg-green-500 text-white font-semibold";
-    const neutral = "font-semibold text-black";
+    const base =
+      "border border-slate-600 bg-gradient-to-b from-slate-700 to-slate-800 px-3 py-2.5 text-center tabular-nums font-bold text-white";
+    const winner = "text-yellow-400";
+    const neutral = "text-white";
     if (p1Won) {
-      return { total1CellClass: `${base} ${green}`, total2CellClass: `${base} ${neutral}` };
+      return { total1CellClass: `${base} ${winner}`, total2CellClass: `${base} ${neutral}` };
     }
     if (p2Won) {
-      return { total1CellClass: `${base} ${neutral}`, total2CellClass: `${base} ${green}` };
+      return { total1CellClass: `${base} ${neutral}`, total2CellClass: `${base} ${winner}` };
     }
     return { total1CellClass: `${base} ${neutral}`, total2CellClass: `${base} ${neutral}` };
   }, [p1Won, p2Won]);
@@ -597,8 +598,8 @@ export function LiveScoringCard({
                     })}
                   </tbody>
                   <tfoot>
-                    <tr className="bg-slate-100 text-black">
-                      <td className="whitespace-nowrap border border-slate-300 px-3 py-1.5 font-semibold">
+                    <tr className="bg-gradient-to-b from-slate-700 to-slate-800">
+                      <td className="whitespace-nowrap border border-slate-600 px-3 py-2.5 font-bold text-white">
                         Total
                       </td>
                       <td className={total1CellClass}>

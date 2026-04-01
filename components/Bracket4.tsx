@@ -51,6 +51,7 @@ export function Bracket4({
   initialScores,
   onScoreChange,
   disabled,
+  matchStatusByIndex,
 }: {
   players: string[];
   playerRaceToMap?: Record<string, number | null>;
@@ -60,6 +61,8 @@ export function Bracket4({
   initialScores?: string[] | null;
   onScoreChange?: (matchIndex: number, side: "top" | "bottom", value: string) => void;
   disabled?: boolean;
+  /** Per-matchup status (length 3) for race cell background: "In Progress...", "Paused", "Completed". */
+  matchStatusByIndex?: (string | null)[];
 }) {
   const pool = useMemo(() => {
     const filtered = players.filter((n) => n != null && n !== "");
@@ -160,6 +163,8 @@ export function Bracket4({
     [slotSelections]
   );
 
+  const statusByIndex = matchStatusByIndex ?? Array(3).fill(null);
+
   return (
     <div className="home-bracket-root bracket-4" style={{ width: "100%" }}>
       <div className="theme theme-dark-trendy">
@@ -170,6 +175,7 @@ export function Bracket4({
                 winner="top"
                 topSlotIndex={0}
                 bottomSlotIndex={1}
+                status={statusByIndex[0]}
                 slotSelections={slotSelections}
                 setSlotSelection={setSlotSelection}
                 topOptions={getOptions(0)}
@@ -186,6 +192,7 @@ export function Bracket4({
                 winner="bottom"
                 topSlotIndex={2}
                 bottomSlotIndex={3}
+                status={statusByIndex[1]}
                 slotSelections={slotSelections}
                 setSlotSelection={setSlotSelection}
                 topOptions={getOptions(2)}
@@ -204,6 +211,7 @@ export function Bracket4({
                 winner="top"
                 topSlotIndex={4}
                 bottomSlotIndex={5}
+                status={statusByIndex[2]}
                 slotSelections={slotSelections}
                 setSlotSelection={setSlotSelection}
                 topOptions={getOptions(4)}
