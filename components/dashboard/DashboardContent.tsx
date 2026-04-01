@@ -1431,7 +1431,7 @@ export function DashboardContent() {
                 </button>
                 <div
                   id="league-card-week1-locations"
-                  className={`flex flex-col gap-3 overflow-hidden transition-[max-height] duration-200 ease-out ${week1SectionOpen ? "max-h-[1200px] px-[5px] pb-[5px]" : "max-h-0 px-0 pb-0 pt-0"}`}
+                  className={`flex flex-col gap-3 overflow-hidden transition-[max-height] duration-200 ease-out ${week1SectionOpen ? "max-h-[2200px] px-[5px] pb-[5px]" : "max-h-0 px-0 pb-0 pt-0"}`}
                   aria-hidden={!week1SectionOpen}
                 >
                   {WEEK_1_KEYS.map((key) => (
@@ -1540,7 +1540,7 @@ export function DashboardContent() {
                 </button>
                 <div
                   id="league-card-week2-locations"
-                  className={`flex flex-col gap-3 overflow-hidden transition-[max-height] duration-200 ease-out ${week2SectionOpen ? "max-h-[600px] px-[5px] pb-4" : "max-h-0 px-0 pb-0 pt-0"}`}
+                  className={`flex flex-col gap-3 overflow-hidden transition-[max-height] duration-200 ease-out ${week2SectionOpen ? "max-h-[1200px] px-[5px] pb-4" : "max-h-0 px-0 pb-0 pt-0"}`}
                   aria-hidden={!week2SectionOpen}
                 >
                   {week2SectionOpen && WEEK_2_KEYS.map((key) => (
