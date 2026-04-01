@@ -565,8 +565,10 @@ export function HomeBracketCards() {
             : "Reset"}
         </p>
       </div>
-      <div className="flex flex-wrap gap-x-6 gap-y-[4.5rem]">
-        {WEEK_1_LOCATION_KEYS.map((key, index) => (
+      <div className="min-w-0 overflow-x-auto">
+        <div className="flex min-w-max flex-wrap items-start gap-6">
+          <div className="flex w-max min-w-0 flex-col gap-6">
+            {WEEK_1_LOCATION_KEYS.map((key, index) => (
           <div
             key={key}
             className="w-full min-w-0 max-w-[600px] overflow-hidden rounded-xl border border-white/40 bg-black text-foreground sm:min-w-[555px]"
@@ -646,85 +648,87 @@ export function HomeBracketCards() {
               />
             </div>
           </div>
-        ))}
-      </div>
-      <div className="flex flex-wrap gap-x-6 gap-y-[4.5rem]">
-        {WEEK_2_LOCATION_KEYS.map((key, index) => (
-          <div
-            key={key}
-            className="w-full min-w-0 max-w-[600px] overflow-hidden rounded-xl border border-white/40 bg-black text-foreground sm:min-w-[555px]"
-          >
-            <div className="flex min-h-14 w-full flex-shrink-0 flex-col gap-1 rounded-t-xl bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 px-5 py-4">
-              <div className="w-full">
-                <h2 className="min-w-0 truncate pb-2 text-center text-[1.6875rem] font-semibold tracking-tight text-yellow-400">
-                  {getLocationName(key)}
-                </h2>
-              </div>
-              <div className="grid w-full grid-cols-3 items-center gap-2 border-t border-white/30 pt-3 text-sm font-medium text-blue-100/90">
-                <span className="text-left">Week 2</span>
-                <span className="text-center">
-                  {formatLocationDate(getLocationStartDate(key)) || "—"}
-                </span>
-                <span className="text-right">
-                  {formatLocationTime(getLocationStartTime(key)) || "—"}
-                </span>
-              </div>
-            </div>
-            <div className="min-h-0 overflow-auto rounded-b-xl border-t border-white/40 bg-black pb-4 pt-4 pl-4">
-              <Bracket8TwoRounds
-                players={playerDisplayNames}
-                playerRaceToMap={playerRaceToMap}
-                initialSlotSelections={(() => {
-                  const base = index * 12;
-                  let byeNum = 0;
-                  return Array.from({ length: 12 }, (_, i) => {
-                    const val = week2BracketSlotsArray[base + i] ?? "";
-                    if (val === BYE_LABEL) return `-- Bye ${++byeNum} --`;
-                    return val;
-                  });
-                })()}
-                cardIndex={index}
-                allFirstRoundSelections={allFirstRoundSelectionsWeek2}
-                disabled
-                matchStatusByIndex={getWeek2MatchStatusByIndex(index)}
-              />
-            </div>
+            ))}
           </div>
-        ))}
-      </div>
-      <div className="flex flex-wrap gap-x-6 gap-y-[4.5rem]">
-        <div className="w-full min-w-0 max-w-[600px] overflow-hidden rounded-xl border border-white/40 bg-black text-foreground sm:min-w-[555px]">
-          <div className="flex min-h-14 w-full flex-shrink-0 flex-col gap-1 rounded-t-xl bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 px-5 py-4">
-            <div className="w-full">
-              <h2 className="min-w-0 truncate pb-2 text-center text-[1.6875rem] font-semibold tracking-tight text-yellow-400">
-                {getLocationName(FINALS_LOCATION_KEY)}
-              </h2>
-            </div>
-            <div className="grid w-full grid-cols-3 items-center gap-2 border-t border-white/30 pt-3 text-sm font-medium text-blue-100/90">
-              <span className="text-left">Finals</span>
-              <span className="text-center">
-                {formatLocationDate(getLocationStartDate(FINALS_LOCATION_KEY)) || "—"}
-              </span>
-              <span className="text-right">
-                {formatLocationTime(getLocationStartTime(FINALS_LOCATION_KEY)) || "—"}
-              </span>
-            </div>
+          <div className="flex w-max min-w-0 flex-col gap-6">
+            {WEEK_2_LOCATION_KEYS.map((key, index) => (
+              <div
+                key={key}
+                className="w-full min-w-0 max-w-[600px] overflow-hidden rounded-xl border border-white/40 bg-black text-foreground sm:min-w-[555px]"
+              >
+                <div className="flex min-h-14 w-full flex-shrink-0 flex-col gap-1 rounded-t-xl bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 px-5 py-4">
+                  <div className="w-full">
+                    <h2 className="min-w-0 truncate pb-2 text-center text-[1.6875rem] font-semibold tracking-tight text-yellow-400">
+                      {getLocationName(key)}
+                    </h2>
+                  </div>
+                  <div className="grid w-full grid-cols-3 items-center gap-2 border-t border-white/30 pt-3 text-sm font-medium text-blue-100/90">
+                    <span className="text-left">Week 2</span>
+                    <span className="text-center">
+                      {formatLocationDate(getLocationStartDate(key)) || "—"}
+                    </span>
+                    <span className="text-right">
+                      {formatLocationTime(getLocationStartTime(key)) || "—"}
+                    </span>
+                  </div>
+                </div>
+                <div className="min-h-0 overflow-auto rounded-b-xl border-t border-white/40 bg-black pb-4 pt-4 pl-4">
+                  <Bracket8TwoRounds
+                    players={playerDisplayNames}
+                    playerRaceToMap={playerRaceToMap}
+                    initialSlotSelections={(() => {
+                      const base = index * 12;
+                      let byeNum = 0;
+                      return Array.from({ length: 12 }, (_, i) => {
+                        const val = week2BracketSlotsArray[base + i] ?? "";
+                        if (val === BYE_LABEL) return `-- Bye ${++byeNum} --`;
+                        return val;
+                      });
+                    })()}
+                    cardIndex={index}
+                    allFirstRoundSelections={allFirstRoundSelectionsWeek2}
+                    disabled
+                    matchStatusByIndex={getWeek2MatchStatusByIndex(index)}
+                  />
+                </div>
+              </div>
+            ))}
           </div>
-          <div className="min-h-0 overflow-auto rounded-b-xl border-t border-white/40 bg-black pb-4 pt-4 pl-4">
-            <Bracket4
-              players={playerDisplayNames}
-              playerRaceToMap={playerRaceToMap}
-              initialSlotSelections={(() => {
-                let byeNum = 0;
-                return finalsBracketSlotsArray.map((val) => {
-                  if (val === BYE_LABEL) return `-- Bye ${++byeNum} --`;
-                  return val;
-                });
-              })()}
-              initialScores={finalsBracketScoresArray}
-              disabled
-              matchStatusByIndex={getFinalsMatchStatusByIndex()}
-            />
+          <div className="flex w-max min-w-0 flex-col gap-6">
+            <div className="w-full min-w-0 max-w-[600px] overflow-hidden rounded-xl border border-white/40 bg-black text-foreground sm:min-w-[555px]">
+              <div className="flex min-h-14 w-full flex-shrink-0 flex-col gap-1 rounded-t-xl bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 px-5 py-4">
+                <div className="w-full">
+                  <h2 className="min-w-0 truncate pb-2 text-center text-[1.6875rem] font-semibold tracking-tight text-yellow-400">
+                    {getLocationName(FINALS_LOCATION_KEY)}
+                  </h2>
+                </div>
+                <div className="grid w-full grid-cols-3 items-center gap-2 border-t border-white/30 pt-3 text-sm font-medium text-blue-100/90">
+                  <span className="text-left">Finals</span>
+                  <span className="text-center">
+                    {formatLocationDate(getLocationStartDate(FINALS_LOCATION_KEY)) || "—"}
+                  </span>
+                  <span className="text-right">
+                    {formatLocationTime(getLocationStartTime(FINALS_LOCATION_KEY)) || "—"}
+                  </span>
+                </div>
+              </div>
+              <div className="min-h-0 overflow-auto rounded-b-xl border-t border-white/40 bg-black pb-4 pt-4 pl-4">
+                <Bracket4
+                  players={playerDisplayNames}
+                  playerRaceToMap={playerRaceToMap}
+                  initialSlotSelections={(() => {
+                    let byeNum = 0;
+                    return finalsBracketSlotsArray.map((val) => {
+                      if (val === BYE_LABEL) return `-- Bye ${++byeNum} --`;
+                      return val;
+                    });
+                  })()}
+                  initialScores={finalsBracketScoresArray}
+                  disabled
+                  matchStatusByIndex={getFinalsMatchStatusByIndex()}
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>
