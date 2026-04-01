@@ -8,5 +8,5 @@ export const DASHBOARD_ALLOWED_EMAILS = [
 
 export function canAccessDashboard(email: string | null | undefined): boolean {
   const normalized = email?.toLowerCase().trim();
-  return normalized != null && DASHBOARD_ALLOWED_EMAILS.includes(normalized);
+  return normalized != null && (DASHBOARD_ALLOWED_EMAILS as readonly string[]).includes(normalized);
 }
