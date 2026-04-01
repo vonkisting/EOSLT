@@ -605,7 +605,7 @@ export function HomeBracketCards() {
 
   return (
     <div className="flex w-full flex-col gap-6">
-      <div className="mx-auto w-full max-w-5xl rounded-xl border border-[var(--surface-border)] bg-gradient-to-br from-purple-950 via-violet-900 to-purple-950 px-5 py-4 text-center">
+      <div className="w-full rounded-xl border border-[var(--surface-border)] bg-gradient-to-br from-purple-950 via-violet-900 to-purple-950 px-5 py-4 text-center">
         <h1 className="text-xl font-semibold tracking-tight text-blue-100">
           {String(settingsRecord.leagueName)} – {String(settingsRecord.season)}
         </h1>
