@@ -137,7 +137,7 @@ function canShareFirstRoundMatchup(
 function buildRandomizedWeek1Slots(
   rows: PlayerTableRow[],
   playerSlotCount: number
-): string[] | null {
+): string[][] | null {
   let byeNumber = 0;
   const participants = rows.slice(0, playerSlotCount).map((row) => {
     if (isBye(row.playerName)) {
@@ -171,7 +171,19 @@ function buildRandomizedWeek1Slots(
       }
     }
 
-    if (valid) return shuffled;
+    if (valid) {
+      return Array.from({ length: 8 }, (_, bracketIndex) => {
+        const firstRound = shuffled.slice(bracketIndex * 8, bracketIndex * 8 + 8);
+        const secondRound = Array.from({ length: 4 }, (_, pairIndex) => {
+          const top = firstRound[pairIndex * 2] ?? "";
+          const bottom = firstRound[pairIndex * 2 + 1] ?? "";
+          if (isBye(top) && !isBye(bottom)) return bottom;
+          if (!isBye(top) && isBye(bottom)) return top;
+          return "";
+        });
+        return [...firstRound, ...secondRound];
+      });
+    }
   }
 
   return null;
@@ -355,6 +367,10 @@ export function DashboardContent() {
     (savedSettings &&
       typeof savedSettings === "object" &&
       (savedSettings as Record<string, unknown>).week1BracketsRandomized === true) ?? false;
+  const showBracketsOnHomeScreen =
+    (savedSettings &&
+      typeof savedSettings === "object" &&
+      (savedSettings as Record<string, unknown>).showBracketsOnHomeScreen === true) ?? false;
 
   const [locations, setLocations] = useState<Record<LocationKey, string>>(() =>
     Object.fromEntries(LOCATION_KEYS.map((k) => [k, ""])) as Record<LocationKey, string>
@@ -727,8 +743,8 @@ export function DashboardContent() {
 
   const randomizeWeek1Brackets = useCallback(() => {
     if (!email) return;
-    const randomizedFirstRound = buildRandomizedWeek1Slots(playerRows, PLAYER_SLOTS);
-    if (!randomizedFirstRound) {
+    const randomizedBracketCards = buildRandomizedWeek1Slots(playerRows, PLAYER_SLOTS);
+    if (!randomizedBracketCards) {
       setRandomizeBracketError(
         "Unable to generate a valid Week 1 bracket with the current players while avoiding same-team first-round matchups and limiting byes to one per bracket."
       );
@@ -739,14 +755,12 @@ export function DashboardContent() {
     const slotEntries: [string, string][] = [];
     for (let cardIndex = 0; cardIndex < 8; cardIndex++) {
       const base = cardIndex * 12;
-      for (let i = 0; i < 8; i++) {
+      const cardSlots = randomizedBracketCards[cardIndex] ?? Array(12).fill("");
+      for (let i = 0; i < 12; i++) {
         slotEntries.push([
           `bracketSlot${base + i}`,
-          randomizedFirstRound[cardIndex * 8 + i] ?? "",
+          cardSlots[i] ?? "",
         ]);
-      }
-      for (let i = 8; i < 12; i++) {
-        slotEntries.push([`bracketSlot${base + i}`, ""]);
       }
     }
 
@@ -1466,6 +1480,26 @@ export function DashboardContent() {
                   : "Currently Running"
                 : "Reset"}
             </p>
+            <label className="mt-3 inline-flex cursor-pointer items-center gap-3 text-sm font-medium text-blue-100">
+              <input
+                type="checkbox"
+                checked={showBracketsOnHomeScreen}
+                onChange={(e) => {
+                  if (!email) return;
+                  setDashboardSettings({
+                    email,
+                    leagueName: selectedLeagueName,
+                    season: selectedSeason,
+                    tournamentStarted,
+                    tournamentPaused,
+                    showBracketsOnHomeScreen: e.target.checked,
+                  } as Parameters<typeof setDashboardSettings>[0]);
+                }}
+                className="h-4 w-4 rounded border-white/30 bg-slate-900 text-blue-500 focus:ring-2 focus:ring-blue-400"
+                aria-label="Show Brackets on Home Screen"
+              />
+              <span>Show Brackets on Home Screen</span>
+            </label>
             {!tournamentStarted && !tournamentPaused && (
               <button
                 type="button"

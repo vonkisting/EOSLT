@@ -94,6 +94,10 @@ export function HomeBracketCards() {
   const tournamentPaused =
     settings && typeof settings === "object" && (settings as Record<string, unknown>).tournamentPaused === true;
   const tournamentInProgress = tournamentStarted && !tournamentPaused;
+  const showBracketsOnHomeScreen =
+    settings &&
+    typeof settings === "object" &&
+    (settings as Record<string, unknown>).showBracketsOnHomeScreen === true;
 
   const resolveLeagueGuid = useCallback(
     async (leagueName: string, season: string) => {
@@ -390,8 +394,7 @@ export function HomeBracketCards() {
     );
   }
 
-  const notSetupYet =
-    !hasLeagueAndSeason || !tournamentStarted || tournamentPaused;
+  const notSetupYet = !hasLeagueAndSeason || !showBracketsOnHomeScreen;
   if (notSetupYet) {
     return (
       <div className="flex flex-col items-center gap-4 px-4 text-center">
