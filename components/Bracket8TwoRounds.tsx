@@ -89,6 +89,7 @@ export function MatchWithDropdowns({
   onTopScoreChange,
   onBottomScoreChange,
   status,
+  placeholderText = "Select Player...",
 }: {
   winner: "top" | "bottom";
   topSlotIndex: number;
@@ -108,6 +109,7 @@ export function MatchWithDropdowns({
   onBottomScoreChange?: (value: string) => void;
   /** Matchup status for race cell background: "In Progress...", "Paused", "Completed". */
   status?: string | null;
+  placeholderText?: string;
 }) {
   const winnerClass = winner === "top" ? "winner-top" : "winner-bottom";
   const topValue = slotSelections[topSlotIndex] ?? "";
@@ -132,7 +134,7 @@ export function MatchWithDropdowns({
             disabled={disabled}
             aria-label="Top player"
           >
-            <option value="">Select Player...</option>
+            <option value="">{placeholderText}</option>
             {topOptions.map((name) => (
               <option key={name} value={name}>
                 {name}
@@ -163,7 +165,7 @@ export function MatchWithDropdowns({
             disabled={disabled}
             aria-label="Bottom player"
           >
-            <option value="">Select Player...</option>
+            <option value="">{placeholderText}</option>
             {bottomOptions.map((name) => (
               <option key={name} value={name}>
                 {name}
@@ -211,6 +213,27 @@ export function isBye(name: string): boolean {
 const EMPTY_SLOTS = Array(12).fill("") as string[];
 const DEFAULT_SCORES = Array(12).fill("0") as string[];
 
+function applyByeAdvancesToBracket8(slots: string[]): string[] {
+  const next = [...slots];
+  for (let m = 0; m < 4; m++) {
+    const topSlot = m * 2;
+    const bottomSlot = m * 2 + 1;
+    const topVal = next[topSlot]?.trim() ?? "";
+    const bottomVal = next[bottomSlot]?.trim() ?? "";
+    const secondSlot = SECOND_ROUND_FIRST_SLOT + m;
+    if (!topVal || !bottomVal) {
+      next[secondSlot] = "";
+      continue;
+    }
+    const topIsBye = isBye(topVal);
+    const bottomIsBye = isBye(bottomVal);
+    if (topIsBye && !bottomIsBye) next[secondSlot] = bottomVal;
+    else if (!topIsBye && bottomIsBye) next[secondSlot] = topVal;
+    else if (topIsBye && bottomIsBye) next[secondSlot] = "";
+  }
+  return next;
+}
+
 /** Length 64: first-round slot values for all 8 Week 1 cards (cardIndex*8 + slot 0..7). */
 export type AllFirstRoundSelections = string[];
 
@@ -225,6 +248,7 @@ export function Bracket8TwoRounds({
   allFirstRoundSelections,
   disabled,
   matchStatusByIndex,
+  placeholderText,
 }: {
   players: string[];
   playerRaceToMap?: Record<string, number | null>;
@@ -240,6 +264,7 @@ export function Bracket8TwoRounds({
   disabled?: boolean;
   /** Per-matchup status (length 6) for race cell background: "In Progress...", "Paused", "Completed". */
   matchStatusByIndex?: (string | null)[];
+  placeholderText?: string;
 }) {
   const pool = useMemo(() => {
     const filtered = players.filter((n) => n != null && n !== "");
@@ -251,7 +276,9 @@ export function Bracket8TwoRounds({
     return [...rest, ...numberedByes];
   }, [players]);
   const [slotSelections, setSlotSelections] = useState<string[]>(() =>
-    initialSlotSelections?.length === 12 ? [...initialSlotSelections] : EMPTY_SLOTS
+    initialSlotSelections?.length === 12
+      ? applyByeAdvancesToBracket8(initialSlotSelections)
+      : EMPTY_SLOTS
   );
   const userDidEditRef = useRef(false);
   const initialSlotSelectionsSerialized =
@@ -260,7 +287,7 @@ export function Bracket8TwoRounds({
   useEffect(() => {
     if (initialSlotSelectionsSerialized == null) return;
     const next = JSON.parse(initialSlotSelectionsSerialized) as string[];
-    queueMicrotask(() => setSlotSelections(next));
+    queueMicrotask(() => setSlotSelections(applyByeAdvancesToBracket8(next)));
   }, [initialSlotSelectionsSerialized]);
 
   const setSlotSelection = useCallback((index: number, value: string) => {
@@ -268,22 +295,7 @@ export function Bracket8TwoRounds({
     setSlotSelections((prev) => {
       const next = [...prev];
       next[index] = value;
-      for (let m = 0; m < 4; m++) {
-        const topSlot = m * 2;
-        const bottomSlot = m * 2 + 1;
-        const topVal = next[topSlot]?.trim() ?? "";
-        const bottomVal = next[bottomSlot]?.trim() ?? "";
-        const secondSlot = SECOND_ROUND_FIRST_SLOT + m;
-        if (topVal && bottomVal) {
-          const topIsBye = isBye(topVal);
-          const bottomIsBye = isBye(bottomVal);
-          if (topIsBye && !bottomIsBye) next[secondSlot] = bottomVal;
-          else if (!topIsBye && bottomIsBye) next[secondSlot] = topVal;
-        } else if (!topVal || !bottomVal) {
-          next[secondSlot] = "";
-        }
-      }
-      return next;
+      return applyByeAdvancesToBracket8(next);
     });
   }, []);
 
@@ -371,6 +383,7 @@ export function Bracket8TwoRounds({
                 playerRaceToMap={playerRaceToMap}
                 disabled={disabled}
                 hasBye={disabled && matchupHasBye(0, 1)}
+                placeholderText={placeholderText}
                 onTopScoreChange={onScoreChange ? (v) => handleScoreChange(0, "top", v) : undefined}
                 onBottomScoreChange={onScoreChange ? (v) => handleScoreChange(0, "bottom", v) : undefined}
               />
@@ -388,6 +401,7 @@ export function Bracket8TwoRounds({
                 playerRaceToMap={playerRaceToMap}
                 disabled={disabled}
                 hasBye={disabled && matchupHasBye(2, 3)}
+                placeholderText={placeholderText}
                 onTopScoreChange={onScoreChange ? (v) => handleScoreChange(1, "top", v) : undefined}
                 onBottomScoreChange={onScoreChange ? (v) => handleScoreChange(1, "bottom", v) : undefined}
               />
@@ -405,6 +419,7 @@ export function Bracket8TwoRounds({
                 playerRaceToMap={playerRaceToMap}
                 disabled={disabled}
                 hasBye={disabled && matchupHasBye(4, 5)}
+                placeholderText={placeholderText}
                 onTopScoreChange={onScoreChange ? (v) => handleScoreChange(2, "top", v) : undefined}
                 onBottomScoreChange={onScoreChange ? (v) => handleScoreChange(2, "bottom", v) : undefined}
               />
@@ -422,6 +437,7 @@ export function Bracket8TwoRounds({
                 playerRaceToMap={playerRaceToMap}
                 disabled={disabled}
                 hasBye={disabled && matchupHasBye(6, 7)}
+                placeholderText={placeholderText}
                 onTopScoreChange={onScoreChange ? (v) => handleScoreChange(3, "top", v) : undefined}
                 onBottomScoreChange={onScoreChange ? (v) => handleScoreChange(3, "bottom", v) : undefined}
               />
@@ -441,6 +457,7 @@ export function Bracket8TwoRounds({
                 playerRaceToMap={playerRaceToMap}
                 disabled={disabled}
                 hasBye={disabled && matchupHasBye(8, 9)}
+                placeholderText={placeholderText}
                 onTopScoreChange={onScoreChange ? (v) => handleScoreChange(4, "top", v) : undefined}
                 onBottomScoreChange={onScoreChange ? (v) => handleScoreChange(4, "bottom", v) : undefined}
               />
@@ -458,6 +475,7 @@ export function Bracket8TwoRounds({
                 playerRaceToMap={playerRaceToMap}
                 disabled={disabled}
                 hasBye={disabled && matchupHasBye(10, 11)}
+                placeholderText={placeholderText}
                 onTopScoreChange={onScoreChange ? (v) => handleScoreChange(5, "top", v) : undefined}
                 onBottomScoreChange={onScoreChange ? (v) => handleScoreChange(5, "bottom", v) : undefined}
               />

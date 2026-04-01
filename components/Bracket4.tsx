@@ -39,6 +39,26 @@ function optionsForFinalBottom(slotSelections: string[]): string[] {
 const EMPTY_SLOTS = Array(6).fill("") as string[];
 const DEFAULT_SCORES = Array(6).fill("0") as string[];
 
+function applyByeAdvancesToBracket4(slots: string[]): string[] {
+  const next = [...slots];
+  const top0 = next[0]?.trim() ?? "";
+  const bottom0 = next[1]?.trim() ?? "";
+  const top1 = next[2]?.trim() ?? "";
+  const bottom1 = next[3]?.trim() ?? "";
+
+  if (!top0 || !bottom0) next[4] = "";
+  else if (isBye(top0) && !isBye(bottom0)) next[4] = bottom0;
+  else if (!isBye(top0) && isBye(bottom0)) next[4] = top0;
+  else if (isBye(top0) && isBye(bottom0)) next[4] = "";
+
+  if (!top1 || !bottom1) next[5] = "";
+  else if (isBye(top1) && !isBye(bottom1)) next[5] = bottom1;
+  else if (!isBye(top1) && isBye(bottom1)) next[5] = top1;
+  else if (isBye(top1) && isBye(bottom1)) next[5] = "";
+
+  return next;
+}
+
 /**
  * 4-person bracket: 2 semi-finals (slots 0–3) and 1 final (slots 4–5).
  * Final dropdowns only offer the two players from the corresponding semi.
@@ -52,6 +72,7 @@ export function Bracket4({
   onScoreChange,
   disabled,
   matchStatusByIndex,
+  placeholderText,
 }: {
   players: string[];
   playerRaceToMap?: Record<string, number | null>;
@@ -63,6 +84,7 @@ export function Bracket4({
   disabled?: boolean;
   /** Per-matchup status (length 3) for race cell background: "In Progress...", "Paused", "Completed". */
   matchStatusByIndex?: (string | null)[];
+  placeholderText?: string;
 }) {
   const pool = useMemo(() => {
     const filtered = players.filter((n) => n != null && n !== "");
@@ -75,42 +97,26 @@ export function Bracket4({
   }, [players]);
 
   const [slotSelections, setSlotSelections] = useState<string[]>(() =>
-    initialSlotSelections?.length === 6 ? [...initialSlotSelections] : EMPTY_SLOTS
+    initialSlotSelections?.length === 6
+      ? applyByeAdvancesToBracket4(initialSlotSelections)
+      : EMPTY_SLOTS
   );
-  const hasAppliedInitial = useRef(false);
   const userDidEditRef = useRef(false);
+  const initialSlotSelectionsSerialized =
+    initialSlotSelections?.length === 6 ? JSON.stringify(initialSlotSelections) : null;
+
   useEffect(() => {
-    if (hasAppliedInitial.current || !initialSlotSelections?.length) return;
-    if (initialSlotSelections.length === 6) {
-      hasAppliedInitial.current = true;
-      const next = [...initialSlotSelections];
-      queueMicrotask(() => setSlotSelections(next));
-    }
-  }, [initialSlotSelections]);
+    if (initialSlotSelectionsSerialized == null) return;
+    const next = JSON.parse(initialSlotSelectionsSerialized) as string[];
+    queueMicrotask(() => setSlotSelections(applyByeAdvancesToBracket4(next)));
+  }, [initialSlotSelectionsSerialized]);
 
   const setSlotSelection = useCallback((index: number, value: string) => {
     userDidEditRef.current = true;
     setSlotSelections((prev) => {
       const next = [...prev];
       next[index] = value;
-      // Slot 4 = winner of semi 1 (0,1); slot 5 = winner of semi 2 (2,3)
-      const top0 = next[0]?.trim() ?? "";
-      const bottom0 = next[1]?.trim() ?? "";
-      const top1 = next[2]?.trim() ?? "";
-      const bottom1 = next[3]?.trim() ?? "";
-      if (top0 && bottom0) {
-        const t0Bye = isBye(top0);
-        const b0Bye = isBye(bottom0);
-        if (t0Bye && !b0Bye) next[4] = bottom0;
-        else if (!t0Bye && b0Bye) next[4] = top0;
-      } else next[4] = "";
-      if (top1 && bottom1) {
-        const t1Bye = isBye(top1);
-        const b1Bye = isBye(bottom1);
-        if (t1Bye && !b1Bye) next[5] = bottom1;
-        else if (!t1Bye && b1Bye) next[5] = top1;
-      } else next[5] = "";
-      return next;
+      return applyByeAdvancesToBracket4(next);
     });
   }, []);
 
@@ -185,6 +191,7 @@ export function Bracket4({
                 playerRaceToMap={playerRaceToMap}
                 disabled={disabled}
                 hasBye={disabled && matchupHasBye(0, 1)}
+                placeholderText={placeholderText}
                 onTopScoreChange={onScoreChange ? (v) => handleScoreChange(0, "top", v) : undefined}
                 onBottomScoreChange={onScoreChange ? (v) => handleScoreChange(0, "bottom", v) : undefined}
               />
@@ -202,6 +209,7 @@ export function Bracket4({
                 playerRaceToMap={playerRaceToMap}
                 disabled={disabled}
                 hasBye={disabled && matchupHasBye(2, 3)}
+                placeholderText={placeholderText}
                 onTopScoreChange={onScoreChange ? (v) => handleScoreChange(1, "top", v) : undefined}
                 onBottomScoreChange={onScoreChange ? (v) => handleScoreChange(1, "bottom", v) : undefined}
               />
@@ -221,6 +229,7 @@ export function Bracket4({
                 playerRaceToMap={playerRaceToMap}
                 disabled={disabled}
                 hasBye={disabled && matchupHasBye(4, 5)}
+                placeholderText={placeholderText}
                 onTopScoreChange={onScoreChange ? (v) => handleScoreChange(2, "top", v) : undefined}
                 onBottomScoreChange={onScoreChange ? (v) => handleScoreChange(2, "bottom", v) : undefined}
               />

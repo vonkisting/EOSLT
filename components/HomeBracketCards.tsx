@@ -644,6 +644,7 @@ export function HomeBracketCards() {
                 cardIndex={index}
                 allFirstRoundSelections={allFirstRoundSelections}
                 disabled
+                placeholderText="TBD..."
                 matchStatusByIndex={getMatchStatusByIndex(index)}
               />
             </div>
@@ -688,6 +689,7 @@ export function HomeBracketCards() {
                     cardIndex={index}
                     allFirstRoundSelections={allFirstRoundSelectionsWeek2}
                     disabled
+                    placeholderText="TBD..."
                     matchStatusByIndex={getWeek2MatchStatusByIndex(index)}
                   />
                 </div>
@@ -725,6 +727,7 @@ export function HomeBracketCards() {
                   })()}
                   initialScores={finalsBracketScoresArray}
                   disabled
+                  placeholderText="TBD..."
                   matchStatusByIndex={getFinalsMatchStatusByIndex()}
                 />
               </div>
