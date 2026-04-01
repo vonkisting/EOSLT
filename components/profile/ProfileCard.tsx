@@ -27,7 +27,7 @@ export function ProfileCard({ user }: ProfileCardProps) {
 
   const isLinked = Boolean(convexUser?.poolhubPlayerName);
   const linkedName = convexUser?.poolhubPlayerName?.trim() ?? "";
-  const resolvedName = convexUser?.name ?? user.name ?? "";
+  const resolvedName = convexUser === undefined ? user.name ?? "" : convexUser?.name ?? "";
 
   useEffect(() => {
     setNameValue(resolvedName);
@@ -42,6 +42,7 @@ export function ProfileCard({ user }: ProfileCardProps) {
     setNameMessage(null);
     try {
       await setName({ email: user.email, name: name.trim() });
+      setNameValue(name.trim());
       setNameMessage("Name updated.");
     } catch {
       setNameMessage("Unable to update name right now.");
@@ -78,16 +79,16 @@ export function ProfileCard({ user }: ProfileCardProps) {
               placeholder="Your name"
               className="w-full rounded-lg border border-white/20 bg-white/5 px-3 py-2.5 text-foreground placeholder:text-slate-500 focus:border-blue-400/60 focus:outline-none focus:ring-1 focus:ring-blue-400/60"
             />
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={handleSaveName}
-                disabled={savingName || !canUpdateName}
-                className="rounded-lg bg-gradient-to-r from-blue-700 to-blue-500 px-4 py-2 text-sm font-medium text-white shadow transition hover:from-blue-600 hover:to-blue-400 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {savingName ? "Updating..." : "Update Name"}
-              </button>
-              {hasNameChanges && (
+            {hasNameChanges && (
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={handleSaveName}
+                  disabled={savingName || !canUpdateName}
+                  className="rounded-lg bg-gradient-to-r from-blue-700 to-blue-500 px-4 py-2 text-sm font-medium text-white shadow transition hover:from-blue-600 hover:to-blue-400 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {savingName ? "Updating..." : "Update Name"}
+                </button>
                 <button
                   type="button"
                   onClick={() => {
@@ -98,8 +99,8 @@ export function ProfileCard({ user }: ProfileCardProps) {
                 >
                   Cancel
                 </button>
-              )}
-            </div>
+              </div>
+            )}
             {hasNameChanges && name.trim().length === 0 && (
               <p className="text-sm text-amber-200/90">
                 Name cannot be empty.

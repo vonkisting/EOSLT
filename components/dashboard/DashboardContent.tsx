@@ -10,6 +10,7 @@ import { Bracket4 } from "@/components/Bracket4";
 import { isBye } from "@/components/Bracket8TwoRounds";
 import { Modal } from "@/components/ui/Modal";
 import { formatLocationDate, formatLocationTime } from "@/lib/formatDateTime";
+import { canAccessDashboard } from "@/lib/dashboard-access";
 
 const PLAYER_SLOTS = 64;
 const BYE_LABEL = "-- Bye --";
@@ -963,7 +964,20 @@ export function DashboardContent() {
                       key={u._id}
                       className="border-b border-slate-800 text-foreground hover:bg-white/5"
                     >
-                      <td className="px-4 py-2">{u.name ?? "—"}</td>
+                      <td className="px-4 py-2">
+                        <span className="inline-flex items-center gap-2">
+                          <span>{u.name ?? "—"}</span>
+                          {canAccessDashboard(u.email) && (
+                            <span
+                              className="text-yellow-300"
+                              title="Has dashboard access"
+                              aria-label="Has dashboard access"
+                            >
+                              ★
+                            </span>
+                          )}
+                        </span>
+                      </td>
                       <td className="px-4 py-2">{u.email || "—"}</td>
                       <td className="px-4 py-2">{u.poolhubPlayerName ?? "—"}</td>
                       <td className="px-2 py-2 align-middle">
