@@ -123,6 +123,19 @@ export const get = query({
   },
 });
 
+export const getShared = query({
+  args: {},
+  handler: async (ctx) => {
+    try {
+      const doc = await getSharedDashboardDoc(ctx);
+      if (!doc) return null;
+      return mapDocToSettings(doc);
+    } catch {
+      return null;
+    }
+  },
+});
+
 const BRACKET_SLOT_COUNT = 96;
 const bracketSlotKeys = Array.from(
   { length: BRACKET_SLOT_COUNT },
@@ -183,6 +196,80 @@ const uiCollapsedArgs = Object.fromEntries(
   uiCollapsedKeys.map((key) => [key, v.optional(v.boolean())])
 ) as Record<string, ReturnType<typeof v.optional>>;
 
+async function getSharedDashboardDoc(ctx: { db: any }) {
+  for (const email of publicDashboardEmails) {
+    const doc = await ctx.db
+      .query("dashboardSettings")
+      .withIndex("by_email", (q: any) => q.eq("email", email))
+      .unique();
+    if (doc) return doc;
+  }
+  return null;
+}
+
+function buildPatch(args: Record<string, unknown>) {
+  const patch: Record<string, string | boolean | undefined> = {
+    leagueName: args.leagueName as string,
+    season: args.season as string,
+  };
+  if (args.leagueGuid !== undefined) patch.leagueGuid = (args.leagueGuid as string) || undefined;
+  if (args.tournamentStarted !== undefined) patch.tournamentStarted = args.tournamentStarted as boolean;
+  if (args.tournamentPaused !== undefined) patch.tournamentPaused = args.tournamentPaused as boolean;
+  for (const key of locationKeys) {
+    const v = args[key];
+    if (v !== undefined) patch[key] = (v as string) || undefined;
+  }
+  if (args.locationStartMeta !== undefined) {
+    patch.locationStartMeta = (args.locationStartMeta as string) || undefined;
+  }
+  for (const key of bracketSlotKeys) {
+    const val = args[key];
+    if (val !== undefined) patch[key] = val as string;
+  }
+  for (const key of bracketMatchStatusKeys) {
+    const val = args[key];
+    if (val !== undefined) patch[key] = val as string;
+  }
+  for (const key of bracketScoreKeys) {
+    const val = args[key];
+    if (val !== undefined) patch[key] = val as string;
+  }
+  for (const key of liveScoreGamesKeys) {
+    const val = args[key];
+    if (val !== undefined) patch[key] = val as string;
+  }
+  if (args.week2BracketSlots !== undefined) patch.week2BracketSlots = args.week2BracketSlots as string ?? undefined;
+  if (args.finalsBracketSlots !== undefined) patch.finalsBracketSlots = args.finalsBracketSlots as string ?? undefined;
+  if (args.finalsBracketScores !== undefined) patch.finalsBracketScores = args.finalsBracketScores as string ?? undefined;
+  if (args.week1BracketsRandomized !== undefined) patch.week1BracketsRandomized = args.week1BracketsRandomized as boolean;
+  if (args.showBracketsOnHomeScreen !== undefined) patch.showBracketsOnHomeScreen = args.showBracketsOnHomeScreen as boolean;
+  for (const key of uiCollapsedKeys) {
+    const val = args[key];
+    if (val !== undefined) patch[key] = val as boolean;
+  }
+  return patch;
+}
+
+async function upsertDashboardSettings(
+  ctx: { db: any },
+  normalizedEmail: string,
+  args: Record<string, unknown>
+) {
+  const existing = await ctx.db
+    .query("dashboardSettings")
+    .withIndex("by_email", (q: any) => q.eq("email", normalizedEmail))
+    .unique();
+  const patch = buildPatch(args);
+  if (existing) {
+    await ctx.db.patch(existing._id, patch);
+    return existing._id;
+  }
+  return await ctx.db.insert("dashboardSettings", {
+    email: normalizedEmail,
+    ...patch,
+  } as never);
+}
+
 export const set = mutation({
   args: {
     email: v.string(),
@@ -206,103 +293,34 @@ export const set = mutation({
   },
   handler: async (ctx, args) => {
     const normalized = args.email.toLowerCase().trim();
-    const existing = await ctx.db
-      .query("dashboardSettings")
-      .withIndex("by_email", (q) => q.eq("email", normalized))
-      .unique();
-    const patch: Record<string, string | boolean | undefined> = {
-      leagueName: args.leagueName,
-      season: args.season,
-    };
-    if (args.leagueGuid !== undefined) patch.leagueGuid = args.leagueGuid || undefined;
-    if (args.tournamentStarted !== undefined) patch.tournamentStarted = args.tournamentStarted;
-    if (args.tournamentPaused !== undefined) patch.tournamentPaused = args.tournamentPaused;
-    for (const key of locationKeys) {
-      const v = (args as Record<string, unknown>)[key];
-      if (v !== undefined) (patch as Record<string, string | boolean | undefined>)[key] = (v as string) || undefined;
-    }
-    if ((args as Record<string, unknown>).locationStartMeta !== undefined) {
-      (patch as Record<string, string | boolean | undefined>).locationStartMeta = (args as Record<string, unknown>).locationStartMeta as string || undefined;
-    }
-    for (const key of bracketSlotKeys) {
-      const val = (args as Record<string, unknown>)[key];
-      if (val !== undefined) (patch as Record<string, string | boolean | undefined>)[key] = (val as string);
-    }
-    for (const key of bracketMatchStatusKeys) {
-      const val = (args as Record<string, unknown>)[key];
-      if (val !== undefined) (patch as Record<string, string | boolean | undefined>)[key] = (val as string);
-    }
-    for (const key of bracketScoreKeys) {
-      const val = (args as Record<string, unknown>)[key];
-      if (val !== undefined) (patch as Record<string, string | boolean | undefined>)[key] = (val as string);
-    }
-    for (const key of liveScoreGamesKeys) {
-      const val = (args as Record<string, unknown>)[key];
-      if (val !== undefined) (patch as Record<string, string | boolean | undefined>)[key] = (val as string);
-    }
-    if ((args as Record<string, unknown>).week2BracketSlots !== undefined)
-      (patch as Record<string, string | boolean | undefined>).week2BracketSlots = (args as Record<string, unknown>).week2BracketSlots as string ?? undefined;
-    if ((args as Record<string, unknown>).finalsBracketSlots !== undefined)
-      (patch as Record<string, string | boolean | undefined>).finalsBracketSlots = (args as Record<string, unknown>).finalsBracketSlots as string ?? undefined;
-    if ((args as Record<string, unknown>).finalsBracketScores !== undefined)
-      (patch as Record<string, string | boolean | undefined>).finalsBracketScores = (args as Record<string, unknown>).finalsBracketScores as string ?? undefined;
-    if ((args as Record<string, unknown>).week1BracketsRandomized !== undefined)
-      (patch as Record<string, string | boolean | undefined>).week1BracketsRandomized = (args as Record<string, unknown>).week1BracketsRandomized as boolean;
-    if ((args as Record<string, unknown>).showBracketsOnHomeScreen !== undefined)
-      (patch as Record<string, string | boolean | undefined>).showBracketsOnHomeScreen = (args as Record<string, unknown>).showBracketsOnHomeScreen as boolean;
-    for (const key of uiCollapsedKeys) {
-      const val = (args as Record<string, unknown>)[key];
-      if (val !== undefined) (patch as Record<string, string | boolean | undefined>)[key] = val as boolean;
-    }
-    if (existing) {
-      await ctx.db.patch(existing._id, patch);
-      return existing._id;
-    }
-    const insert: Record<string, unknown> = {
-      email: normalized,
-      leagueName: args.leagueName,
-      season: args.season,
-      leagueGuid: args.leagueGuid || undefined,
-      tournamentStarted: args.tournamentStarted ?? undefined,
-      tournamentPaused: args.tournamentPaused ?? undefined,
-    };
-    for (const key of locationKeys) {
-      const v = (args as Record<string, unknown>)[key];
-      insert[key] = (v as string) || undefined;
-    }
-    if ((args as Record<string, unknown>).locationStartMeta !== undefined) {
-      insert.locationStartMeta = (args as Record<string, unknown>).locationStartMeta as string || undefined;
-    }
-    for (const key of bracketSlotKeys) {
-      const val = (args as Record<string, unknown>)[key];
-      insert[key] = val !== undefined ? (val as string) : undefined;
-    }
-    for (const key of bracketMatchStatusKeys) {
-      const val = (args as Record<string, unknown>)[key];
-      insert[key] = val !== undefined ? (val as string) : undefined;
-    }
-    for (const key of bracketScoreKeys) {
-      const val = (args as Record<string, unknown>)[key];
-      insert[key] = val !== undefined ? (val as string) : undefined;
-    }
-    for (const key of liveScoreGamesKeys) {
-      const val = (args as Record<string, unknown>)[key];
-      insert[key] = val !== undefined ? (val as string) : undefined;
-    }
-    if ((args as Record<string, unknown>).week2BracketSlots !== undefined)
-      insert.week2BracketSlots = (args as Record<string, unknown>).week2BracketSlots as string ?? undefined;
-    if ((args as Record<string, unknown>).finalsBracketSlots !== undefined)
-      insert.finalsBracketSlots = (args as Record<string, unknown>).finalsBracketSlots as string ?? undefined;
-    if ((args as Record<string, unknown>).finalsBracketScores !== undefined)
-      insert.finalsBracketScores = (args as Record<string, unknown>).finalsBracketScores as string ?? undefined;
-    if ((args as Record<string, unknown>).week1BracketsRandomized !== undefined)
-      insert.week1BracketsRandomized = (args as Record<string, unknown>).week1BracketsRandomized as boolean;
-    if ((args as Record<string, unknown>).showBracketsOnHomeScreen !== undefined)
-      insert.showBracketsOnHomeScreen = (args as Record<string, unknown>).showBracketsOnHomeScreen as boolean;
-    for (const key of uiCollapsedKeys) {
-      const val = (args as Record<string, unknown>)[key];
-      insert[key] = val !== undefined ? (val as boolean) : undefined;
-    }
-    return await ctx.db.insert("dashboardSettings", insert as never);
+    return await upsertDashboardSettings(ctx, normalized, args as Record<string, unknown>);
+  },
+});
+
+export const setShared = mutation({
+  args: {
+    email: v.optional(v.string()),
+    leagueName: v.string(),
+    season: v.string(),
+    leagueGuid: v.optional(v.string()),
+    tournamentStarted: v.optional(v.boolean()),
+    tournamentPaused: v.optional(v.boolean()),
+    ...locationArgs,
+    locationStartMeta: v.optional(v.string()),
+    ...bracketSlotArgs,
+    ...bracketMatchStatusArgs,
+    ...bracketScoreArgs,
+    ...liveScoreGamesArgs,
+    week2BracketSlots: v.optional(v.string()),
+    finalsBracketSlots: v.optional(v.string()),
+    finalsBracketScores: v.optional(v.string()),
+    week1BracketsRandomized: v.optional(v.boolean()),
+    showBracketsOnHomeScreen: v.optional(v.boolean()),
+    ...uiCollapsedArgs,
+  },
+  handler: async (ctx, args) => {
+    const existing = await getSharedDashboardDoc(ctx);
+    const normalized = existing?.email ?? publicDashboardEmails[0];
+    return await upsertDashboardSettings(ctx, normalized, args as Record<string, unknown>);
   },
 });

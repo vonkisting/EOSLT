@@ -192,11 +192,8 @@ function buildRandomizedWeek1Slots(
 export function DashboardContent() {
   const { data: session } = useSession();
   const email = session?.user?.email?.toLowerCase().trim();
-  const savedSettings = useQuery(
-    api.dashboardSettings.get,
-    email ? { email } : "skip"
-  );
-  const setDashboardSettings = useMutation(api.dashboardSettings.set);
+  const savedSettings = useQuery(api.dashboardSettings.getShared, {});
+  const setDashboardSettings = useMutation(api.dashboardSettings.setShared);
   const hasAppliedInitialSettings = useRef(false);
   const settingsQueryHasReturned = useRef(false);
 

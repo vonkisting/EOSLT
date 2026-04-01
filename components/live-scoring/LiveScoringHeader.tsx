@@ -53,12 +53,8 @@ export function LiveScoringHeader({
   cardIndex: number;
   matchIndex: number;
 }) {
-  const { data: session } = useSession();
-  const email = session?.user?.email?.toLowerCase().trim();
-  const settings = useQuery(
-    api.dashboardSettings.get,
-    email ? { email } : "skip"
-  );
+  useSession();
+  const settings = useQuery(api.dashboardSettings.getShared, {});
   const users = useQuery(api.users.list, {});
 
   const { player1Name, player2Name, player1AvatarUrl, player2AvatarUrl } =

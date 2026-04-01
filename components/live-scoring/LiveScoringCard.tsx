@@ -136,11 +136,8 @@ export function LiveScoringCard({
 
   const router = useRouter();
   const email = useSession().data?.user?.email?.toLowerCase().trim();
-  const settings = useQuery(
-    api.dashboardSettings.get,
-    email ? { email } : "skip"
-  );
-  const setDashboardSettings = useMutation(api.dashboardSettings.set);
+  const settings = useQuery(api.dashboardSettings.getShared, {});
+  const setDashboardSettings = useMutation(api.dashboardSettings.setShared);
 
   const tournamentStarted =
     settings && typeof settings === "object" && (settings as Record<string, unknown>).tournamentStarted === true;

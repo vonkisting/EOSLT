@@ -560,7 +560,7 @@
 
 /* Per-matchup status: soft background and bright white text on both player row race cells */
 .home-bracket-root.bracket-8-two-rounds .match-status-in-progress .team .race {
-  background-color: rgba(74, 222, 128, 0.25);
+  background-color: #16a34a;
   color: #fff;
 }
 .home-bracket-root.bracket-8-two-rounds .match-status-paused .team .race {
@@ -568,6 +568,6 @@
   color: #fff;
 }
 .home-bracket-root.bracket-8-two-rounds .match-status-completed .team .race {
-  background-color: rgba(239, 68, 68, 0.25);
+  background-color: #dc2626;
   color: #fff;
 }
