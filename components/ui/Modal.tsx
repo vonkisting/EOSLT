@@ -14,15 +14,19 @@ export function Modal({
   open,
   onClose,
   title,
+  titleDescription,
   children,
   footer,
   hideCloseButton = false,
   closeOnEscape = true,
   closeOnBackdropClick = true,
+  panelClassName = "max-w-md",
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
+  /** Renders below the title in the header (e.g. subtitle or metadata). */
+  titleDescription?: React.ReactNode;
   children: React.ReactNode;
   /** When provided, modal uses 3-section layout with line separators: Header | Body | Footer. */
   footer?: React.ReactNode;
@@ -30,6 +34,8 @@ export function Modal({
   hideCloseButton?: boolean;
   closeOnEscape?: boolean;
   closeOnBackdropClick?: boolean;
+  /** Tailwind width classes for the dialog panel (default `max-w-md`). */
+  panelClassName?: string;
 }) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const id = useId();
@@ -74,21 +80,26 @@ export function Modal({
       />
       <div className="relative flex min-h-full items-center justify-center">
         <div
-          className="relative my-8 w-full max-w-md shrink-0 rounded-2xl border border-white/10 bg-[#2A204A]/95 p-6 shadow-2xl shadow-purple-950/50 backdrop-blur-md"
+          className={`relative my-8 w-full shrink-0 rounded-2xl border border-white/10 bg-[#2A204A]/95 p-6 shadow-2xl shadow-purple-950/50 backdrop-blur-md ${panelClassName}`}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header / Title section */}
           <div
-            className={`flex items-center ${hideCloseButton ? "" : "justify-between"} pb-4 ${footer != null ? "border-b border-white/10" : "mb-4"}`}
+            className={`flex items-start gap-3 pb-4 ${hideCloseButton ? "" : "justify-between"} ${footer != null ? "border-b border-white/10" : "mb-4"}`}
           >
-            <h2 id={titleId} className="text-xl font-semibold capitalize text-blue-400">
-              {title}
-            </h2>
+            <div className="min-w-0 flex-1">
+              <h2 id={titleId} className="text-xl font-semibold capitalize text-blue-400">
+                {title}
+              </h2>
+              {titleDescription != null && (
+                <div className="mt-1.5 text-sm leading-snug text-slate-400">{titleDescription}</div>
+              )}
+            </div>
             {!hideCloseButton && (
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-lg p-1 text-slate-400 hover:bg-white/10 hover:text-white transition-colors"
+                className="shrink-0 rounded-lg p-1 text-slate-400 hover:bg-white/10 hover:text-white transition-colors"
                 aria-label="Close"
               >
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

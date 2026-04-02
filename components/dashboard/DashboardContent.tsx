@@ -156,6 +156,15 @@ type TeammateLocationConflict = {
   players: string[];
 };
 
+/** Success modal: "Name (Team)" with em dash when no team; byes unchanged. */
+function formatDrawModalPlayerWithTeam(name: string, rows: PlayerTableRow[]): string {
+  if (isBye(name)) return name;
+  const row = rows.find((r) => r.playerName === name && !isBye(r.playerName));
+  const team = row?.teamName?.trim();
+  const teamPart = team && team !== "" ? team : "—";
+  return `${name} (${teamPart})`;
+}
+
 function buildTeamDisplayByKey(rows: PlayerTableRow[]): Map<string, string> {
   const m = new Map<string, string>();
   for (const row of rows) {
@@ -199,6 +208,58 @@ function computeTeammateLocationConflicts(
     a.locationLabel.localeCompare(b.locationLabel) || a.teamLabel.localeCompare(b.teamLabel)
   );
   return out;
+}
+
+/** Each entry is one team that has 2+ members at the same Week 1 location. */
+function countTeammateSameLocationInstances(
+  cards: string[][],
+  teamByPlayer: Map<string, string | null>,
+  teamDisplayByKey: Map<string, string>
+): number {
+  return computeTeammateLocationConflicts(cards, teamByPlayer, teamDisplayByKey).length;
+}
+
+const MAX_TEAMMATE_LOCATION_RETRY_ROUNDS = 1000;
+/** Accept bracket only when there are no teammate same-location overlaps (reject when > 0). */
+const MAX_TEAMMATE_LOCATION_INSTANCES_ALLOWED = 0;
+
+type Week1DrawMatchupLine = { top: string; bottom: string };
+
+type Week1DrawLocationBlock = {
+  locationLabel: string;
+  matchups: Week1DrawMatchupLine[];
+};
+
+type RandomizeWeek1SuccessModalPayload = {
+  teammateConflicts: TeammateLocationConflict[];
+  locations: Week1DrawLocationBlock[];
+};
+
+function buildRandomizeWeek1SuccessModalPayload(
+  cards: string[][],
+  teamByPlayer: Map<string, string | null>,
+  teamDisplayByKey: Map<string, string>,
+  rows: PlayerTableRow[]
+): RandomizeWeek1SuccessModalPayload {
+  const teammateConflicts = computeTeammateLocationConflicts(
+    cards,
+    teamByPlayer,
+    teamDisplayByKey
+  );
+  const locations: Week1DrawLocationBlock[] = Array.from({ length: 8 }, (_, bracketIndex) => {
+    const firstRound = (cards[bracketIndex] ?? []).slice(0, 8);
+    const matchups: Week1DrawMatchupLine[] = [];
+    for (let p = 0; p < 8; p += 2) {
+      const top = firstRound[p] ?? "";
+      const bottom = firstRound[p + 1] ?? "";
+      matchups.push({
+        top: formatDrawModalPlayerWithTeam(top, rows),
+        bottom: formatDrawModalPlayerWithTeam(bottom, rows),
+      });
+    }
+    return { locationLabel: LOCATION_LABELS[WEEK_1_KEYS[bracketIndex]], matchups };
+  });
+  return { teammateConflicts, locations };
 }
 
 function tryRandomizeWeek1Slots(
@@ -314,10 +375,9 @@ export function DashboardContent() {
   const [randomizeBracketModalOpen, setRandomizeBracketModalOpen] = useState(false);
   const [resetTournamentModalOpen, setResetTournamentModalOpen] = useState(false);
   const [randomizeBracketError, setRandomizeBracketError] = useState<string | null>(null);
-  const [teammateLocationWarningOpen, setTeammateLocationWarningOpen] = useState(false);
-  const [teammateLocationConflicts, setTeammateLocationConflicts] = useState<
-    TeammateLocationConflict[]
-  >([]);
+  const [randomizeTooManyAttemptsOpen, setRandomizeTooManyAttemptsOpen] = useState(false);
+  const [randomizeSuccessModal, setRandomizeSuccessModal] =
+    useState<RandomizeWeek1SuccessModalPayload | null>(null);
 
   /** Player list with byes numbered as "-- Bye 1 --", "-- Bye 2 --", etc. for display and bracket. */
   const playerDisplayNames = useMemo(() => {
@@ -353,6 +413,29 @@ export function DashboardContent() {
     }
     return out;
   }, [savedSettings]);
+
+  /**
+   * Count of “teammates at same Week 1 location”: each team that has 2+ players in the same
+   * 8-player first-round block (one card) counts once per location.
+   */
+  const week1TeammateLocationOverlapCount = useMemo(() => {
+    const cards = Array.from({ length: 8 }, (_, c) =>
+      Array.from({ length: 8 }, (_, i) => allFirstRoundSelections[c * 8 + i]?.trim() ?? "")
+    );
+    const teamByPlayer = new Map(
+      playerRows
+        .filter((row) => !isBye(row.playerName))
+        .map(
+          (row) =>
+            [row.playerName, row.teamName?.toLowerCase().trim() ?? null] as [
+              string,
+              string | null,
+            ]
+        )
+    );
+    const teamDisplayByKey = buildTeamDisplayByKey(playerRows);
+    return countTeammateSameLocationInstances(cards, teamByPlayer, teamDisplayByKey);
+  }, [allFirstRoundSelections, playerRows]);
 
   /** True when all 64 first-round slots (8 cards × 8 slots) have a selected player name. */
   const allFirstRoundFilled = useMemo(() => {
@@ -854,34 +937,48 @@ export function DashboardContent() {
 
   const randomizeWeek1Brackets = useCallback(() => {
     if (!email) return;
-    setTeammateLocationWarningOpen(false);
-    setTeammateLocationConflicts([]);
+    setRandomizeTooManyAttemptsOpen(false);
+    setRandomizeSuccessModal(null);
 
-    let randomizedBracketCards = tryRandomizeWeek1Slots(playerRows, PLAYER_SLOTS, true);
-    let usedRelaxedLayout = false;
-    if (!randomizedBracketCards) {
-      randomizedBracketCards = tryRandomizeWeek1Slots(playerRows, PLAYER_SLOTS, false);
-      usedRelaxedLayout = true;
-    }
-    if (!randomizedBracketCards) {
-      setRandomizeBracketError(
-        "Unable to generate a valid Week 1 bracket with the current players while avoiding same-team first-round matchups and limiting byes to one per bracket."
-      );
-      return;
-    }
-
-    setRandomizeBracketError(null);
     const teamByPlayer = new Map(
       playerRows
         .filter((row) => !isBye(row.playerName))
         .map((row) => [row.playerName, row.teamName?.toLowerCase().trim() ?? null] as const)
     );
     const teamDisplayByKey = buildTeamDisplayByKey(playerRows);
-    const conflicts = computeTeammateLocationConflicts(
-      randomizedBracketCards,
-      teamByPlayer,
-      teamDisplayByKey
-    );
+
+    let randomizedBracketCards: string[][] | null = null;
+    for (let round = 0; round < MAX_TEAMMATE_LOCATION_RETRY_ROUNDS; round++) {
+      let cards = tryRandomizeWeek1Slots(playerRows, PLAYER_SLOTS, true);
+      if (cards) {
+        randomizedBracketCards = cards;
+        break;
+      }
+      cards = tryRandomizeWeek1Slots(playerRows, PLAYER_SLOTS, false);
+      if (!cards) {
+        setRandomizeBracketError(
+          "Unable to generate a valid Week 1 bracket with the current players while avoiding same-team first-round matchups and limiting byes to one per bracket."
+        );
+        return;
+      }
+      const instances = countTeammateSameLocationInstances(
+        cards,
+        teamByPlayer,
+        teamDisplayByKey
+      );
+      if (instances <= MAX_TEAMMATE_LOCATION_INSTANCES_ALLOWED) {
+        randomizedBracketCards = cards;
+        break;
+      }
+    }
+
+    if (!randomizedBracketCards) {
+      setRandomizeBracketError(null);
+      setRandomizeTooManyAttemptsOpen(true);
+      return;
+    }
+
+    setRandomizeBracketError(null);
 
     const slotEntries: [string, string][] = [];
     for (let cardIndex = 0; cardIndex < 8; cardIndex++) {
@@ -909,10 +1006,14 @@ export function DashboardContent() {
     } as Parameters<typeof setDashboardSettings>[0]);
     setBracketResetKey(0);
 
-    if (usedRelaxedLayout && conflicts.length > 0) {
-      setTeammateLocationConflicts(conflicts);
-      setTeammateLocationWarningOpen(true);
-    }
+    setRandomizeSuccessModal(
+      buildRandomizeWeek1SuccessModalPayload(
+        randomizedBracketCards,
+        teamByPlayer,
+        teamDisplayByKey,
+        playerRows
+      )
+    );
   }, [
     email,
     playerRows,
@@ -1616,26 +1717,37 @@ export function DashboardContent() {
                   : "Currently Running"
                 : "Reset"}
             </p>
-            <label className="mt-3 inline-flex cursor-pointer items-center gap-3 text-sm font-medium text-blue-100">
-              <input
-                type="checkbox"
-                checked={showBracketsOnHomeScreen}
-                onChange={(e) => {
-                  if (!email) return;
-                  setDashboardSettings({
-                    email,
-                    leagueName: selectedLeagueName,
-                    season: selectedSeason,
-                    tournamentStarted,
-                    tournamentPaused,
-                    showBracketsOnHomeScreen: e.target.checked,
-                  } as Parameters<typeof setDashboardSettings>[0]);
-                }}
-                className="h-4 w-4 rounded border-white/30 bg-slate-900 text-blue-500 focus:ring-2 focus:ring-blue-400"
-                aria-label="Show Brackets on Home Screen"
-              />
-              <span>Show Brackets on Home Screen</span>
-            </label>
+            <div className="mt-3">
+              <label className="inline-flex cursor-pointer items-center gap-3 text-sm font-medium text-blue-100">
+                <input
+                  type="checkbox"
+                  checked={showBracketsOnHomeScreen}
+                  onChange={(e) => {
+                    if (!email) return;
+                    setDashboardSettings({
+                      email,
+                      leagueName: selectedLeagueName,
+                      season: selectedSeason,
+                      tournamentStarted,
+                      tournamentPaused,
+                      showBracketsOnHomeScreen: e.target.checked,
+                    } as Parameters<typeof setDashboardSettings>[0]);
+                  }}
+                  className="h-4 w-4 rounded border-white/30 bg-slate-900 text-blue-500 focus:ring-2 focus:ring-blue-400"
+                  aria-label="Show Brackets on Home Screen"
+                />
+                <span>Show Brackets on Home Screen</span>
+              </label>
+              <p
+                className="mt-1.5 pl-7 text-xs text-slate-400 dark:text-slate-500"
+                aria-live="polite"
+              >
+                Teammates at same Week 1 location:{" "}
+                <span className="font-medium tabular-nums text-slate-300 dark:text-slate-400">
+                  {week1TeammateLocationOverlapCount}
+                </span>
+              </p>
+            </div>
             {!tournamentStarted && !tournamentPaused && (
               <button
                 type="button"
@@ -1698,47 +1810,130 @@ export function DashboardContent() {
               </p>
             </Modal>
             <Modal
-              open={teammateLocationWarningOpen}
-              onClose={() => setTeammateLocationWarningOpen(false)}
-              title="Teammates share a Week 1 location"
+              open={randomizeSuccessModal != null}
+              onClose={() => setRandomizeSuccessModal(null)}
+              title="Week 1 draw complete"
+              titleDescription={
+                randomizeSuccessModal ? (
+                  <span className="block text-[1.75rem] leading-snug text-slate-400">
+                    Teammates at same Week 1 location:{" "}
+                    <span className="font-medium tabular-nums text-slate-200">
+                      {randomizeSuccessModal.teammateConflicts.length}
+                    </span>
+                  </span>
+                ) : undefined
+              }
+              panelClassName="max-w-2xl"
               footer={
                 <div className="flex flex-wrap justify-end gap-3">
                   <button
                     type="button"
-                    onClick={() => setTeammateLocationWarningOpen(false)}
-                    className="cursor-pointer rounded-lg border border-amber-400/50 bg-amber-800/80 px-4 py-2.5 text-sm font-medium text-amber-100 shadow-sm transition-colors hover:bg-amber-700/80"
+                    onClick={() => setRandomizeSuccessModal(null)}
+                    className="cursor-pointer rounded-lg border border-purple-400/50 bg-purple-800/80 px-4 py-2.5 text-sm font-medium text-purple-100 shadow-sm transition-colors hover:bg-purple-700/80"
                   >
-                    Understood
+                    Close
                   </button>
                 </div>
               }
             >
-              <div className="space-y-4 text-slate-200">
-                <p className="text-sm leading-relaxed text-slate-300">
-                  A valid Week 1 draw was applied, but the randomizer could not keep all teammates on separate locations (this can happen when the roster makes it impossible, or when a valid layout exists but was not found within the attempt limit). Your Week 1 brackets have been updated. Teammates sharing a Week 1 location:
-                </p>
-                <ul
-                  className="max-h-[min(50vh,22rem)] space-y-3 overflow-y-auto rounded-lg border border-amber-500/25 bg-amber-950/20 p-3 text-sm"
-                  role="list"
-                >
-                  {teammateLocationConflicts.map((c, idx) => (
-                    <li
-                      key={`${c.locationLabel}-${c.teamLabel}-${idx}`}
-                      className="rounded-md border border-white/5 bg-slate-900/40 px-3 py-2.5"
+              {randomizeSuccessModal && (
+                <div className="max-h-[min(70vh,36rem)] space-y-5 overflow-y-auto pr-1 text-slate-200">
+                  {randomizeSuccessModal.teammateConflicts.length > 0 && (
+                    <div
+                      className="rounded-lg border border-amber-500/30 bg-amber-950/25 p-4 text-sm"
+                      role="region"
+                      aria-label="Teammates at same location"
                     >
-                      <div className="font-medium text-amber-200/95">
-                        {c.locationLabel}
-                        <span className="font-normal text-slate-400"> — </span>
-                        <span className="text-slate-100">{c.teamLabel}</span>
-                      </div>
-                      <ul className="mt-2 list-inside list-disc space-y-0.5 text-slate-300" role="list">
-                        {c.players.map((p) => (
-                          <li key={p}>{p}</li>
+                      <p className="mb-3 font-medium text-amber-200">
+                        Teammates at the same Week 1 location (
+                        {randomizeSuccessModal.teammateConflicts.length}{" "}
+                        {randomizeSuccessModal.teammateConflicts.length === 1 ? "case" : "cases"})
+                      </p>
+                      <ul className="space-y-2" role="list">
+                        {randomizeSuccessModal.teammateConflicts.map((c, idx) => (
+                          <li
+                            key={`${c.locationLabel}-${c.teamLabel}-${idx}`}
+                            className="rounded-md border border-white/10 bg-slate-900/50 px-3 py-2"
+                          >
+                            <span className="font-medium text-amber-100/95">{c.locationLabel}</span>
+                            <span className="text-slate-400"> — </span>
+                            <span className="text-slate-100">{c.teamLabel}</span>
+                            <span className="mt-1 block text-slate-300">
+                              {c.players.map((p) => formatDrawModalPlayerWithTeam(p, playerRows)).join(", ")}
+                            </span>
+                          </li>
                         ))}
                       </ul>
-                    </li>
-                  ))}
-                </ul>
+                    </div>
+                  )}
+                  <p className="text-sm font-medium text-slate-300">First-round matchups by location</p>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {randomizeSuccessModal.locations.map((loc) => (
+                      <div
+                        key={loc.locationLabel}
+                        className="min-w-0 rounded-lg border border-white/10 bg-slate-900/35 p-3"
+                      >
+                        <h3 className="mb-3 border-b border-white/10 pb-2 text-sm font-semibold text-blue-300">
+                          {loc.locationLabel}
+                        </h3>
+                        <ul className="space-y-3 text-sm" role="list">
+                          {loc.matchups.map((m, mi) => (
+                            <li
+                              key={`${loc.locationLabel}-m${mi}`}
+                              className="rounded-lg border border-white/10 bg-slate-950/55 px-3 py-2.5 shadow-sm"
+                            >
+                              <div
+                                className="min-w-0 truncate text-[0.8125rem] font-semibold leading-tight text-slate-100"
+                                title={m.top}
+                              >
+                                {m.top}
+                              </div>
+                              <div className="py-1.5 text-left" aria-hidden>
+                                <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-yellow-400">
+                                  vs
+                                </span>
+                              </div>
+                              <div
+                                className="min-w-0 truncate text-[0.8125rem] font-semibold leading-tight text-slate-100"
+                                title={m.bottom}
+                              >
+                                {m.bottom}
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </Modal>
+            <Modal
+              open={randomizeTooManyAttemptsOpen}
+              onClose={() => setRandomizeTooManyAttemptsOpen(false)}
+              title="Could not meet location spread"
+              footer={
+                <div className="flex flex-wrap justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setRandomizeTooManyAttemptsOpen(false)}
+                    className="cursor-pointer rounded-lg border border-amber-400/50 bg-amber-800/80 px-4 py-2.5 text-sm font-medium text-amber-100 shadow-sm transition-colors hover:bg-amber-700/80"
+                  >
+                    Close
+                  </button>
+                </div>
+              }
+            >
+              <div className="space-y-3 text-sm leading-relaxed text-slate-200">
+                <p>
+                  After {MAX_TEAMMATE_LOCATION_RETRY_ROUNDS} random draws, the bracket still had
+                  more than {MAX_TEAMMATE_LOCATION_INSTANCES_ALLOWED} cases of teammates assigned to
+                  the same Week 1 location (counting each team at each location as one case).
+                </p>
+                <p className="text-slate-300">
+                  No changes were saved. Try again, adjust the player list or teams, or fill brackets
+                  manually.
+                </p>
               </div>
             </Modal>
             <Modal
