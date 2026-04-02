@@ -1942,18 +1942,18 @@ export function DashboardContent() {
                               className="rounded-lg border border-white/10 bg-slate-950/55 px-3 py-2.5 shadow-sm"
                             >
                               <div
-                                className="min-w-0 truncate text-[0.8125rem] font-semibold leading-tight text-slate-100"
+                                className="min-w-0 truncate text-center text-[0.8125rem] font-semibold leading-tight text-slate-100"
                                 title={m.top}
                               >
                                 {m.top}
                               </div>
-                              <div className="py-1.5 text-left" aria-hidden>
+                              <div className="py-1.5 text-center" aria-hidden>
                                 <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-yellow-400">
                                   vs
                                 </span>
                               </div>
                               <div
-                                className="min-w-0 truncate text-[0.8125rem] font-semibold leading-tight text-slate-100"
+                                className="min-w-0 truncate text-center text-[0.8125rem] font-semibold leading-tight text-slate-100"
                                 title={m.bottom}
                               >
                                 {m.bottom}
