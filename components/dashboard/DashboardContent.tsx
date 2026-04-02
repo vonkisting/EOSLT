@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useSession } from "next-auth/react";
 import { useMutation, useQuery } from "convex/react";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -378,6 +379,7 @@ export function DashboardContent() {
   const [randomizeTooManyAttemptsOpen, setRandomizeTooManyAttemptsOpen] = useState(false);
   const [randomizeSuccessModal, setRandomizeSuccessModal] =
     useState<RandomizeWeek1SuccessModalPayload | null>(null);
+  const [isRandomizingBracket, setIsRandomizingBracket] = useState(false);
 
   /** Player list with byes numbered as "-- Bye 1 --", "-- Bye 2 --", etc. for display and bracket. */
   const playerDisplayNames = useMemo(() => {
@@ -937,83 +939,90 @@ export function DashboardContent() {
 
   const randomizeWeek1Brackets = useCallback(() => {
     if (!email) return;
-    setRandomizeTooManyAttemptsOpen(false);
-    setRandomizeSuccessModal(null);
+    setIsRandomizingBracket(true);
+    window.setTimeout(() => {
+      try {
+        setRandomizeTooManyAttemptsOpen(false);
+        setRandomizeSuccessModal(null);
 
-    const teamByPlayer = new Map(
-      playerRows
-        .filter((row) => !isBye(row.playerName))
-        .map((row) => [row.playerName, row.teamName?.toLowerCase().trim() ?? null] as const)
-    );
-    const teamDisplayByKey = buildTeamDisplayByKey(playerRows);
-
-    let randomizedBracketCards: string[][] | null = null;
-    for (let round = 0; round < MAX_TEAMMATE_LOCATION_RETRY_ROUNDS; round++) {
-      let cards = tryRandomizeWeek1Slots(playerRows, PLAYER_SLOTS, true);
-      if (cards) {
-        randomizedBracketCards = cards;
-        break;
-      }
-      cards = tryRandomizeWeek1Slots(playerRows, PLAYER_SLOTS, false);
-      if (!cards) {
-        setRandomizeBracketError(
-          "Unable to generate a valid Week 1 bracket with the current players while avoiding same-team first-round matchups and limiting byes to one per bracket."
+        const teamByPlayer = new Map(
+          playerRows
+            .filter((row) => !isBye(row.playerName))
+            .map((row) => [row.playerName, row.teamName?.toLowerCase().trim() ?? null] as const)
         );
-        return;
+        const teamDisplayByKey = buildTeamDisplayByKey(playerRows);
+
+        let randomizedBracketCards: string[][] | null = null;
+        for (let round = 0; round < MAX_TEAMMATE_LOCATION_RETRY_ROUNDS; round++) {
+          let cards = tryRandomizeWeek1Slots(playerRows, PLAYER_SLOTS, true);
+          if (cards) {
+            randomizedBracketCards = cards;
+            break;
+          }
+          cards = tryRandomizeWeek1Slots(playerRows, PLAYER_SLOTS, false);
+          if (!cards) {
+            setRandomizeBracketError(
+              "Unable to generate a valid Week 1 bracket with the current players while avoiding same-team first-round matchups and limiting byes to one per bracket."
+            );
+            return;
+          }
+          const instances = countTeammateSameLocationInstances(
+            cards,
+            teamByPlayer,
+            teamDisplayByKey
+          );
+          if (instances <= MAX_TEAMMATE_LOCATION_INSTANCES_ALLOWED) {
+            randomizedBracketCards = cards;
+            break;
+          }
+        }
+
+        if (!randomizedBracketCards) {
+          setRandomizeBracketError(null);
+          setRandomizeTooManyAttemptsOpen(true);
+          return;
+        }
+
+        setRandomizeBracketError(null);
+
+        const slotEntries: [string, string][] = [];
+        for (let cardIndex = 0; cardIndex < 8; cardIndex++) {
+          const base = cardIndex * 12;
+          const cardSlots = randomizedBracketCards[cardIndex] ?? Array(12).fill("");
+          for (let i = 0; i < 12; i++) {
+            slotEntries.push([
+              `bracketSlot${base + i}`,
+              cardSlots[i] ?? "",
+            ]);
+          }
+        }
+
+        setDashboardSettings({
+          email,
+          leagueName: selectedLeagueName,
+          season: selectedSeason,
+          tournamentStarted,
+          tournamentPaused,
+          week1BracketsRandomized: true,
+          ...Object.fromEntries(slotEntries),
+          ...Object.fromEntries(
+            Array.from({ length: 48 }, (_, i) => [`bracketMatchStatus${i}`, ""])
+          ),
+        } as Parameters<typeof setDashboardSettings>[0]);
+        setBracketResetKey(0);
+
+        setRandomizeSuccessModal(
+          buildRandomizeWeek1SuccessModalPayload(
+            randomizedBracketCards,
+            teamByPlayer,
+            teamDisplayByKey,
+            playerRows
+          )
+        );
+      } finally {
+        setIsRandomizingBracket(false);
       }
-      const instances = countTeammateSameLocationInstances(
-        cards,
-        teamByPlayer,
-        teamDisplayByKey
-      );
-      if (instances <= MAX_TEAMMATE_LOCATION_INSTANCES_ALLOWED) {
-        randomizedBracketCards = cards;
-        break;
-      }
-    }
-
-    if (!randomizedBracketCards) {
-      setRandomizeBracketError(null);
-      setRandomizeTooManyAttemptsOpen(true);
-      return;
-    }
-
-    setRandomizeBracketError(null);
-
-    const slotEntries: [string, string][] = [];
-    for (let cardIndex = 0; cardIndex < 8; cardIndex++) {
-      const base = cardIndex * 12;
-      const cardSlots = randomizedBracketCards[cardIndex] ?? Array(12).fill("");
-      for (let i = 0; i < 12; i++) {
-        slotEntries.push([
-          `bracketSlot${base + i}`,
-          cardSlots[i] ?? "",
-        ]);
-      }
-    }
-
-    setDashboardSettings({
-      email,
-      leagueName: selectedLeagueName,
-      season: selectedSeason,
-      tournamentStarted,
-      tournamentPaused,
-      week1BracketsRandomized: true,
-      ...Object.fromEntries(slotEntries),
-      ...Object.fromEntries(
-        Array.from({ length: 48 }, (_, i) => [`bracketMatchStatus${i}`, ""])
-      ),
-    } as Parameters<typeof setDashboardSettings>[0]);
-    setBracketResetKey(0);
-
-    setRandomizeSuccessModal(
-      buildRandomizeWeek1SuccessModalPayload(
-        randomizedBracketCards,
-        teamByPlayer,
-        teamDisplayByKey,
-        playerRows
-      )
-    );
+    }, 0);
   }, [
     email,
     playerRows,
@@ -1310,6 +1319,29 @@ export function DashboardContent() {
 
   return (
     <>
+      {typeof document !== "undefined" &&
+        isRandomizingBracket &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[200] flex items-center justify-center p-6"
+            role="status"
+            aria-live="polite"
+            aria-busy="true"
+            aria-label="Randomizing Bracket"
+          >
+            <div className="absolute inset-0 bg-black/65 backdrop-blur-[2px]" aria-hidden />
+            <div className="relative flex flex-col items-center gap-8">
+              <div
+                className="h-28 w-28 shrink-0 animate-spin rounded-full border-[6px] border-white/15 border-t-blue-400 shadow-lg shadow-blue-950/40"
+                aria-hidden
+              />
+              <p className="text-center text-xl font-semibold tracking-tight text-slate-100">
+                Randomizing Bracket…
+              </p>
+            </div>
+          </div>,
+          document.body
+        )}
       {/* Side card: inset from page padding, collapsible */}
       <aside
         ref={sidePanelRef}
