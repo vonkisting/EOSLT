@@ -377,8 +377,10 @@ export function DashboardContent() {
   const [resetTournamentModalOpen, setResetTournamentModalOpen] = useState(false);
   const [randomizeBracketError, setRandomizeBracketError] = useState<string | null>(null);
   const [randomizeTooManyAttemptsOpen, setRandomizeTooManyAttemptsOpen] = useState(false);
-  const [randomizeSuccessModal, setRandomizeSuccessModal] =
-    useState<RandomizeWeek1SuccessModalPayload | null>(null);
+  /** Proposed Week 1 card slot data; saved to Convex only after user clicks Accept in the preview modal. */
+  const [pendingWeek1RandomizeCards, setPendingWeek1RandomizeCards] = useState<string[][] | null>(
+    null
+  );
   const [isRandomizingBracket, setIsRandomizingBracket] = useState(false);
 
   /** Player list with byes numbered as "-- Bye 1 --", "-- Bye 2 --", etc. for display and bracket. */
@@ -399,6 +401,22 @@ export function DashboardContent() {
       ),
     [playersFromApi]
   );
+
+  const pendingWeek1RandomizeModalPayload = useMemo((): RandomizeWeek1SuccessModalPayload | null => {
+    if (!pendingWeek1RandomizeCards) return null;
+    const teamByPlayer = new Map(
+      playerRows
+        .filter((row) => !isBye(row.playerName))
+        .map((row) => [row.playerName, row.teamName?.toLowerCase().trim() ?? null] as const)
+    );
+    const teamDisplayByKey = buildTeamDisplayByKey(playerRows);
+    return buildRandomizeWeek1SuccessModalPayload(
+      pendingWeek1RandomizeCards,
+      teamByPlayer,
+      teamDisplayByKey,
+      playerRows
+    );
+  }, [pendingWeek1RandomizeCards, playerRows]);
 
   /** First-round slot values for all 8 Week 1 cards (8×8=64). Used so each first-round dropdown excludes names selected in any other card’s first round. */
   const allFirstRoundSelections = useMemo(() => {
@@ -937,13 +955,48 @@ export function DashboardContent() {
     setDashboardSettings,
   ]);
 
+  const acceptPendingWeek1Randomize = useCallback(() => {
+    if (!email || !pendingWeek1RandomizeCards) return;
+    const randomizedBracketCards = pendingWeek1RandomizeCards;
+    const slotEntries: [string, string][] = [];
+    for (let cardIndex = 0; cardIndex < 8; cardIndex++) {
+      const base = cardIndex * 12;
+      const cardSlots = randomizedBracketCards[cardIndex] ?? Array(12).fill("");
+      for (let i = 0; i < 12; i++) {
+        slotEntries.push([`bracketSlot${base + i}`, cardSlots[i] ?? ""]);
+      }
+    }
+    setDashboardSettings({
+      email,
+      leagueName: selectedLeagueName,
+      season: selectedSeason,
+      tournamentStarted,
+      tournamentPaused,
+      week1BracketsRandomized: true,
+      ...Object.fromEntries(slotEntries),
+      ...Object.fromEntries(
+        Array.from({ length: 48 }, (_, i) => [`bracketMatchStatus${i}`, ""])
+      ),
+    } as Parameters<typeof setDashboardSettings>[0]);
+    setBracketResetKey(0);
+    setPendingWeek1RandomizeCards(null);
+  }, [
+    email,
+    pendingWeek1RandomizeCards,
+    selectedLeagueName,
+    selectedSeason,
+    tournamentStarted,
+    tournamentPaused,
+    setDashboardSettings,
+  ]);
+
   const randomizeWeek1Brackets = useCallback(() => {
     if (!email) return;
     setIsRandomizingBracket(true);
     window.setTimeout(() => {
       try {
         setRandomizeTooManyAttemptsOpen(false);
-        setRandomizeSuccessModal(null);
+        setPendingWeek1RandomizeCards(null);
 
         const teamByPlayer = new Map(
           playerRows
@@ -985,53 +1038,12 @@ export function DashboardContent() {
 
         setRandomizeBracketError(null);
 
-        const slotEntries: [string, string][] = [];
-        for (let cardIndex = 0; cardIndex < 8; cardIndex++) {
-          const base = cardIndex * 12;
-          const cardSlots = randomizedBracketCards[cardIndex] ?? Array(12).fill("");
-          for (let i = 0; i < 12; i++) {
-            slotEntries.push([
-              `bracketSlot${base + i}`,
-              cardSlots[i] ?? "",
-            ]);
-          }
-        }
-
-        setDashboardSettings({
-          email,
-          leagueName: selectedLeagueName,
-          season: selectedSeason,
-          tournamentStarted,
-          tournamentPaused,
-          week1BracketsRandomized: true,
-          ...Object.fromEntries(slotEntries),
-          ...Object.fromEntries(
-            Array.from({ length: 48 }, (_, i) => [`bracketMatchStatus${i}`, ""])
-          ),
-        } as Parameters<typeof setDashboardSettings>[0]);
-        setBracketResetKey(0);
-
-        setRandomizeSuccessModal(
-          buildRandomizeWeek1SuccessModalPayload(
-            randomizedBracketCards,
-            teamByPlayer,
-            teamDisplayByKey,
-            playerRows
-          )
-        );
+        setPendingWeek1RandomizeCards(randomizedBracketCards);
       } finally {
         setIsRandomizingBracket(false);
       }
     }, 0);
-  }, [
-    email,
-    playerRows,
-    selectedLeagueName,
-    selectedSeason,
-    tournamentStarted,
-    tournamentPaused,
-    setDashboardSettings,
-  ]);
+  }, [email, playerRows]);
 
   const startTournament = useCallback(() => {
     if (!email) return;
@@ -1838,19 +1850,19 @@ export function DashboardContent() {
               }
             >
               <p className="text-slate-200">
-                Randomly fill all Week 1 first-round brackets using the current player list? This will allow at most one bye per bracket, prevent bye-vs-bye matchups, avoid first-round matchups between players on the same team, and try to keep teammates at different Week 1 locations when possible.
+                Randomly fill all Week 1 first-round brackets using the current player list? This will allow at most one bye per bracket, prevent bye-vs-bye matchups, avoid first-round matchups between players on the same team, and try to keep teammates at different Week 1 locations when possible. You will preview the draw and choose Accept to save it.
               </p>
             </Modal>
             <Modal
-              open={randomizeSuccessModal != null}
-              onClose={() => setRandomizeSuccessModal(null)}
+              open={pendingWeek1RandomizeCards != null}
+              onClose={() => setPendingWeek1RandomizeCards(null)}
               title="Week 1 draw complete"
               titleDescription={
-                randomizeSuccessModal ? (
+                pendingWeek1RandomizeModalPayload ? (
                   <span className="block text-[1.75rem] leading-snug text-slate-400">
                     Teammates at same Week 1 location:{" "}
                     <span className="font-medium tabular-nums text-slate-200">
-                      {randomizeSuccessModal.teammateConflicts.length}
+                      {pendingWeek1RandomizeModalPayload.teammateConflicts.length}
                     </span>
                   </span>
                 ) : undefined
@@ -1860,17 +1872,29 @@ export function DashboardContent() {
                 <div className="flex flex-wrap justify-end gap-3">
                   <button
                     type="button"
-                    onClick={() => setRandomizeSuccessModal(null)}
-                    className="cursor-pointer rounded-lg border border-purple-400/50 bg-purple-800/80 px-4 py-2.5 text-sm font-medium text-purple-100 shadow-sm transition-colors hover:bg-purple-700/80"
+                    onClick={() => setPendingWeek1RandomizeCards(null)}
+                    className="cursor-pointer rounded-lg border border-white/20 bg-transparent px-4 py-2.5 text-sm font-medium text-slate-200 transition-colors hover:bg-white/10"
                   >
-                    Close
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={acceptPendingWeek1Randomize}
+                    className="cursor-pointer rounded-lg border border-green-500/50 bg-green-700/90 px-4 py-2.5 text-sm font-semibold text-green-50 shadow-sm transition-colors hover:bg-green-600/90"
+                    aria-label="Accept draw and save to brackets"
+                  >
+                    Accept
                   </button>
                 </div>
               }
             >
-              {randomizeSuccessModal && (
+              {pendingWeek1RandomizeModalPayload && (
                 <div className="max-h-[min(70vh,36rem)] space-y-5 overflow-y-auto pr-1 text-slate-200">
-                  {randomizeSuccessModal.teammateConflicts.length > 0 && (
+                  <p className="text-sm leading-relaxed text-slate-400">
+                    Review this draw. Accept saves it to Week 1 brackets; Cancel keeps your current
+                    brackets.
+                  </p>
+                  {pendingWeek1RandomizeModalPayload.teammateConflicts.length > 0 && (
                     <div
                       className="rounded-lg border border-amber-500/30 bg-amber-950/25 p-4 text-sm"
                       role="region"
@@ -1878,11 +1902,14 @@ export function DashboardContent() {
                     >
                       <p className="mb-3 font-medium text-amber-200">
                         Teammates at the same Week 1 location (
-                        {randomizeSuccessModal.teammateConflicts.length}{" "}
-                        {randomizeSuccessModal.teammateConflicts.length === 1 ? "case" : "cases"})
+                        {pendingWeek1RandomizeModalPayload.teammateConflicts.length}{" "}
+                        {pendingWeek1RandomizeModalPayload.teammateConflicts.length === 1
+                          ? "case"
+                          : "cases"}
+                        )
                       </p>
                       <ul className="space-y-2" role="list">
-                        {randomizeSuccessModal.teammateConflicts.map((c, idx) => (
+                        {pendingWeek1RandomizeModalPayload.teammateConflicts.map((c, idx) => (
                           <li
                             key={`${c.locationLabel}-${c.teamLabel}-${idx}`}
                             className="rounded-md border border-white/10 bg-slate-900/50 px-3 py-2"
@@ -1900,7 +1927,7 @@ export function DashboardContent() {
                   )}
                   <p className="text-sm font-medium text-slate-300">First-round matchups by location</p>
                   <div className="grid gap-4 sm:grid-cols-2">
-                    {randomizeSuccessModal.locations.map((loc) => (
+                    {pendingWeek1RandomizeModalPayload.locations.map((loc) => (
                       <div
                         key={loc.locationLabel}
                         className="min-w-0 rounded-lg border border-white/10 bg-slate-900/35 p-3"
