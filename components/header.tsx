@@ -3,14 +3,16 @@ import { auth } from "@/auth";
 import { signOutAction } from "@/app/actions/auth";
 import { SignInModal } from "@/components/SignInModal";
 import { canAccessDashboard } from "@/lib/dashboard-access";
+import { canAccessStream } from "@/lib/stream-access";
 
 /**
  * App header with brand, nav links, and auth actions.
- * Dashboard link only shown for the allowed email.
+ * Dashboard link only shown for allowed emails; Stream only for kjkisting@gmail.com.
  */
 export async function Header() {
   const session = await auth();
   const showDashboardLink = canAccessDashboard(session?.user?.email);
+  const showStreamLink = canAccessStream(session?.user?.email);
 
   return (
     <header className="fixed left-0 right-0 top-0 z-50 w-full">
@@ -37,6 +39,14 @@ export async function Header() {
                   className="text-sm text-slate-300 hover:text-white transition-colors"
                 >
                   Dashboard
+                </Link>
+              )}
+              {showStreamLink && (
+                <Link
+                  href="/stream"
+                  className="text-sm text-slate-300 hover:text-white transition-colors"
+                >
+                  Stream
                 </Link>
               )}
               <Link

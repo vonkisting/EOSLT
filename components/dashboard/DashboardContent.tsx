@@ -134,9 +134,77 @@ function canShareFirstRoundMatchup(
   return topTeam !== bottomTeam;
 }
 
-function buildRandomizedWeek1Slots(
+/** True if two or more non-bye players in this 8-slot bracket share the same team (normalized key). */
+function bracketHasDuplicateTeamAtLocation(
+  bracket: string[],
+  teamByPlayer: Map<string, string | null>
+): boolean {
+  const seen = new Set<string>();
+  for (const name of bracket) {
+    if (isBye(name)) continue;
+    const t = teamByPlayer.get(name) ?? null;
+    if (!t) continue;
+    if (seen.has(t)) return true;
+    seen.add(t);
+  }
+  return false;
+}
+
+type TeammateLocationConflict = {
+  locationLabel: string;
+  teamLabel: string;
+  players: string[];
+};
+
+function buildTeamDisplayByKey(rows: PlayerTableRow[]): Map<string, string> {
+  const m = new Map<string, string>();
+  for (const row of rows) {
+    if (isBye(row.playerName)) continue;
+    const raw = row.teamName?.trim();
+    if (!raw) continue;
+    const key = raw.toLowerCase();
+    if (!m.has(key)) m.set(key, raw);
+  }
+  return m;
+}
+
+function computeTeammateLocationConflicts(
+  cards: string[][],
+  teamByPlayer: Map<string, string | null>,
+  teamDisplayByKey: Map<string, string>
+): TeammateLocationConflict[] {
+  const out: TeammateLocationConflict[] = [];
+  for (let bracketIndex = 0; bracketIndex < 8; bracketIndex++) {
+    const firstRound = (cards[bracketIndex] ?? []).slice(0, 8);
+    const byTeam = new Map<string, string[]>();
+    for (const name of firstRound) {
+      if (isBye(name)) continue;
+      const tk = teamByPlayer.get(name) ?? null;
+      if (!tk) continue;
+      const list = byTeam.get(tk) ?? [];
+      list.push(name);
+      byTeam.set(tk, list);
+    }
+    for (const [teamKey, players] of byTeam) {
+      if (players.length > 1) {
+        out.push({
+          locationLabel: LOCATION_LABELS[WEEK_1_KEYS[bracketIndex]],
+          teamLabel: teamDisplayByKey.get(teamKey) ?? teamKey,
+          players: [...players].sort((a, b) => a.localeCompare(b)),
+        });
+      }
+    }
+  }
+  out.sort((a, b) =>
+    a.locationLabel.localeCompare(b.locationLabel) || a.teamLabel.localeCompare(b.teamLabel)
+  );
+  return out;
+}
+
+function tryRandomizeWeek1Slots(
   rows: PlayerTableRow[],
-  playerSlotCount: number
+  playerSlotCount: number,
+  avoidTeammatesSameLocation: boolean
 ): string[][] | null {
   let byeNumber = 0;
   const participants = rows.slice(0, playerSlotCount).map((row) => {
@@ -160,6 +228,13 @@ function buildRandomizedWeek1Slots(
       const bracket = shuffled.slice(bracketIndex * 8, bracketIndex * 8 + 8);
       const byeCount = bracket.filter((name) => isBye(name)).length;
       if (byeCount > 1) {
+        valid = false;
+        break;
+      }
+      if (
+        avoidTeammatesSameLocation &&
+        bracketHasDuplicateTeamAtLocation(bracket, teamByPlayer)
+      ) {
         valid = false;
         break;
       }
@@ -239,6 +314,10 @@ export function DashboardContent() {
   const [randomizeBracketModalOpen, setRandomizeBracketModalOpen] = useState(false);
   const [resetTournamentModalOpen, setResetTournamentModalOpen] = useState(false);
   const [randomizeBracketError, setRandomizeBracketError] = useState<string | null>(null);
+  const [teammateLocationWarningOpen, setTeammateLocationWarningOpen] = useState(false);
+  const [teammateLocationConflicts, setTeammateLocationConflicts] = useState<
+    TeammateLocationConflict[]
+  >([]);
 
   /** Player list with byes numbered as "-- Bye 1 --", "-- Bye 2 --", etc. for display and bracket. */
   const playerDisplayNames = useMemo(() => {
@@ -775,7 +854,15 @@ export function DashboardContent() {
 
   const randomizeWeek1Brackets = useCallback(() => {
     if (!email) return;
-    const randomizedBracketCards = buildRandomizedWeek1Slots(playerRows, PLAYER_SLOTS);
+    setTeammateLocationWarningOpen(false);
+    setTeammateLocationConflicts([]);
+
+    let randomizedBracketCards = tryRandomizeWeek1Slots(playerRows, PLAYER_SLOTS, true);
+    let usedRelaxedLayout = false;
+    if (!randomizedBracketCards) {
+      randomizedBracketCards = tryRandomizeWeek1Slots(playerRows, PLAYER_SLOTS, false);
+      usedRelaxedLayout = true;
+    }
     if (!randomizedBracketCards) {
       setRandomizeBracketError(
         "Unable to generate a valid Week 1 bracket with the current players while avoiding same-team first-round matchups and limiting byes to one per bracket."
@@ -784,6 +871,18 @@ export function DashboardContent() {
     }
 
     setRandomizeBracketError(null);
+    const teamByPlayer = new Map(
+      playerRows
+        .filter((row) => !isBye(row.playerName))
+        .map((row) => [row.playerName, row.teamName?.toLowerCase().trim() ?? null] as const)
+    );
+    const teamDisplayByKey = buildTeamDisplayByKey(playerRows);
+    const conflicts = computeTeammateLocationConflicts(
+      randomizedBracketCards,
+      teamByPlayer,
+      teamDisplayByKey
+    );
+
     const slotEntries: [string, string][] = [];
     for (let cardIndex = 0; cardIndex < 8; cardIndex++) {
       const base = cardIndex * 12;
@@ -809,6 +908,11 @@ export function DashboardContent() {
       ),
     } as Parameters<typeof setDashboardSettings>[0]);
     setBracketResetKey(0);
+
+    if (usedRelaxedLayout && conflicts.length > 0) {
+      setTeammateLocationConflicts(conflicts);
+      setTeammateLocationWarningOpen(true);
+    }
   }, [
     email,
     playerRows,
@@ -1590,8 +1694,52 @@ export function DashboardContent() {
               }
             >
               <p className="text-slate-200">
-                Randomly fill all Week 1 first-round brackets using the current player list? This will allow at most one bye per bracket, prevent bye-vs-bye matchups, and avoid first-round matchups between players on the same team.
+                Randomly fill all Week 1 first-round brackets using the current player list? This will allow at most one bye per bracket, prevent bye-vs-bye matchups, avoid first-round matchups between players on the same team, and try to keep teammates at different Week 1 locations when possible.
               </p>
+            </Modal>
+            <Modal
+              open={teammateLocationWarningOpen}
+              onClose={() => setTeammateLocationWarningOpen(false)}
+              title="Teammates share a Week 1 location"
+              footer={
+                <div className="flex flex-wrap justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setTeammateLocationWarningOpen(false)}
+                    className="cursor-pointer rounded-lg border border-amber-400/50 bg-amber-800/80 px-4 py-2.5 text-sm font-medium text-amber-100 shadow-sm transition-colors hover:bg-amber-700/80"
+                  >
+                    Understood
+                  </button>
+                </div>
+              }
+            >
+              <div className="space-y-4 text-slate-200">
+                <p className="text-sm leading-relaxed text-slate-300">
+                  A valid Week 1 draw was applied, but the randomizer could not keep all teammates on separate locations (this can happen when the roster makes it impossible, or when a valid layout exists but was not found within the attempt limit). Your Week 1 brackets have been updated. Teammates sharing a Week 1 location:
+                </p>
+                <ul
+                  className="max-h-[min(50vh,22rem)] space-y-3 overflow-y-auto rounded-lg border border-amber-500/25 bg-amber-950/20 p-3 text-sm"
+                  role="list"
+                >
+                  {teammateLocationConflicts.map((c, idx) => (
+                    <li
+                      key={`${c.locationLabel}-${c.teamLabel}-${idx}`}
+                      className="rounded-md border border-white/5 bg-slate-900/40 px-3 py-2.5"
+                    >
+                      <div className="font-medium text-amber-200/95">
+                        {c.locationLabel}
+                        <span className="font-normal text-slate-400"> — </span>
+                        <span className="text-slate-100">{c.teamLabel}</span>
+                      </div>
+                      <ul className="mt-2 list-inside list-disc space-y-0.5 text-slate-300" role="list">
+                        {c.players.map((p) => (
+                          <li key={p}>{p}</li>
+                        ))}
+                      </ul>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </Modal>
             <Modal
               open={resetTournamentModalOpen}
