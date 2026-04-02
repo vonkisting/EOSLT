@@ -360,4 +360,35 @@ export default defineSchema({
   venues: defineTable({
     name: v.string(),
   }).index("by_name", ["name"]),
+  /**
+   * Stream / OBS dashboard: one row per user email + connection profile name.
+   * WebSocket password is stored for convenience; restrict Convex dashboard access accordingly.
+   */
+  streamObsProfiles: defineTable({
+    email: v.string(),
+    connectionName: v.string(),
+    host: v.string(),
+    port: v.string(),
+    websocketPassword: v.optional(v.string()),
+    activeScene: v.optional(v.string()),
+    audioChannelsJson: v.optional(v.string()),
+    scoreboardJson: v.optional(v.string()),
+    lastSfx: v.optional(v.string()),
+    overlayPushedAt: v.optional(v.string()),
+    /** Secret for browser-source URL; public read of cue only with this key. */
+    overlayAudioKey: v.optional(v.string()),
+    /** Monotonic; overlay plays when this changes. */
+    sfxCueSeq: v.optional(v.number()),
+    sfxCueSoundId: v.optional(v.string()),
+    updatedAt: v.number(),
+  })
+    .index("by_email", ["email"])
+    .index("by_email_and_name", ["email", "connectionName"])
+    .index("by_overlay_audio_key", ["overlayAudioKey"]),
+  /** Stream OBS dashboard: per-user UI (collapsible card open state, JSON map). */
+  streamObsUiState: defineTable({
+    email: v.string(),
+    /** JSON: Record<cardId, boolean> — true = expanded */
+    cardOpenByIdJson: v.optional(v.string()),
+  }).index("by_email", ["email"]),
 });

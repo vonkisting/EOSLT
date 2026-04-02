@@ -1,11 +1,14 @@
 import { auth } from "@/auth";
+import { StreamObsDashboard } from "@/components/stream/StreamObsDashboard";
 import { canAccessStream } from "@/lib/stream-access";
+import { listStreamSfxMp3Basenames } from "@/lib/list-stream-sfx-mp3";
 import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Stream page. Only kjkisting@gmail.com may view; others are redirected home.
+ * Stream control: OBS dashboard for authenticated, allowlisted users only.
+ * Data layer is separate from league Convex; session identifies the operator.
  */
 export default async function StreamPage() {
   const session = await auth();
@@ -16,12 +19,9 @@ export default async function StreamPage() {
     redirect("/");
   }
 
-  return (
-    <div className="w-full px-4 py-6 md:p-[25px]">
-      <h1 className="text-xl font-semibold tracking-tight text-blue-100">Stream</h1>
-      <p className="mt-2 text-sm text-slate-400">
-        Live stream content can be embedded or linked here when ready.
-      </p>
-    </div>
-  );
+  const email = session.user.email ?? "";
+  const name = session.user.name ?? null;
+  const sfxBasenames = listStreamSfxMp3Basenames();
+
+  return <StreamObsDashboard userEmail={email} userName={name} sfxBasenames={sfxBasenames} />;
 }

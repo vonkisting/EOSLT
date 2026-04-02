@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Providers } from "@/components/providers";
-import { Header } from "@/components/header";
+import { SiteChrome } from "@/components/SiteChrome";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   description: "Next.js 16 + Auth.js + Convex",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
@@ -30,10 +30,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <Providers>
-          <div className="flex min-h-screen flex-col">
-            <Header />
-            <main className="min-h-0 flex-1 pt-14">{children}</main>
-          </div>
+          <SiteChrome>{children}</SiteChrome>
         </Providers>
       </body>
     </html>

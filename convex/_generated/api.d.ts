@@ -9,6 +9,9 @@
  */
 
 import type * as dashboardSettings from "../dashboardSettings.js";
+import type * as streamObsProfiles from "../streamObsProfiles.js";
+import type * as streamObsUiState from "../streamObsUiState.js";
+import type * as streamSfxBasename from "../streamSfxBasename.js";
 import type * as users from "../users.js";
 import type * as venues from "../venues.js";
 
@@ -20,6 +23,9 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   dashboardSettings: typeof dashboardSettings;
+  streamObsProfiles: typeof streamObsProfiles;
+  streamObsUiState: typeof streamObsUiState;
+  streamSfxBasename: typeof streamSfxBasename;
   users: typeof users;
   venues: typeof venues;
 }>;
