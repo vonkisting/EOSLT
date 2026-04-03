@@ -1,4 +1,7 @@
 import type { ObsCredentials } from "@/components/stream/useObsProgramSources";
+import { obsPortOrError, withObsWebSocketBrowser } from "@/lib/stream-obs-browser-with-connection";
+import { buildObsPanelsSnapshot } from "@/lib/stream-obs-panels-snapshot";
+import { streamObsUseBrowserTransport } from "@/lib/stream-obs-transport";
 
 type SnapshotOk = {
   ok: true;
@@ -24,11 +27,32 @@ type SnapshotFail = { ok: false; error: string };
 export type ObsPanelsSnapshotFetchResult = SnapshotOk | SnapshotFail;
 
 /**
- * Loads scenes, program scene items, and audio inputs in one server round-trip (one OBS WebSocket).
+ * Loads scenes, program scene items, and audio inputs in one OBS WebSocket session
+ * (from the API on localhost, or from the browser on Vercel / when transport is browser).
  */
 export async function fetchObsPanelsSnapshot(
   credentials: ObsCredentials
 ): Promise<ObsPanelsSnapshotFetchResult> {
+  if (streamObsUseBrowserTransport()) {
+    const p = obsPortOrError(credentials.port);
+    if (!p.ok) return { ok: false, error: p.error };
+    const r = await withObsWebSocketBrowser(
+      credentials.host.trim(),
+      p.port,
+      credentials.password,
+      (obs) => buildObsPanelsSnapshot(obs)
+    );
+    if (!r.ok) return { ok: false, error: r.error };
+    const d = r.data;
+    return {
+      ok: true,
+      scenes: d.sceneNames,
+      currentProgramSceneName: d.currentProgramSceneName,
+      items: d.items,
+      inputs: d.audioInputs,
+    };
+  }
+
   try {
     const res = await fetch("/api/stream/obs/panels-snapshot", {
       method: "POST",

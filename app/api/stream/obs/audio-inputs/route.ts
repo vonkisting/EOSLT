@@ -3,7 +3,7 @@ import { canAccessStream } from "@/lib/stream-access";
 import { parseObsRequestCredentials, type ObsJsonBody } from "@/lib/stream-obs-credentials";
 import { obsVolumeDbToUiPercent } from "@/lib/stream-obs-volume-ui";
 import { withObsWebSocket } from "@/lib/stream-obs-with-connection";
-import type { OBSWebSocket } from "obs-websocket-js";
+import type { OBSWebSocket } from "obs-websocket-js/json";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";

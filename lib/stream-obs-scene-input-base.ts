@@ -1,5 +1,5 @@
-import type { OBSWebSocket } from "obs-websocket-js";
-import { OBSWebSocketError } from "obs-websocket-js";
+import type { OBSWebSocket } from "obs-websocket-js/json";
+import { OBSWebSocketError } from "obs-websocket-js/json";
 import { normalizeProgramSceneItems } from "@/lib/stream-obs-scene-items";
 import { normalizeSceneNames } from "@/lib/stream-obs-scene-list";
 

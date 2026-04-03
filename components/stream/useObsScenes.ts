@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ObsCredentials } from "@/components/stream/useObsProgramSources";
+import { obsClientSetProgramScene } from "@/lib/stream-obs-client-actions";
 
 /**
  * OBS scene list and program scene; data is loaded via {@link fetchObsPanelsSnapshot} from the parent.
@@ -58,20 +59,9 @@ export function useObsScenes(
       setSwitchingScene(sceneName);
       setError(null);
       try {
-        const res = await fetch("/api/stream/obs/set-program-scene", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({
-            host: credentials.host,
-            port: credentials.port,
-            password: credentials.password,
-            sceneName,
-          }),
-        });
-        const data = (await res.json()) as { ok?: boolean; error?: string };
-        if (!res.ok || !data.ok) {
-          setError(data.error ?? `Request failed (${res.status})`);
+        const data = await obsClientSetProgramScene(credentials, sceneName);
+        if (!data.ok) {
+          setError(data.error ?? "Could not switch scene.");
           return;
         }
         onSceneRef.current(sceneName);

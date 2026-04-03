@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { SourceToggle } from "@/components/stream/ObsSourcesPanel";
+import { obsClientSetSceneItemEnabled } from "@/lib/stream-obs-client-actions";
 
 export type ObsCredentials = { host: string; port: string; password: string };
 
@@ -75,22 +76,13 @@ export function useObsProgramSources(credentials: ObsCredentials | null, connect
       setError(null);
       const next = !item.visible;
       try {
-        const res = await fetch("/api/stream/obs/set-scene-item-enabled", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({
-            host: credentials.host,
-            port: credentials.port,
-            password: credentials.password,
-            sceneName: item.sceneName,
-            sceneItemId: item.sceneItemId,
-            sceneItemEnabled: next,
-          }),
+        const data = await obsClientSetSceneItemEnabled(credentials, {
+          sceneName: item.sceneName,
+          sceneItemId: item.sceneItemId,
+          sceneItemEnabled: next,
         });
-        const data = (await res.json()) as { ok?: boolean; error?: string };
-        if (!res.ok || !data.ok) {
-          setError(data.error ?? `Request failed (${res.status})`);
+        if (!data.ok) {
+          setError(data.error ?? "Could not update visibility.");
           return;
         }
         setSources((prev) =>

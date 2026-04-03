@@ -25,6 +25,11 @@ import {
 } from "@/components/stream/streamObsFormDefaults";
 import { useObsScenes } from "@/components/stream/useObsScenes";
 import { fetchObsPanelsSnapshot } from "@/lib/stream-obs-fetch-panels-snapshot";
+import {
+  obsClientConnect,
+  obsClientRefreshBrowserSource,
+  obsClientSetBrowserSourceUrl,
+} from "@/lib/stream-obs-client-actions";
 
 type StreamObsDashboardProps = {
   userEmail: string;
@@ -39,7 +44,8 @@ type StreamObsDashboardProps = {
 };
 
 /**
- * Stream OBS dashboard: connection is verified via POST /api/stream/obs/connect (server → OBS WebSocket).
+ * Stream OBS dashboard: on Vercel, OBS WebSocket runs in the browser (see `lib/stream-obs-transport.ts`);
+ * locally, API routes are used by default.
  * Named connection profiles persist to Convex when Connection name is set.
  */
 export function StreamObsDashboard({
@@ -216,22 +222,13 @@ export function StreamObsDashboard({
     try {
       await saveProfileNow();
       const url = `${publicOrigin}/overlay/scoreboard?k=${encodeURIComponent(overlayAudioKey)}`;
-      const res = await fetch("/api/stream/obs/set-browser-source-url", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          host: obsCredentials.host,
-          port: obsCredentials.port,
-          password: obsCredentials.password,
-          inputName:
-            scoreboardBrowserSourceName.trim() || DEFAULT_SCOREBOARD_BROWSER_SOURCE_NAME,
-          url,
-        }),
-      });
-      const data = (await res.json()) as { ok?: boolean; error?: string };
-      if (!res.ok || !data.ok) {
-        setWireScoreboardError(data.error ?? `Request failed (${res.status})`);
+      const data = await obsClientSetBrowserSourceUrl(
+        obsCredentials,
+        scoreboardBrowserSourceName.trim() || DEFAULT_SCOREBOARD_BROWSER_SOURCE_NAME,
+        url
+      );
+      if (!data.ok) {
+        setWireScoreboardError(data.error ?? "Could not update OBS browser source.");
         return;
       }
       setWireScoreboardError(null);
@@ -252,24 +249,17 @@ export function StreamObsDashboard({
     try {
       await saveProfileNow();
       const url = `${publicOrigin}/overlay/results?k=${encodeURIComponent(overlayAudioKey)}`;
-      const res = await fetch("/api/stream/obs/set-browser-source-url", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          host: obsCredentials.host,
-          port: obsCredentials.port,
-          password: obsCredentials.password,
-          inputName:
-            resultsBrowserSourceName.trim() || DEFAULT_RESULTS_BROWSER_SOURCE_NAME,
-          url,
-          browserWidth: RESULTS_PREVIEW_CARD_OUTER_WIDTH_PX,
-          browserHeight: RESULTS_PREVIEW_CARD_OUTER_HEIGHT_PX,
-        }),
-      });
-      const data = (await res.json()) as { ok?: boolean; error?: string };
-      if (!res.ok || !data.ok) {
-        setWireResultsError(data.error ?? `Request failed (${res.status})`);
+      const data = await obsClientSetBrowserSourceUrl(
+        obsCredentials,
+        resultsBrowserSourceName.trim() || DEFAULT_RESULTS_BROWSER_SOURCE_NAME,
+        url,
+        {
+          width: RESULTS_PREVIEW_CARD_OUTER_WIDTH_PX,
+          height: RESULTS_PREVIEW_CARD_OUTER_HEIGHT_PX,
+        }
+      );
+      if (!data.ok) {
+        setWireResultsError(data.error ?? "Could not update OBS browser source.");
         return;
       }
       setWireResultsError(null);
@@ -290,21 +280,13 @@ export function StreamObsDashboard({
     try {
       await saveProfileNow();
       const url = `${publicOrigin}/overlay/sfx?k=${encodeURIComponent(overlayAudioKey)}`;
-      const res = await fetch("/api/stream/obs/set-browser-source-url", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          host: obsCredentials.host,
-          port: obsCredentials.port,
-          password: obsCredentials.password,
-          inputName: sfxBrowserSourceName.trim() || DEFAULT_SFX_BROWSER_SOURCE_NAME,
-          url,
-        }),
-      });
-      const data = (await res.json()) as { ok?: boolean; error?: string };
-      if (!res.ok || !data.ok) {
-        setWireSfxError(data.error ?? `Request failed (${res.status})`);
+      const data = await obsClientSetBrowserSourceUrl(
+        obsCredentials,
+        sfxBrowserSourceName.trim() || DEFAULT_SFX_BROWSER_SOURCE_NAME,
+        url
+      );
+      if (!data.ok) {
+        setWireSfxError(data.error ?? "Could not update OBS browser source.");
         return;
       }
       setWireSfxError(null);
@@ -319,24 +301,16 @@ export function StreamObsDashboard({
     setConnectError(null);
     setIsConnecting(true);
     try {
-      const res = await fetch("/api/stream/obs/connect", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ host: h.trim(), port: p.trim(), password: pw }),
+      const data = await obsClientConnect({
+        host: h.trim(),
+        port: p.trim(),
+        password: pw,
       });
-      const data = (await res.json()) as {
-        ok?: boolean;
-        error?: string;
-        obsVersion?: string;
-        obsWebSocketVersion?: number;
-        platform?: string;
-      };
-      if (!res.ok || !data.ok) {
+      if (!data.ok) {
         setConnected(false);
         setObsServerInfo(null);
         setObsCredentials(null);
-        setConnectError(data.error ?? `Request failed (${res.status})`);
+        setConnectError(data.error ?? "Could not connect to OBS.");
         return;
       }
       const bits = [
@@ -404,19 +378,8 @@ export function StreamObsDashboard({
     const t = setTimeout(() => {
       void (async () => {
         try {
-          const res = await fetch("/api/stream/obs/refresh-browser-source", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({
-              host: obsCredentials.host,
-              port: obsCredentials.port,
-              password: obsCredentials.password,
-              inputName,
-            }),
-          });
-          const data = (await res.json()) as { ok?: boolean };
-          if (res.ok && data.ok) lastObsScoreboardRefreshRef.current = pending;
+          const data = await obsClientRefreshBrowserSource(obsCredentials, inputName);
+          if (data.ok) lastObsScoreboardRefreshRef.current = pending;
         } catch {
           /* OBS off or wrong source name */
         }

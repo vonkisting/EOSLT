@@ -1,7 +1,7 @@
 import { listItemsForObsScene, type SceneItemRow } from "@/lib/stream-obs-list-scene-items";
 import { normalizeSceneNames } from "@/lib/stream-obs-scene-list";
 import { obsVolumeDbToUiPercent } from "@/lib/stream-obs-volume-ui";
-import type { OBSWebSocket } from "obs-websocket-js";
+import type { OBSWebSocket } from "obs-websocket-js/json";
 
 export type ObsPanelsSnapshot = {
   sceneNames: string[];

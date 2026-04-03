@@ -1,4 +1,4 @@
-import type { OBSWebSocket } from "obs-websocket-js";
+import type { OBSWebSocket } from "obs-websocket-js/json";
 import type { JsonObject } from "type-fest";
 import {
   ensureScenesReady,

@@ -6,6 +6,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import type { StreamLogoRowUi } from "@/components/stream/streamObsLogoTypes";
 import type { ObsCredentials } from "@/components/stream/useObsProgramSources";
+import { obsClientSetImageSourceFile } from "@/lib/stream-obs-client-actions";
 
 type UseObsConnectionLogosArgs = {
   emailNormalized: string;
@@ -109,21 +110,9 @@ export function useObsConnectionLogos({
           logoId: logo.id,
           obsImageSourceName: inputName,
         });
-        const res = await fetch("/api/stream/obs/set-image-source-file", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({
-            host: obsCredentials.host,
-            port: obsCredentials.port,
-            password: obsCredentials.password,
-            inputName,
-            file: fileUrl,
-          }),
-        });
-        const data = (await res.json()) as { ok?: boolean; error?: string };
-        if (!res.ok || !data.ok) {
-          throw new Error(data.error ?? `Request failed (${res.status})`);
+        const data = await obsClientSetImageSourceFile(obsCredentials, inputName, fileUrl);
+        if (!data.ok) {
+          throw new Error(data.error ?? "Could not update OBS image source.");
         }
       } catch (err) {
         setWireErrorById((s) => ({

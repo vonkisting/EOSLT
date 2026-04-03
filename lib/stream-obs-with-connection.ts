@@ -1,5 +1,5 @@
 import { buildObsWebSocketUrl } from "@/lib/stream-obs-url";
-import { OBSWebSocket } from "obs-websocket-js";
+import { OBSWebSocket } from "obs-websocket-js/json";
 
 const CONNECT_TIMEOUT_MS = 12_000;
 

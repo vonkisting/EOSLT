@@ -2,7 +2,7 @@ import {
   normalizeProgramSceneItems,
   type ProgramSceneSourceRow,
 } from "@/lib/stream-obs-scene-items";
-import type { OBSWebSocket } from "obs-websocket-js";
+import type { OBSWebSocket } from "obs-websocket-js/json";
 
 export type SceneItemRow = ProgramSceneSourceRow & { sceneName: string };
 

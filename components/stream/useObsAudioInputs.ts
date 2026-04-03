@@ -3,17 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import type { AudioChannel } from "@/components/stream/ObsAudioPanel";
 import type { ObsCredentials } from "@/components/stream/useObsProgramSources";
-
-type ListResponse = {
-  ok?: boolean;
-  error?: string;
-  inputs?: Array<{
-    inputName: string;
-    inputKind?: string;
-    volume: number;
-    muted: boolean;
-  }>;
-};
+import {
+  obsClientAudioInputs,
+  obsClientSetInputMute,
+  obsClientSetInputVolume,
+} from "@/lib/stream-obs-client-actions";
 
 /**
  * OBS audio inputs; list data is loaded via {@link fetchObsPanelsSnapshot} from the parent.
@@ -79,20 +73,10 @@ export function useObsAudioInputs(
     setError(null);
     setLoading(true);
     try {
-      const res = await fetch("/api/stream/obs/audio-inputs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          host: credentials.host,
-          port: credentials.port,
-          password: credentials.password,
-        }),
-      });
-      const data = (await res.json()) as ListResponse;
-      if (!res.ok || !data.ok || !Array.isArray(data.inputs)) {
+      const data = await obsClientAudioInputs(credentials);
+      if (!data.ok || !Array.isArray(data.inputs)) {
         setChannels([]);
-        setError(data.error ?? `Request failed (${res.status})`);
+        setError(data.error ?? "Could not load audio inputs.");
         setLoading(false);
         return;
       }
@@ -110,21 +94,9 @@ export function useObsAudioInputs(
       setError(null);
       const v = Math.min(100, Math.max(0, Math.round(volume)));
       try {
-        const res = await fetch("/api/stream/obs/set-input-volume", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({
-            host: credentials.host,
-            port: credentials.port,
-            password: credentials.password,
-            inputName,
-            volume: v,
-          }),
-        });
-        const data = (await res.json()) as { ok?: boolean; error?: string };
-        if (!res.ok || !data.ok) {
-          setError(data.error ?? `Request failed (${res.status})`);
+        const data = await obsClientSetInputVolume(credentials, inputName, v);
+        if (!data.ok) {
+          setError(data.error ?? "Could not set volume.");
           await resyncFromObs();
           return;
         }
@@ -144,21 +116,9 @@ export function useObsAudioInputs(
       if (!credentials) return;
       setError(null);
       try {
-        const res = await fetch("/api/stream/obs/set-input-mute", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({
-            host: credentials.host,
-            port: credentials.port,
-            password: credentials.password,
-            inputName,
-            inputMuted,
-          }),
-        });
-        const data = (await res.json()) as { ok?: boolean; error?: string };
-        if (!res.ok || !data.ok) {
-          setError(data.error ?? `Request failed (${res.status})`);
+        const data = await obsClientSetInputMute(credentials, inputName, inputMuted);
+        if (!data.ok) {
+          setError(data.error ?? "Could not set mute.");
           await resyncFromObs();
           return;
         }
