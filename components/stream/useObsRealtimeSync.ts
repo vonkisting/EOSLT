@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import type { ObsCredentials } from "@/components/stream/useObsProgramSources";
 import { buildObsWebSocketUrl, parseObsPort } from "@/lib/stream-obs-url";
 
-const DEBOUNCE_MS = 320;
+const DEBOUNCE_MS = 700;
 
 /** OBS events that should refresh scene list, scene items, or audio inputs (debounced). */
 const REFETCH_TRIGGER_EVENTS = [
@@ -26,8 +26,8 @@ const REFETCH_TRIGGER_EVENTS = [
 type ObsWsModule = typeof import("obs-websocket-js/json");
 
 /**
- * Opens a second OBS WebSocket from the browser (LAN) to mirror server-driven fetches:
- * when OBS emits structural or mixer events, runs `refetchAll` after a short debounce.
+ * Opens a browser WebSocket to OBS to trigger batched panel refresh after structural/mixer events.
+ * Uses a narrow event subscription (not `All`) to avoid noisy high-frequency OBS events.
  */
 export function useObsRealtimeSync(
   credentials: ObsCredentials | null,
@@ -67,9 +67,15 @@ export function useObsRealtimeSync(
 
       const { default: OBSWebSocket, EventSubscription } = mod;
       const client = new OBSWebSocket();
+      const eventSubscriptions =
+        EventSubscription.General |
+        EventSubscription.Scenes |
+        EventSubscription.Inputs |
+        EventSubscription.SceneItems;
       try {
         await client.connect(url, credentials.password, {
-          eventSubscriptions: EventSubscription.All,
+          rpcVersion: 1,
+          eventSubscriptions,
         });
       } catch {
         return;

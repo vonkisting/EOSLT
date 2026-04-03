@@ -1,11 +1,7 @@
 import { auth } from "@/auth";
 import { canAccessStream } from "@/lib/stream-access";
+import { buildObsPanelsSnapshot } from "@/lib/stream-obs-panels-snapshot";
 import { parseObsRequestCredentials, type ObsJsonBody } from "@/lib/stream-obs-credentials";
-import {
-  listItemsForObsScene,
-  type SceneItemRow,
-} from "@/lib/stream-obs-list-scene-items";
-import { normalizeSceneNames } from "@/lib/stream-obs-scene-list";
 import { withObsWebSocket } from "@/lib/stream-obs-with-connection";
 import { NextResponse } from "next/server";
 
@@ -13,8 +9,8 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 /**
- * POST /api/stream/obs/program-scene-sources
- * Lists scene items from every OBS scene (not only the program scene), with group contents expanded.
+ * POST /api/stream/obs/panels-snapshot
+ * Scenes, scene items, and audio inputs in one WebSocket session (avoids OBS "new connection" spam).
  */
 export async function POST(request: Request) {
   const session = await auth();
@@ -34,30 +30,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: creds.error }, { status: 400 });
   }
 
-  const result = await withObsWebSocket(creds.host, creds.port, creds.password, async (obs) => {
-    const sceneList = await obs.call("GetSceneList");
-    const sceneNames = normalizeSceneNames(sceneList.scenes);
-    const programSceneName =
-      typeof sceneList.currentProgramSceneName === "string" && sceneList.currentProgramSceneName
-        ? sceneList.currentProgramSceneName
-        : null;
-
-    const items: SceneItemRow[] = [];
-    for (const name of sceneNames) {
-      const chunk = await listItemsForObsScene(obs, name);
-      items.push(...chunk);
-    }
-
-    return { programSceneName, items };
-  });
+  const result = await withObsWebSocket(creds.host, creds.port, creds.password, (obs) =>
+    buildObsPanelsSnapshot(obs)
+  );
 
   if (!result.ok) {
     return NextResponse.json({ ok: false, error: result.error }, { status: 502 });
   }
 
+  const d = result.data;
   return NextResponse.json({
     ok: true,
-    programSceneName: result.data.programSceneName,
-    items: result.data.items,
+    scenes: d.sceneNames,
+    currentProgramSceneName: d.currentProgramSceneName,
+    items: d.items,
+    inputs: d.audioInputs,
   });
 }

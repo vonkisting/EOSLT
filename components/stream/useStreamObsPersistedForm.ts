@@ -129,49 +129,64 @@ export function useStreamObsPersistedForm(userEmail: string, normalizedEmail: st
   const scoreboardJson = JSON.stringify(scoreboard);
   const tournamentSettingsJson = tournamentSettingsToJson(tournamentSettings);
 
-  const profileReady = !trimmedConnectionName || profile !== undefined;
+  /** Convex row exists for this connection name (not loading, not missing). */
+  const hasPersistedProfile =
+    Boolean(trimmedConnectionName) &&
+    profile !== undefined &&
+    profile !== null;
 
-  const saveProfileNow = useCallback(async () => {
-    const name = connectionName.trim();
-    if (!name) return;
-    await upsertProfile({
-      email: normalizedEmail,
-      connectionName: name,
+  /**
+   * @param createIfMissing - Pass true after a successful OBS connect so the profile row is created.
+   *                         Default false: only patch an existing row (never create from typing alone).
+   */
+  const saveProfileNow = useCallback(
+    async (createIfMissing = false) => {
+      const name = connectionName.trim();
+      if (!name) return;
+      await upsertProfile({
+        email: normalizedEmail,
+        connectionName: name,
+        host,
+        port,
+        websocketPassword: password,
+        activeScene: activeScene ?? undefined,
+        scoreboardJson: JSON.stringify(scoreboard),
+        tournamentSettingsJson,
+        scoreboardBrowserSourceName:
+          scoreboardBrowserSourceName.trim() || DEFAULT_SCOREBOARD_BROWSER_SOURCE_NAME,
+        resultsBrowserSourceName:
+          resultsBrowserSourceName.trim() || DEFAULT_RESULTS_BROWSER_SOURCE_NAME,
+        sfxBrowserSourceName: sfxBrowserSourceName.trim() || DEFAULT_SFX_BROWSER_SOURCE_NAME,
+        lastSfx: lastSfx ?? undefined,
+        createIfMissing,
+      });
+      if (createIfMissing || hasPersistedProfile) {
+        writeLastStreamObsProfileName(userEmail, name);
+      }
+    },
+    [
+      connectionName,
+      normalizedEmail,
       host,
       port,
-      websocketPassword: password,
-      activeScene: activeScene ?? undefined,
-      scoreboardJson: JSON.stringify(scoreboard),
+      password,
+      activeScene,
+      scoreboard,
+      tournamentSettings,
       tournamentSettingsJson,
-      scoreboardBrowserSourceName:
-        scoreboardBrowserSourceName.trim() || DEFAULT_SCOREBOARD_BROWSER_SOURCE_NAME,
-      resultsBrowserSourceName:
-        resultsBrowserSourceName.trim() || DEFAULT_RESULTS_BROWSER_SOURCE_NAME,
-      sfxBrowserSourceName: sfxBrowserSourceName.trim() || DEFAULT_SFX_BROWSER_SOURCE_NAME,
-      lastSfx: lastSfx ?? undefined,
-    });
-    writeLastStreamObsProfileName(userEmail, name);
-  }, [
-    connectionName,
-    normalizedEmail,
-    host,
-    port,
-    password,
-    activeScene,
-    scoreboard,
-    tournamentSettings,
-    tournamentSettingsJson,
-    scoreboardBrowserSourceName,
-    resultsBrowserSourceName,
-    sfxBrowserSourceName,
-    lastSfx,
-    userEmail,
-    upsertProfile,
-  ]);
+      scoreboardBrowserSourceName,
+      resultsBrowserSourceName,
+      sfxBrowserSourceName,
+      lastSfx,
+      userEmail,
+      upsertProfile,
+      hasPersistedProfile,
+    ]
+  );
 
   /** Persist immediately when a tournament player row is added or removed (count change). */
   useEffect(() => {
-    if (!trimmedConnectionName || !profileReady) return;
+    if (!hasPersistedProfile) return;
     const n = tournamentSettings.players.length;
     if (prevPlayerCountForSaveRef.current === null) {
       prevPlayerCountForSaveRef.current = n;
@@ -182,14 +197,13 @@ export function useStreamObsPersistedForm(userEmail: string, normalizedEmail: st
     void saveProfileNow();
   }, [
     tournamentSettings.players.length,
-    trimmedConnectionName,
-    profileReady,
+    hasPersistedProfile,
     saveProfileNow,
   ]);
 
   /** Short debounce so OBS scoreboard overlay (Convex live query) tracks names. */
   useEffect(() => {
-    if (!trimmedConnectionName || !profileReady) return;
+    if (!hasPersistedProfile) return;
     const t = setTimeout(() => {
       void upsertProfile({
         email: normalizedEmail,
@@ -205,13 +219,14 @@ export function useStreamObsPersistedForm(userEmail: string, normalizedEmail: st
           resultsBrowserSourceName.trim() || DEFAULT_RESULTS_BROWSER_SOURCE_NAME,
         sfxBrowserSourceName: sfxBrowserSourceName.trim() || DEFAULT_SFX_BROWSER_SOURCE_NAME,
         lastSfx: lastSfx ?? undefined,
+        createIfMissing: false,
       });
       writeLastStreamObsProfileName(userEmail, trimmedConnectionName);
     }, 120);
     return () => clearTimeout(t);
   }, [
     trimmedConnectionName,
-    profileReady,
+    hasPersistedProfile,
     host,
     port,
     password,

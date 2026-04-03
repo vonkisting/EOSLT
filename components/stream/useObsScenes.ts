@@ -3,15 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ObsCredentials } from "@/components/stream/useObsProgramSources";
 
-type ScenesResponse = {
-  ok?: boolean;
-  error?: string;
-  scenes?: string[];
-  currentProgramSceneName?: string | null;
-};
-
 /**
- * Loads OBS scene list when connected; switching program scene calls the server API.
+ * OBS scene list and program scene; data is loaded via {@link fetchObsPanelsSnapshot} from the parent.
  */
 export function useObsScenes(
   credentials: ObsCredentials | null,
@@ -26,50 +19,38 @@ export function useObsScenes(
   const [error, setError] = useState<string | null>(null);
   const [switchingScene, setSwitchingScene] = useState<string | null>(null);
 
-  const refetch = useCallback(async () => {
-    if (!credentials) return;
+  const notifyPanelsRefetchStart = useCallback(() => {
     setError(null);
     setLoading(true);
-    try {
-      const res = await fetch("/api/stream/obs/scenes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          host: credentials.host,
-          port: credentials.port,
-          password: credentials.password,
-        }),
-      });
-      const data = (await res.json()) as ScenesResponse;
-      if (!res.ok || !data.ok || !Array.isArray(data.scenes)) {
-        setScenes([]);
-        setError(data.error ?? `Request failed (${res.status})`);
-        return;
-      }
+  }, []);
+
+  const ingestPanelsSnapshot = useCallback(
+    (data: { scenes: string[]; currentProgramSceneName: string | null }) => {
       setScenes(data.scenes);
       const cur =
         typeof data.currentProgramSceneName === "string" && data.currentProgramSceneName
           ? data.currentProgramSceneName
           : null;
       onSceneRef.current(cur);
-    } catch {
-      setScenes([]);
-      setError("Network error — could not load scenes.");
-    } finally {
+      setError(null);
       setLoading(false);
-    }
-  }, [credentials]);
+    },
+    []
+  );
+
+  const ingestPanelsRefetchError = useCallback((message: string) => {
+    setScenes([]);
+    setError(message);
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
     if (!connected || !credentials) {
       setScenes([]);
       setError(null);
       setLoading(false);
-      return;
     }
-    void refetch();
-  }, [connected, credentials, refetch]);
+  }, [connected, credentials]);
 
   const selectScene = useCallback(
     async (sceneName: string) => {
@@ -107,7 +88,9 @@ export function useObsScenes(
     scenes,
     loading,
     error,
-    refetch,
+    notifyPanelsRefetchStart,
+    ingestPanelsSnapshot,
+    ingestPanelsRefetchError,
     selectScene,
     switchingScene,
   };

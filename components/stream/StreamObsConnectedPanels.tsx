@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useMemo } from "react";
 import { ObsAudioPanel, type AudioChannel } from "@/components/stream/ObsAudioPanel";
 import { ObsScenesPanel } from "@/components/stream/ObsScenesPanel";
 import { ObsScoreboardPanel, type ScoreboardState } from "@/components/stream/ObsScoreboardPanel";
@@ -12,7 +12,6 @@ import { tournamentPlayerDisplayNames } from "@/components/stream/tournamentSett
 import { ObsSoundboardPanel, type SoundboardEffect } from "@/components/stream/ObsSoundboardPanel";
 import { ObsSourcesPanel, type SourceToggle } from "@/components/stream/ObsSourcesPanel";
 import type { ObsCredentials } from "@/components/stream/useObsProgramSources";
-import { useObsScenes } from "@/components/stream/useObsScenes";
 import { useObsRealtimeSync } from "@/components/stream/useObsRealtimeSync";
 
 type StreamObsConnectedPanelsProps = {
@@ -20,19 +19,23 @@ type StreamObsConnectedPanelsProps = {
   soundboardEffects: SoundboardEffect[];
   obsCredentials: ObsCredentials;
   activeScene: string | null;
-  setActiveScene: (scene: string | null) => void;
+  scenes: string[];
+  scenesLoading: boolean;
+  scenesError: string | null;
+  onSelectScene: (name: string) => void;
+  switchingScene: string | null;
   lastSfx: string | null;
   onTriggerSfx: (soundId: string) => void;
   sources: SourceToggle[];
   onToggleSource: (item: SourceToggle) => void | Promise<void>;
   sourcesLoading: boolean;
   sourcesError: string | null;
-  onRefreshSources: () => void;
+  /** One batched refresh (single OBS WebSocket) for scenes, sources, and audio lists. */
+  onRefreshObsPanels: () => void;
   togglingKey: string | null;
   audioChannels: AudioChannel[];
   audioLoading: boolean;
   audioError: string | null;
-  onRefreshAudio: () => void;
   onAudioVolumeChange: (id: string, volume: number) => void;
   onAudioMute: (id: string, nextMuted: boolean) => void;
   scoreboard: ScoreboardState;
@@ -47,19 +50,22 @@ export function StreamObsConnectedPanels({
   soundboardEffects,
   obsCredentials,
   activeScene,
-  setActiveScene,
+  scenes,
+  scenesLoading,
+  scenesError,
+  onSelectScene,
+  switchingScene,
   lastSfx,
   onTriggerSfx,
   sources,
   onToggleSource,
   sourcesLoading,
   sourcesError,
-  onRefreshSources,
+  onRefreshObsPanels,
   togglingKey,
   audioChannels,
   audioLoading,
   audioError,
-  onRefreshAudio,
   onAudioVolumeChange,
   onAudioMute,
   scoreboard,
@@ -68,22 +74,7 @@ export function StreamObsConnectedPanels({
   onTournamentSettingsChange,
   onTournamentPersistRequest,
 }: StreamObsConnectedPanelsProps) {
-  const {
-    scenes,
-    loading: scenesLoading,
-    error: scenesError,
-    refetch: refetchScenes,
-    selectScene,
-    switchingScene,
-  } = useObsScenes(obsCredentials, true, setActiveScene);
-
-  const refetchObsPanels = useCallback(() => {
-    void refetchScenes();
-    onRefreshSources();
-    onRefreshAudio();
-  }, [refetchScenes, onRefreshSources, onRefreshAudio]);
-
-  useObsRealtimeSync(obsCredentials, true, refetchObsPanels);
+  useObsRealtimeSync(obsCredentials, true, onRefreshObsPanels);
 
   const tournamentPlayerNames = useMemo(
     () => tournamentPlayerDisplayNames(tournamentSettings),
@@ -97,7 +88,7 @@ export function StreamObsConnectedPanels({
           connected
           scenes={scenes}
           activeScene={activeScene}
-          onSelectScene={(name) => void selectScene(name)}
+          onSelectScene={onSelectScene}
           loading={scenesLoading}
           error={scenesError}
           switchingScene={switchingScene}

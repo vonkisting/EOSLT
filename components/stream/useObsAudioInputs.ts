@@ -16,14 +16,65 @@ type ListResponse = {
 };
 
 /**
- * Loads OBS audio-capable inputs (volume + mute) via server WebSocket calls.
+ * OBS audio inputs; list data is loaded via {@link fetchObsPanelsSnapshot} from the parent.
+ * @param refetchPanels - Batched OBS refresh (e.g. after a failed mute/volume call).
  */
-export function useObsAudioInputs(credentials: ObsCredentials | null, connected: boolean) {
+export function useObsAudioInputs(
+  credentials: ObsCredentials | null,
+  connected: boolean,
+  refetchPanels?: () => Promise<void>
+) {
   const [channels, setChannels] = useState<AudioChannel[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const refetch = useCallback(async () => {
+  const notifyPanelsRefetchStart = useCallback(() => {
+    setError(null);
+    setLoading(true);
+  }, []);
+
+  const ingestPanelsSnapshot = useCallback(
+    (data: {
+      inputs: Array<{
+        inputName: string;
+        inputKind?: string;
+        volume: number;
+        muted: boolean;
+      }>;
+    }) => {
+      setChannels(
+        data.inputs.map((row) => ({
+          id: row.inputName,
+          label: row.inputName,
+          volume: Math.min(100, Math.max(0, Math.round(row.volume))),
+          muted: row.muted === true,
+        }))
+      );
+      setError(null);
+      setLoading(false);
+    },
+    []
+  );
+
+  const ingestPanelsRefetchError = useCallback((message: string) => {
+    setChannels([]);
+    setError(message);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (!connected || !credentials) {
+      setChannels([]);
+      setError(null);
+      setLoading(false);
+    }
+  }, [connected, credentials]);
+
+  const resyncFromObs = useCallback(async () => {
+    if (refetchPanels) {
+      await refetchPanels();
+      return;
+    }
     if (!credentials) return;
     setError(null);
     setLoading(true);
@@ -42,33 +93,16 @@ export function useObsAudioInputs(credentials: ObsCredentials | null, connected:
       if (!res.ok || !data.ok || !Array.isArray(data.inputs)) {
         setChannels([]);
         setError(data.error ?? `Request failed (${res.status})`);
+        setLoading(false);
         return;
       }
-      setChannels(
-        data.inputs.map((row) => ({
-          id: row.inputName,
-          label: row.inputName,
-          volume: Math.min(100, Math.max(0, Math.round(row.volume))),
-          muted: row.muted === true,
-        }))
-      );
+      ingestPanelsSnapshot({ inputs: data.inputs });
     } catch {
       setChannels([]);
       setError("Network error — could not load audio inputs.");
-    } finally {
       setLoading(false);
     }
-  }, [credentials]);
-
-  useEffect(() => {
-    if (!connected || !credentials) {
-      setChannels([]);
-      setError(null);
-      setLoading(false);
-      return;
-    }
-    void refetch();
-  }, [connected, credentials, refetch]);
+  }, [credentials, refetchPanels, ingestPanelsSnapshot]);
 
   const setVolume = useCallback(
     async (inputName: string, volume: number) => {
@@ -91,7 +125,7 @@ export function useObsAudioInputs(credentials: ObsCredentials | null, connected:
         const data = (await res.json()) as { ok?: boolean; error?: string };
         if (!res.ok || !data.ok) {
           setError(data.error ?? `Request failed (${res.status})`);
-          await refetch();
+          await resyncFromObs();
           return;
         }
         setChannels((prev) =>
@@ -99,10 +133,10 @@ export function useObsAudioInputs(credentials: ObsCredentials | null, connected:
         );
       } catch {
         setError("Network error — could not set volume.");
-        await refetch();
+        await resyncFromObs();
       }
     },
-    [credentials, refetch]
+    [credentials, resyncFromObs]
   );
 
   const setMute = useCallback(
@@ -125,7 +159,7 @@ export function useObsAudioInputs(credentials: ObsCredentials | null, connected:
         const data = (await res.json()) as { ok?: boolean; error?: string };
         if (!res.ok || !data.ok) {
           setError(data.error ?? `Request failed (${res.status})`);
-          await refetch();
+          await resyncFromObs();
           return;
         }
         setChannels((prev) =>
@@ -133,11 +167,20 @@ export function useObsAudioInputs(credentials: ObsCredentials | null, connected:
         );
       } catch {
         setError("Network error — could not set mute.");
-        await refetch();
+        await resyncFromObs();
       }
     },
-    [credentials, refetch]
+    [credentials, resyncFromObs]
   );
 
-  return { channels, loading, error, refetch, setVolume, setMute };
+  return {
+    channels,
+    loading,
+    error,
+    notifyPanelsRefetchStart,
+    ingestPanelsSnapshot,
+    ingestPanelsRefetchError,
+    setVolume,
+    setMute,
+  };
 }

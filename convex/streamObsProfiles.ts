@@ -3,6 +3,16 @@ import { v } from "convex/values";
 import { resolveStreamLogosForProfile } from "./streamObsLogos";
 import { isSafeStreamSfxBasename } from "./streamSfxBasename";
 
+/** Hidden from the connection-name combobox (legacy partial/typo profiles). */
+const DROPPED_OBS_CONNECTION_NAMES = new Set([
+  "Wor",
+  "Wo",
+  "W",
+  "Home Wif",
+  "Th",
+  "Ho",
+]);
+
 function newOverlayAudioKey(): string {
   const u = new Uint8Array(24);
   crypto.getRandomValues(u);
@@ -21,6 +31,7 @@ export const listByEmail = query({
       .withIndex("by_email", (q) => q.eq("email", normalized))
       .collect();
     return docs
+      .filter((d) => !DROPPED_OBS_CONNECTION_NAMES.has(d.connectionName.trim()))
       .map((d) => ({ connectionName: d.connectionName, updatedAt: d.updatedAt }))
       .sort((a, b) => b.updatedAt - a.updatedAt);
   },
@@ -186,6 +197,8 @@ export const upsert = mutation({
     sfxBrowserSourceName: v.optional(v.string()),
     lastSfx: v.optional(v.string()),
     overlayPushedAt: v.optional(v.string()),
+    /** When false and no row exists, skip insert (avoid profiles for partial connection names). */
+    createIfMissing: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const email = args.email.toLowerCase().trim();
@@ -230,6 +243,10 @@ export const upsert = mutation({
         ...(args.overlayPushedAt !== undefined ? { overlayPushedAt: args.overlayPushedAt } : {}),
       });
       return existing._id;
+    }
+
+    if (args.createIfMissing === false) {
+      return null;
     }
 
     return await ctx.db.insert("streamObsProfiles", {

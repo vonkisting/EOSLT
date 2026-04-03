@@ -23,6 +23,8 @@ import {
   DEFAULT_SCOREBOARD_BROWSER_SOURCE_NAME,
   DEFAULT_SFX_BROWSER_SOURCE_NAME,
 } from "@/components/stream/streamObsFormDefaults";
+import { useObsScenes } from "@/components/stream/useObsScenes";
+import { fetchObsPanelsSnapshot } from "@/lib/stream-obs-fetch-panels-snapshot";
 
 type StreamObsDashboardProps = {
   userEmail: string;
@@ -125,11 +127,29 @@ export function StreamObsDashboard({
   const [obsServerInfo, setObsServerInfo] = useState<string | null>(null);
   const [obsCredentials, setObsCredentials] = useState<ObsCredentials | null>(null);
 
+  const refetchPanelsRef = useRef<() => Promise<void>>(async () => {});
+  const triggerBatchedPanelsRefetch = useCallback(async () => {
+    await refetchPanelsRef.current();
+  }, []);
+
+  const {
+    scenes,
+    loading: scenesLoading,
+    error: scenesError,
+    notifyPanelsRefetchStart: scenesRefetchStart,
+    ingestPanelsSnapshot: ingestScenesPanels,
+    ingestPanelsRefetchError: ingestScenesError,
+    selectScene,
+    switchingScene,
+  } = useObsScenes(obsCredentials, connected, setActiveScene);
+
   const {
     sources,
     loading: sourcesLoading,
     error: sourcesError,
-    refetch: refetchSources,
+    notifyPanelsRefetchStart: sourcesRefetchStart,
+    ingestPanelsSnapshot: ingestSourcesPanels,
+    ingestPanelsRefetchError: ingestSourcesError,
     toggleSource,
     togglingKey,
   } = useObsProgramSources(obsCredentials, connected);
@@ -138,10 +158,53 @@ export function StreamObsDashboard({
     channels: obsAudioChannels,
     loading: obsAudioLoading,
     error: obsAudioError,
-    refetch: refetchObsAudio,
+    notifyPanelsRefetchStart: audioRefetchStart,
+    ingestPanelsSnapshot: ingestAudioPanels,
+    ingestPanelsRefetchError: ingestAudioError,
     setVolume: setObsInputVolume,
     setMute: setObsInputMute,
-  } = useObsAudioInputs(obsCredentials, connected);
+  } = useObsAudioInputs(obsCredentials, connected, triggerBatchedPanelsRefetch);
+
+  const refetchAllObsPanels = useCallback(async () => {
+    if (!obsCredentials) return;
+    scenesRefetchStart();
+    sourcesRefetchStart();
+    audioRefetchStart();
+    const result = await fetchObsPanelsSnapshot(obsCredentials);
+    if (!result.ok) {
+      const msg = result.error;
+      ingestScenesError(msg);
+      ingestSourcesError(msg);
+      ingestAudioError(msg);
+      return;
+    }
+    ingestScenesPanels({
+      scenes: result.scenes,
+      currentProgramSceneName: result.currentProgramSceneName,
+    });
+    ingestSourcesPanels({ items: result.items });
+    ingestAudioPanels({ inputs: result.inputs });
+  }, [
+    obsCredentials,
+    scenesRefetchStart,
+    sourcesRefetchStart,
+    audioRefetchStart,
+    ingestScenesError,
+    ingestSourcesError,
+    ingestAudioError,
+    ingestScenesPanels,
+    ingestSourcesPanels,
+    ingestAudioPanels,
+  ]);
+
+  useEffect(() => {
+    refetchPanelsRef.current = refetchAllObsPanels;
+  }, [refetchAllObsPanels]);
+
+  useEffect(() => {
+    if (!connected || !obsCredentials) return;
+    void refetchAllObsPanels();
+  }, [connected, obsCredentials, refetchAllObsPanels]);
 
   const wireScoreboardToObs = useCallback(async () => {
     if (!obsCredentials || !overlayAudioKey || !publicOrigin) {
@@ -284,7 +347,7 @@ export function StreamObsDashboard({
       setObsServerInfo(bits.join(" · "));
       setObsCredentials({ host: h.trim(), port: p, password: pw });
       setConnected(true);
-      void saveProfileNow();
+      void saveProfileNow(true);
     } catch {
       setConnected(false);
       setObsServerInfo(null);
@@ -417,19 +480,22 @@ export function StreamObsDashboard({
               soundboardEffects={soundboardEffects}
               obsCredentials={obsCredentials}
               activeScene={activeScene}
-              setActiveScene={setActiveScene}
+              scenes={scenes}
+              scenesLoading={scenesLoading}
+              scenesError={scenesError}
+              onSelectScene={(name) => void selectScene(name)}
+              switchingScene={switchingScene}
               lastSfx={lastSfx}
               onTriggerSfx={triggerSfx}
               sources={sources}
               onToggleSource={toggleSource}
               sourcesLoading={sourcesLoading}
               sourcesError={sourcesError}
-              onRefreshSources={refetchSources}
+              onRefreshObsPanels={() => void refetchAllObsPanels()}
               togglingKey={togglingKey}
               audioChannels={obsAudioChannels}
               audioLoading={obsAudioLoading}
               audioError={obsAudioError}
-              onRefreshAudio={refetchObsAudio}
               onAudioVolumeChange={setObsInputVolume}
               onAudioMute={setObsInputMute}
               scoreboard={scoreboard}
