@@ -7,6 +7,7 @@ export const STREAM_OBS_CARD_IDS = {
   audio: "audio",
   scoreboard: "scoreboard",
   tournamentSettings: "tournament-settings",
-  /** Nested section under Tournament Settings (same Convex `cardOpenByIdJson` as other cards). */
+  /** @deprecated Merged into `tournamentResults` panel; kept for older saved UI state JSON. */
   tournamentPlayerList: "tournament-settings-player-list",
+  tournamentResults: "tournament-results-preview",
 } as const;

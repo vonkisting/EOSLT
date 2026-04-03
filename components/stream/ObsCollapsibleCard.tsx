@@ -15,6 +15,8 @@ type ObsCollapsibleCardProps = {
   headerExtra?: ReactNode;
   /** Accessible name fragment for expand/collapse, e.g. "OBS connection". */
   collapseLabel?: string;
+  /** When false, omit the rule between the title row and body (default true). */
+  bodyTopDivider?: boolean;
   children: ReactNode;
 };
 
@@ -32,6 +34,7 @@ export function ObsCollapsibleCard({
   onOpenChange,
   headerExtra,
   collapseLabel,
+  bodyTopDivider = true,
   children,
 }: ObsCollapsibleCardProps) {
   const uid = useId().replace(/:/g, "");
@@ -80,7 +83,9 @@ export function ObsCollapsibleCard({
           </div>
         </div>
         <div id={panelId} className={open ? "space-y-4 pt-3" : "hidden"}>
-          <div className="border-b border-white/10" role="presentation" />
+          {bodyTopDivider ? (
+            <div className="border-b border-white/10" role="presentation" />
+          ) : null}
           {children}
         </div>
       </div>

@@ -8,14 +8,20 @@ import {
   DEFAULT_SCOREBOARD,
   mergeOverlayScoreboardWithSnapshot,
   scoreboardFromOverlayQuery,
+  stabilizeOverlayScoreboardDisplay,
   type ScoreboardState,
 } from "@/components/stream/streamObsFormDefaults";
-
+import {
+  readOverlayScoreboardCache,
+  writeOverlayScoreboardCache,
+} from "@/lib/streamObsOverlayScoreboardCache";
 /**
- * Last merged scoreboard per overlay key survives React remounts (Strict Mode, OBS refresh)
- * so we do not fall back to placeholder names when Convex briefly drops the query.
+ * Last merged scoreboard per overlay key survives React remounts (Strict Mode).
+ * OBS “refresh browser” reloads this page and clears these maps — use sessionStorage too.
  */
 const lastMergedByOverlayKey = new Map<string, ScoreboardState>();
+/** Per-key last stable display (partial Convex rows + post-refresh hydrate). */
+const lastStableDisplayByOverlayKey = new Map<string, ScoreboardState>();
 
 type StreamScoreboardOverlayPageClientProps = {
   overlayKey: string;
@@ -32,18 +38,35 @@ export function StreamScoreboardOverlayPageClient({ overlayKey }: StreamScoreboa
 
   const key = overlayKey.trim();
 
-  const snapshot = lastMergedByOverlayKey.get(key) ?? DEFAULT_SCOREBOARD;
+  const cached = readOverlayScoreboardCache(key);
+  const snapshot =
+    lastMergedByOverlayKey.get(key) ?? cached ?? DEFAULT_SCOREBOARD;
 
-  const value: ScoreboardState =
+  const merged: ScoreboardState =
     data !== undefined && data !== null
       ? mergeOverlayScoreboardWithSnapshot(scoreboardFromOverlayQuery(data), snapshot)
       : snapshot;
 
+  const prevStable =
+    lastStableDisplayByOverlayKey.get(key) ?? cached ?? null;
+  const value = stabilizeOverlayScoreboardDisplay(merged, prevStable);
+
   useLayoutEffect(() => {
     if (data === undefined || data === null) return;
-    const snap = lastMergedByOverlayKey.get(key) ?? DEFAULT_SCOREBOARD;
-    const merged = mergeOverlayScoreboardWithSnapshot(scoreboardFromOverlayQuery(data), snap);
-    lastMergedByOverlayKey.set(key, merged);
+    const snap =
+      lastMergedByOverlayKey.get(key) ??
+      readOverlayScoreboardCache(key) ??
+      DEFAULT_SCOREBOARD;
+    const nextMerged = mergeOverlayScoreboardWithSnapshot(scoreboardFromOverlayQuery(data), snap);
+    lastMergedByOverlayKey.set(key, nextMerged);
+    const nextDisplay = stabilizeOverlayScoreboardDisplay(
+      nextMerged,
+      lastStableDisplayByOverlayKey.get(key) ?? readOverlayScoreboardCache(key) ?? null
+    );
+    if (nextDisplay.homeName.trim() || nextDisplay.awayName.trim()) {
+      lastStableDisplayByOverlayKey.set(key, nextDisplay);
+      writeOverlayScoreboardCache(key, nextDisplay);
+    }
   }, [data, key]);
 
   useEffect(() => {
@@ -67,9 +90,10 @@ export function StreamScoreboardOverlayPageClient({ overlayKey }: StreamScoreboa
     );
   }
 
+  // Fill the OBS browser source (dimensions set in OBS); compact variant matches dashboard preview.
   return (
-    <div className="flex min-h-screen w-full items-center justify-center bg-transparent p-2">
-      <ScoreboardOverlayView value={value} variant="overlay" />
+    <div className="box-border flex h-full min-h-0 w-full items-center justify-center overflow-auto bg-transparent p-3">
+      <ScoreboardOverlayView value={value} variant="dashboard" />
     </div>
   );
 }

@@ -69,3 +69,34 @@ select.slot-filled {
   ) !important;
   border-color: rgba(255, 255, 255, 0.2);
 }
+
+/*
+ * OBS browser sources under /overlay/*: hide Next.js dev UI (N badge, “N Issues”, error entry).
+ * Dev tools render inside a shadow root on <nextjs-portal>; global CSS must target the host.
+ * `data-eoslt-obs-overlay` is set on <html> from the root layout (middleware pathname). No-op in production.
+ */
+html[data-eoslt-obs-overlay="1"] nextjs-portal,
+html[data-eoslt-obs-overlay="1"] script[data-nextjs-dev-overlay] {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  clip-path: inset(100%) !important;
+}
+
+html[data-eoslt-obs-overlay="1"] .dev-tools-indicator-inner,
+html[data-eoslt-obs-overlay="1"] .dev-tools-indicator-menu,
+html[data-eoslt-obs-overlay="1"] .dev-tools-indicator-issue-count,
+html[data-eoslt-obs-overlay="1"] .dev-tools-indicator-issue-count-indicator,
+html[data-eoslt-obs-overlay="1"] [class*="dev-tools-indicator"] {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+html[data-eoslt-obs-overlay="1"] body :has(> .dev-tools-indicator-inner) {
+  display: none !important;
+}

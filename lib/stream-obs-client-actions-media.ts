@@ -1,5 +1,8 @@
 import type { ObsCredentials } from "@/components/stream/useObsProgramSources";
-import { setBrowserSourceUrlOrCreate, type BrowserSourcePixelSize } from "@/lib/stream-obs-browser-source-url";
+import {
+  setBrowserSourceUrlOrCreate,
+  type SetBrowserSourceUrlOptions,
+} from "@/lib/stream-obs-browser-source-url";
 import { obsPortOrError, withObsWebSocketBrowser } from "@/lib/stream-obs-browser-with-connection";
 import { credBody, postObsJson } from "@/lib/stream-obs-client-post-json";
 import { setImageSourceFileOrCreate } from "@/lib/stream-obs-image-source-file";
@@ -59,13 +62,22 @@ export async function obsClientSetBrowserSourceUrl(
   credentials: ObsCredentials,
   inputName: string,
   url: string,
-  pixelSize?: BrowserSourcePixelSize
+  options?: SetBrowserSourceUrlOptions
 ): Promise<{ ok: boolean; error?: string }> {
   if (!streamObsUseBrowserTransport()) {
     const body: Record<string, unknown> = { ...credBody(credentials), inputName, url };
-    if (pixelSize) {
-      body.browserWidth = pixelSize.width;
-      body.browserHeight = pixelSize.height;
+    if (options?.pixelSize) {
+      body.browserWidth = options.pixelSize.width;
+      body.browserHeight = options.pixelSize.height;
+    }
+    if (options?.rerouteAudio) {
+      body.controlAudioViaObs = true;
+    }
+    if (options?.audioMonitorAndOutput) {
+      body.audioMonitorAndOutput = true;
+    }
+    if (typeof options?.initialInputVolumeDb === "number" && Number.isFinite(options.initialInputVolumeDb)) {
+      body.initialInputVolumeDb = options.initialInputVolumeDb;
     }
     return postObsJson("/api/stream/obs/set-browser-source-url", body);
   }
@@ -75,7 +87,7 @@ export async function obsClientSetBrowserSourceUrl(
     credentials.host.trim(),
     p.port,
     credentials.password,
-    (obs) => setBrowserSourceUrlOrCreate(obs, inputName, url, pixelSize)
+    (obs) => setBrowserSourceUrlOrCreate(obs, inputName, url, options)
   );
   return r.ok ? { ok: true } : { ok: false, error: r.error };
 }

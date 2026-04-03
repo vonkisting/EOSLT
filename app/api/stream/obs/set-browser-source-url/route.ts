@@ -4,6 +4,7 @@ import { parseObsRequestCredentials, type ObsJsonBody } from "@/lib/stream-obs-c
 import {
   setBrowserSourceUrlOrCreate,
   type BrowserSourcePixelSize,
+  type SetBrowserSourceUrlOptions,
 } from "@/lib/stream-obs-browser-source-url";
 import { withObsWebSocket } from "@/lib/stream-obs-with-connection";
 import { DEFAULT_GENERIC_BROWSER_SOURCE_NAME } from "@/components/stream/streamObsFormDefaults";
@@ -17,6 +18,12 @@ type Body = ObsJsonBody & {
   url?: string;
   browserWidth?: number;
   browserHeight?: number;
+  /** Enables OBS browser “Control audio via OBS” (SFX sources). */
+  controlAudioViaObs?: boolean;
+  /** Advanced Audio → Monitoring → “Monitor and Output” (SFX listener). */
+  audioMonitorAndOutput?: boolean;
+  /** Mixer dB applied only when the browser source is first created. */
+  initialInputVolumeDb?: number;
 };
 
 /**
@@ -62,17 +69,36 @@ export async function POST(request: Request) {
     }
     const width = Math.round(bw);
     const height = Math.round(bh);
-    if (width < 64 || width > 4096 || height < 64 || height > 4096) {
+    if (width < 32 || width > 4096 || height < 32 || height > 4096) {
       return NextResponse.json(
-        { ok: false, error: "browser dimensions must be between 64 and 4096 px" },
+        { ok: false, error: "browser dimensions must be between 32 and 4096 px" },
         { status: 400 }
       );
     }
     pixelSize = { width, height };
   }
 
+  let initialInputVolumeDb: number | undefined;
+  if (body.initialInputVolumeDb !== undefined) {
+    const v = body.initialInputVolumeDb;
+    if (typeof v !== "number" || !Number.isFinite(v) || v < -100 || v > 12) {
+      return NextResponse.json(
+        { ok: false, error: "initialInputVolumeDb must be a finite number between -100 and 12" },
+        { status: 400 }
+      );
+    }
+    initialInputVolumeDb = v;
+  }
+
+  const wireOptions: SetBrowserSourceUrlOptions = {
+    ...(pixelSize ? { pixelSize } : {}),
+    ...(body.controlAudioViaObs === true ? { rerouteAudio: true } : {}),
+    ...(body.audioMonitorAndOutput === true ? { audioMonitorAndOutput: true } : {}),
+    ...(initialInputVolumeDb !== undefined ? { initialInputVolumeDb } : {}),
+  };
+
   const result = await withObsWebSocket(creds.host, creds.port, creds.password, async (obs) => {
-    await setBrowserSourceUrlOrCreate(obs, inputName, url, pixelSize);
+    await setBrowserSourceUrlOrCreate(obs, inputName, url, wireOptions);
   });
 
   if (!result.ok) {

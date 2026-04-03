@@ -1,13 +1,14 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, type RefObject } from "react";
 import { ObsAudioPanel, type AudioChannel } from "@/components/stream/ObsAudioPanel";
 import { ObsScenesPanel } from "@/components/stream/ObsScenesPanel";
 import { ObsScoreboardPanel, type ScoreboardState } from "@/components/stream/ObsScoreboardPanel";
 import {
-  ObsTournamentSettingsPanel,
+  ObsTournamentResultsPanel,
   type TournamentSettingsState,
-} from "@/components/stream/ObsTournamentSettingsPanel";
+} from "@/components/stream/ObsTournamentResultsPanel";
+import { ObsTournamentSettingsPanel } from "@/components/stream/ObsTournamentSettingsPanel";
 import { tournamentPlayerDisplayNames } from "@/components/stream/tournamentSettingsDefaults";
 import { ObsSoundboardPanel, type SoundboardEffect } from "@/components/stream/ObsSoundboardPanel";
 import { ObsSourcesPanel, type SourceToggle } from "@/components/stream/ObsSourcesPanel";
@@ -24,7 +25,6 @@ type StreamObsConnectedPanelsProps = {
   scenesError: string | null;
   onSelectScene: (name: string) => void;
   switchingScene: string | null;
-  lastSfx: string | null;
   onTriggerSfx: (soundId: string) => void;
   sources: SourceToggle[];
   onToggleSource: (item: SourceToggle) => void | Promise<void>;
@@ -43,6 +43,7 @@ type StreamObsConnectedPanelsProps = {
   tournamentSettings: TournamentSettingsState;
   onTournamentSettingsChange: (next: TournamentSettingsState) => void;
   onTournamentPersistRequest: () => void | Promise<void>;
+  resultsPreviewOuterRef?: RefObject<HTMLDivElement | null>;
 };
 
 export function StreamObsConnectedPanels({
@@ -55,7 +56,6 @@ export function StreamObsConnectedPanels({
   scenesError,
   onSelectScene,
   switchingScene,
-  lastSfx,
   onTriggerSfx,
   sources,
   onToggleSource,
@@ -73,6 +73,7 @@ export function StreamObsConnectedPanels({
   tournamentSettings,
   onTournamentSettingsChange,
   onTournamentPersistRequest,
+  resultsPreviewOuterRef,
 }: StreamObsConnectedPanelsProps) {
   useObsRealtimeSync(obsCredentials, true, onRefreshObsPanels);
 
@@ -96,7 +97,6 @@ export function StreamObsConnectedPanels({
         <ObsSoundboardPanel
           sfxCueEnabled={connectionName.trim().length > 0}
           effects={soundboardEffects}
-          lastTriggered={lastSfx}
           onTrigger={onTriggerSfx}
         />
       </div>
@@ -122,11 +122,16 @@ export function StreamObsConnectedPanels({
           onChange={onTournamentSettingsChange}
           onPersistRequest={onTournamentPersistRequest}
         />
+        <ObsTournamentResultsPanel
+          settings={tournamentSettings}
+          onChange={onTournamentSettingsChange}
+          onPersistRequest={onTournamentPersistRequest}
+          resultsPreviewOuterRef={resultsPreviewOuterRef}
+        />
         <ObsScoreboardPanel
           value={scoreboard}
           onChange={onScoreboardChange}
           tournamentPlayerNames={tournamentPlayerNames}
-          tournamentSettings={tournamentSettings}
         />
       </div>
     </div>

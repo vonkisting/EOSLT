@@ -40,10 +40,8 @@ export function ObsSourcesPanel({
       collapseLabel="Cameras And Sources"
       open={open}
       onOpenChange={setOpen}
+      bodyTopDivider={false}
     >
-      {connected ? (
-        <p className="text-xs text-slate-500">Scene items update when OBS changes.</p>
-      ) : null}
       {error && (
         <p className="rounded-lg border border-red-500/35 bg-red-950/35 px-3 py-2 text-xs text-red-200" role="alert">
           {error}

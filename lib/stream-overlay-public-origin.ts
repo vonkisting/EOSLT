@@ -1,7 +1,7 @@
 /**
  * Optional canonical origin for Stream OBS overlay URLs (browser sources).
- * Without it, the dashboard uses `window.location.origin`, which embeds your current LAN IP
- * in copied URLs — after Wi‑Fi changes, OBS still loads the old address and SFX/scoreboard break.
+ * When unset, the Stream page passes a server-derived origin (LAN IP when Host is loopback), then
+ * `window.location.origin` as fallback.
  */
 export function getStreamOverlayPublicOrigin(): string | null {
   const raw = process.env.NEXT_PUBLIC_STREAM_OVERLAY_ORIGIN?.trim();

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { OverlayViewportShell } from "@/components/stream/OverlayViewportShell";
 
 export const metadata: Metadata = {
   title: "Stream overlay | EOSLT",
@@ -7,9 +8,8 @@ export const metadata: Metadata = {
 };
 
 /**
- * Full-viewport shell for OBS browser sources (hides site chrome visually).
- * Child routes add their own background (e.g. SFX uses black; scoreboard is transparent).
+ * OBS browser sources: fill the embedded viewport (CEF); avoid `position:fixed` without a sized body chain.
  */
 export default function OverlayLayout({ children }: { children: ReactNode }) {
-  return <div className="fixed inset-0 z-[200]">{children}</div>;
+  return <OverlayViewportShell>{children}</OverlayViewportShell>;
 }

@@ -11,6 +11,7 @@ import {
   type ScoreboardState,
   DEFAULT_STREAM_OBS_HOST,
   DEFAULT_STREAM_OBS_PORT,
+  mergeOverlayScoreboardWithSnapshot,
   parseScoreboardJson,
 } from "@/components/stream/streamObsFormDefaults";
 import {
@@ -105,6 +106,14 @@ export function useStreamObsPersistedForm(userEmail: string, normalizedEmail: st
     if (profile === undefined || profile === null) return;
     const key = `${trimmedConnectionName}::${profile._id}`;
     if (hydrateKeyRef.current === key) return;
+
+    const previousKey = hydrateKeyRef.current;
+    const sep = "::";
+    const previousConn =
+      previousKey.includes(sep) ? previousKey.slice(0, previousKey.indexOf(sep)) : "";
+    const switchedConnection =
+      previousConn.length > 0 && previousConn !== trimmedConnectionName;
+
     hydrateKeyRef.current = key;
     hydratingRef.current = true;
     setHost(profile.host || DEFAULT_STREAM_OBS_HOST);
@@ -112,7 +121,10 @@ export function useStreamObsPersistedForm(userEmail: string, normalizedEmail: st
     setPassword(profile.websocketPassword ?? "");
     setActiveScene(profile.activeScene ?? "Match");
     const parsedScoreboard = parseScoreboardJson(profile.scoreboardJson);
-    setScoreboard(parsedScoreboard);
+    setScoreboard((prev) => {
+      const snapshot = switchedConnection ? DEFAULT_SCOREBOARD : prev;
+      return mergeOverlayScoreboardWithSnapshot(parsedScoreboard, snapshot);
+    });
     setScoreboardBrowserSourceName(
       profile.scoreboardBrowserSourceName?.trim() || DEFAULT_SCOREBOARD_BROWSER_SOURCE_NAME
     );

@@ -10,14 +10,16 @@ type ObsOverlayCopyUrlBlockProps = {
   url: string | null;
   /** When true and url is null, show “generating” copy. */
   showPendingPlaceholder: boolean;
-  /** Rendered inside the same card below the URL row (e.g. Import to OBS Scene). */
+  /** Rendered inside the same card below the URL row (e.g. Export to OBS Scene). */
   footer?: ReactNode;
   /** Omit title, URL text, and Copy button (actions-only card). */
   hideUrlAndCopy?: boolean;
+  /** Skip the bordered card shell (pending line + footer only). */
+  plain?: boolean;
 };
 
 /**
- * Card for OBS overlay URL (optional copy) and/or footer actions.
+ * OBS overlay URL (optional copy) and/or footer actions. Use `plain` to omit the inner bordered card.
  */
 export function ObsOverlayCopyUrlBlock({
   title,
@@ -25,6 +27,7 @@ export function ObsOverlayCopyUrlBlock({
   showPendingPlaceholder,
   footer,
   hideUrlAndCopy = false,
+  plain = false,
 }: ObsOverlayCopyUrlBlockProps) {
   const [copied, setCopied] = useState(false);
 
@@ -46,12 +49,18 @@ export function ObsOverlayCopyUrlBlock({
   if (!url && !showPendingPlaceholder && !footer) return null;
 
   const footerSep =
-    (showUrlSection || showPendingOnly) && footer
-      ? "mt-3 space-y-2 border-t border-white/5 pt-3"
-      : "space-y-2";
+    plain
+      ? "space-y-2"
+      : (showUrlSection || showPendingOnly) && footer
+        ? "mt-3 space-y-2 border-t border-white/5 pt-3"
+        : "space-y-2";
+
+  const shellClass = plain
+    ? "space-y-3"
+    : "rounded-lg border border-white/10 bg-black/30 px-3 py-2.5";
 
   return (
-    <div className="rounded-lg border border-white/10 bg-black/30 px-3 py-2.5">
+    <div className={shellClass}>
       {showUrlSection ? (
         <>
           {title ? (

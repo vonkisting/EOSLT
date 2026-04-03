@@ -638,7 +638,8 @@ export function LiveScoringCard({
                     {Array.from({ length: GAME_COUNT }, (_, i) => {
                       const hasAnyValue =
                         (player1Scores[i] ?? "").trim() !== "" || (player2Scores[i] ?? "").trim() !== "";
-                      if (totalsReached && !hasAnyValue) return null;
+                      /** Hide trailing empty rows only after legal win is confirmed (Yes). If they answer No, keep blanks for extra games. */
+                      if (totalsReached && legalWinConfirmed && !hasAnyValue) return null;
                       return (
                         <Fragment key={i}>
                           <tr>
@@ -657,7 +658,11 @@ export function LiveScoringCard({
                                   value={player1Scores[i]}
                                   onChange={(e) => handleScoreChange(0, i, e.target.value)}
                                   onBlur={() => handleScoreBlur(i)}
-                                  disabled={totalsReached && (player1Scores[i] ?? "").trim() === ""}
+                                  disabled={
+                                    totalsReached &&
+                                    legalWinConfirmed &&
+                                    (player1Scores[i] ?? "").trim() === ""
+                                  }
                                   className="w-full min-w-[2.5rem] border-0 bg-white px-2 py-1.5 text-center text-[16px] text-black outline-none focus:ring-1 focus:ring-inset focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 sm:text-base"
                                   aria-label={`Game ${i + 1} ${player1Name}`}
                                 />
@@ -675,7 +680,11 @@ export function LiveScoringCard({
                                   value={player2Scores[i]}
                                   onChange={(e) => handleScoreChange(1, i, e.target.value)}
                                   onBlur={() => handleScoreBlur(i)}
-                                  disabled={totalsReached && (player2Scores[i] ?? "").trim() === ""}
+                                  disabled={
+                                    totalsReached &&
+                                    legalWinConfirmed &&
+                                    (player2Scores[i] ?? "").trim() === ""
+                                  }
                                   className="w-full min-w-[2.5rem] border-0 bg-white px-2 py-1.5 text-center text-[16px] text-black outline-none focus:ring-1 focus:ring-inset focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 sm:text-base"
                                   aria-label={`Game ${i + 1} ${player2Name}`}
                                 />
@@ -683,7 +692,7 @@ export function LiveScoringCard({
                             </td>
                           </tr>
                           {(() => {
-                            if (readOnly || totalsReached) return null;
+                            if (readOnly || (totalsReached && legalWinConfirmed)) return null;
                             const msg = getGameRowErrorMessage(player1Scores, player2Scores, i);
                             return msg ? (
                               <tr>

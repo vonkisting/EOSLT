@@ -24,21 +24,21 @@ export const DEFAULT_GENERIC_BROWSER_SOURCE_NAME = "Browser source";
 /** When the API body omits `inputName` for image source routes. */
 export const DEFAULT_STREAM_IMAGE_SOURCE_NAME = "Image";
 
-export const DEFAULT_SCOREBOARD: ScoreboardState = {
-  awayName: "Team A",
-  homeName: "Team B",
-};
+/** No placeholder team labels — empty until the operator picks players. */
+export const EMPTY_SCOREBOARD: ScoreboardState = { awayName: "", homeName: "" };
+
+export const DEFAULT_SCOREBOARD = EMPTY_SCOREBOARD;
 
 export function parseScoreboardJson(json: string | undefined | null): ScoreboardState {
-  if (!json?.trim()) return DEFAULT_SCOREBOARD;
+  if (!json?.trim()) return { ...EMPTY_SCOREBOARD };
   try {
     const o = JSON.parse(json) as Record<string, unknown>;
     return {
-      awayName: typeof o.awayName === "string" ? o.awayName : DEFAULT_SCOREBOARD.awayName,
-      homeName: typeof o.homeName === "string" ? o.homeName : DEFAULT_SCOREBOARD.homeName,
+      awayName: typeof o.awayName === "string" ? o.awayName : "",
+      homeName: typeof o.homeName === "string" ? o.homeName : "",
     };
   } catch {
-    return DEFAULT_SCOREBOARD;
+    return { ...EMPTY_SCOREBOARD };
   }
 }
 
@@ -52,39 +52,62 @@ export function scoreboardFromOverlayQuery(data: { awayName: string; homeName: s
   );
 }
 
-/** Case-insensitive match to default overlay placeholder names (stored JSON may vary casing). */
-export function scoreboardNamesAreDefaultPlaceholderPair(awayName: string, homeName: string): boolean {
-  const a = awayName.trim().toLowerCase();
-  const h = homeName.trim().toLowerCase();
-  return (
-    a === DEFAULT_SCOREBOARD.awayName.trim().toLowerCase() &&
-    h === DEFAULT_SCOREBOARD.homeName.trim().toLowerCase()
-  );
+export function scoreboardNamesAreEmptyPair(awayName: string, homeName: string): boolean {
+  return !awayName.trim() && !homeName.trim();
 }
 
 /**
- * OBS overlay: Convex / the client can briefly yield rows that parse to placeholder team names.
- * Keep the last good names so the card does not jump.
+ * When Convex briefly returns no names, keep the last non-empty row so the overlay does not blink.
  */
 export function mergeOverlayScoreboardWithSnapshot(
   parsed: ScoreboardState,
   snapshot: ScoreboardState
 ): ScoreboardState {
-  const parsedIsPlaceholderPair = scoreboardNamesAreDefaultPlaceholderPair(
-    parsed.awayName,
-    parsed.homeName
-  );
-  const snapshotHadCustomNames = !scoreboardNamesAreDefaultPlaceholderPair(
-    snapshot.awayName,
-    snapshot.homeName
-  );
+  const parsedEmpty = scoreboardNamesAreEmptyPair(parsed.awayName, parsed.homeName);
+  const snapshotHasName = Boolean(snapshot.awayName.trim() || snapshot.homeName.trim());
 
-  if (parsedIsPlaceholderPair && snapshotHadCustomNames) {
+  if (parsedEmpty && snapshotHasName) {
     return {
-      ...parsed,
       awayName: snapshot.awayName,
       homeName: snapshot.homeName,
     };
   }
   return parsed;
+}
+
+/**
+ * OBS overlay: Convex can briefly send one name updated and the other empty. Without this, the empty
+ * side shows “Player 1/2”. Only fill from `prevStable` when the non-empty side **changed** vs
+ * `prevStable` (in-flight update); if the user cleared a slot, the non-empty side matches `prevStable`
+ * and we do not restore the cleared name.
+ */
+export function stabilizeOverlayScoreboardDisplay(
+  merged: ScoreboardState,
+  prevStable: ScoreboardState | null
+): ScoreboardState {
+  const mH = merged.homeName.trim();
+  const mA = merged.awayName.trim();
+
+  if (!mH && !mA) {
+    if (prevStable && (prevStable.homeName.trim() || prevStable.awayName.trim())) {
+      return { homeName: prevStable.homeName, awayName: prevStable.awayName };
+    }
+    return merged;
+  }
+
+  if (!prevStable || !prevStable.homeName.trim() || !prevStable.awayName.trim()) {
+    return merged;
+  }
+
+  const pH = prevStable.homeName;
+  const pA = prevStable.awayName;
+
+  if (mH && !mA && merged.homeName !== pH) {
+    return { homeName: merged.homeName, awayName: pA };
+  }
+  if (!mH && mA && merged.awayName !== pA) {
+    return { homeName: pH, awayName: merged.awayName };
+  }
+
+  return merged;
 }

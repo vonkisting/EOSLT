@@ -60,7 +60,7 @@ export function ObsConnectionLogoRow({
             onClick={() => void onWire()}
             className="rounded-lg bg-gradient-to-r from-purple-700 to-purple-500 px-4 py-2 text-sm font-medium text-white shadow-md shadow-purple-900/40 transition hover:from-purple-600 hover:to-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-400/60 disabled:cursor-not-allowed disabled:opacity-55"
           >
-            {wiring ? "Importing…" : "Import to OBS Scene"}
+            {wiring ? "Exporting…" : "Export to OBS Scene"}
           </button>
           <button
             type="button"

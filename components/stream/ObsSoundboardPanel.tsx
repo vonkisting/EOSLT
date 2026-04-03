@@ -10,7 +10,6 @@ type ObsSoundboardPanelProps = {
   /** Requires a saved connection name so Convex can find the profile row. */
   sfxCueEnabled: boolean;
   effects: SoundboardEffect[];
-  lastTriggered: string | null;
   onTrigger: (soundId: string) => void;
 };
 
@@ -20,7 +19,6 @@ type ObsSoundboardPanelProps = {
 export function ObsSoundboardPanel({
   sfxCueEnabled,
   effects,
-  lastTriggered,
   onTrigger,
 }: ObsSoundboardPanelProps) {
   const { open, setOpen } = useObsStreamCardOpen(STREAM_OBS_CARD_IDS.soundEffects);
@@ -31,6 +29,7 @@ export function ObsSoundboardPanel({
       collapseLabel="Sound Effects"
       open={open}
       onOpenChange={setOpen}
+      bodyTopDivider={false}
     >
       {!sfxCueEnabled ? (
         <p className="text-xs text-slate-500">
@@ -57,11 +56,6 @@ export function ObsSoundboardPanel({
             </button>
           ))}
         </div>
-      )}
-      {lastTriggered && (
-        <p className="text-xs text-slate-500" aria-live="polite">
-          Last Triggered: <span className="text-slate-400">{lastTriggered}</span>
-        </p>
       )}
     </ObsCollapsibleCard>
   );

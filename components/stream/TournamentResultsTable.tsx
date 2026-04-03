@@ -42,41 +42,33 @@ export function TournamentResultsTable({
   const assignedNames = assignNamesToResultRows(settings.players);
   const overlay = variant === "overlay";
 
+  const rowCount = TOURNAMENT_RESULTS_ROW_PLACEMENTS.length;
+
   return (
-    <div
-      className={
-        overlay
-          ? "space-y-4 text-base text-slate-100"
-          : "space-y-3 text-sm text-slate-200"
-      }
-    >
-      <p
-        className={`text-center font-semibold text-blue-300 ${overlay ? "text-3xl" : "text-2xl"}`}
-      >
-        Results
-      </p>
+    <div className={overlay ? "text-base text-slate-100" : "text-sm text-slate-200"}>
       <table
         className="w-full table-fixed border-collapse"
         aria-label="Tournament results"
       >
         <tbody>
-          {TOURNAMENT_RESULTS_ROW_PLACEMENTS.map((placementLabel, i) => (
-            <tr
-              key={`result-row-${i}`}
-              className="border-b border-white/10 last:border-b-0"
-            >
-              <td
-                className={`w-[42%] py-2 pr-3 align-middle text-slate-400 lg:w-[40%] ${overlay ? "text-xl" : "text-lg"}`}
-              >
-                {placementLabel}
-              </td>
-              <td
-                className={`py-2 align-middle font-medium leading-snug text-slate-100 ${overlay ? "text-xl" : "text-[1.094rem]"}`}
-              >
-                {assignedNames[i] ?? ""}
-              </td>
-            </tr>
-          ))}
+          {TOURNAMENT_RESULTS_ROW_PLACEMENTS.map((placementLabel, i) => {
+            const isLast = i === rowCount - 1;
+            const cellY = isLast ? "pt-2 pb-0" : "py-2";
+            return (
+              <tr key={`result-row-${i}`}>
+                <td
+                  className={`w-[42%] pr-3 align-middle text-slate-400 lg:w-[40%] ${cellY} ${overlay ? "text-xl" : "text-lg"}`}
+                >
+                  {placementLabel}
+                </td>
+                <td
+                  className={`${cellY} align-middle font-medium leading-snug text-slate-100 ${overlay ? "text-xl" : "text-[1.094rem]"}`}
+                >
+                  {assignedNames[i] ?? ""}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

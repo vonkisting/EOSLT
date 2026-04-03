@@ -5,11 +5,8 @@ import { ObsCollapsibleCard } from "@/components/stream/ObsCollapsibleCard";
 import { ScoreboardOverlayView } from "@/components/stream/ScoreboardOverlayView";
 import { STREAM_OBS_CARD_IDS } from "@/components/stream/streamObsCardIds";
 import { useObsStreamCardOpen } from "@/components/stream/ObsStreamCardOpenContext";
-import { TournamentResultsPreviewView } from "@/components/stream/TournamentResultsPreviewView";
 import type { ScoreboardState } from "@/components/stream/streamObsFormDefaults";
-import type { TournamentSettingsState } from "@/components/stream/tournamentSettingsDefaults";
 import { selectOptionsFullPool } from "@/lib/dropdownOptions";
-import { RESULTS_PREVIEW_CARD_OUTER_WIDTH_PX } from "@/lib/streamObsResultsPreviewDimensions";
 import { labelTitleCase } from "@/lib/labelTitleCase";
 
 export type { ScoreboardState };
@@ -38,7 +35,6 @@ type ObsScoreboardPanelProps = {
   onChange: (next: ScoreboardState) => void;
   /** Player names from Tournament Settings (live while connected). */
   tournamentPlayerNames: string[];
-  tournamentSettings: TournamentSettingsState;
 };
 
 /**
@@ -48,7 +44,6 @@ export function ObsScoreboardPanel({
   value,
   onChange,
   tournamentPlayerNames,
-  tournamentSettings,
 }: ObsScoreboardPanelProps) {
   const { open, setOpen } = useObsStreamCardOpen(STREAM_OBS_CARD_IDS.scoreboard);
 
@@ -123,19 +118,11 @@ export function ObsScoreboardPanel({
           </select>
         </label>
       </div>
-      <div className="space-y-4">
-        <div className="rounded-lg border border-white/10 bg-black/40 p-3">
-          <p className="text-[10px] font-semibold text-slate-500">
-            {labelTitleCase("scoreboard preview")}
-          </p>
-          <ScoreboardOverlayView value={value} variant="dashboard" />
-        </div>
-        <div
-          className="mx-auto w-full rounded-lg border border-white/10 bg-black/50 p-3"
-          style={{ maxWidth: RESULTS_PREVIEW_CARD_OUTER_WIDTH_PX }}
-        >
-          <TournamentResultsPreviewView settings={tournamentSettings} />
-        </div>
+      <div className="mx-auto w-full max-w-full overflow-x-auto rounded-lg border border-white/10 bg-black/40 p-3">
+        <p className="text-[10px] font-semibold text-slate-500">
+          {labelTitleCase("scoreboard preview")}
+        </p>
+        <ScoreboardOverlayView value={value} variant="dashboard" />
       </div>
     </ObsCollapsibleCard>
   );

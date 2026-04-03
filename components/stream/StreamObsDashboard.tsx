@@ -16,7 +16,17 @@ import { useStreamObsPersistedForm } from "@/components/stream/useStreamObsPersi
 import {
   RESULTS_PREVIEW_CARD_OUTER_HEIGHT_PX,
   RESULTS_PREVIEW_CARD_OUTER_WIDTH_PX,
+  readResultsPreviewOuterDimensionsPx,
 } from "@/lib/streamObsResultsPreviewDimensions";
+import {
+  SCOREBOARD_PREVIEW_CARD_OUTER_HEIGHT_PX,
+  SCOREBOARD_PREVIEW_CARD_OUTER_WIDTH_PX,
+} from "@/lib/streamObsScoreboardPreviewDimensions";
+import {
+  SFX_BROWSER_SOURCE_HEIGHT_PX,
+  SFX_BROWSER_SOURCE_INITIAL_VOLUME_DB,
+  SFX_BROWSER_SOURCE_WIDTH_PX,
+} from "@/lib/streamObsSfxBrowserDimensions";
 import { formatStreamSfxButtonLabel } from "@/lib/stream-sfx-basename";
 import {
   DEFAULT_RESULTS_BROWSER_SOURCE_NAME,
@@ -25,11 +35,7 @@ import {
 } from "@/components/stream/streamObsFormDefaults";
 import { useObsScenes } from "@/components/stream/useObsScenes";
 import { fetchObsPanelsSnapshot } from "@/lib/stream-obs-fetch-panels-snapshot";
-import {
-  obsClientConnect,
-  obsClientRefreshBrowserSource,
-  obsClientSetBrowserSourceUrl,
-} from "@/lib/stream-obs-client-actions";
+import { obsClientConnect, obsClientSetBrowserSourceUrl } from "@/lib/stream-obs-client-actions";
 
 type StreamObsDashboardProps = {
   userEmail: string;
@@ -37,10 +43,14 @@ type StreamObsDashboardProps = {
   /** Basenames of `public/stream-sfx/*.mp3` discovered at request time. */
   sfxBasenames: string[];
   /**
-   * When set (e.g. `NEXT_PUBLIC_STREAM_OVERLAY_ORIGIN`), overlay URLs use this instead of
-   * `window.location.origin` so OBS browser sources stay valid after LAN IP changes.
+   * When set (`NEXT_PUBLIC_STREAM_OVERLAY_ORIGIN`), overlay URLs use this instead of server/client origins.
    */
   overlayPublicOrigin?: string | null;
+  /**
+   * Next.js server origin for this request (from Host + LAN IPv4 when Host is loopback).
+   * Used for Export / copied overlay URLs so the OBS PC loads this machine, not localhost.
+   */
+  overlayRequestOrigin?: string | null;
 };
 
 /**
@@ -53,6 +63,7 @@ export function StreamObsDashboard({
   userName,
   sfxBasenames,
   overlayPublicOrigin,
+  overlayRequestOrigin,
 }: StreamObsDashboardProps) {
   const normalizedEmail = userEmail.toLowerCase().trim();
 
@@ -78,7 +89,6 @@ export function StreamObsDashboard({
     setPassword,
     activeScene,
     setActiveScene,
-    lastSfx,
     setLastSfx,
     scoreboard,
     setScoreboard,
@@ -97,14 +107,14 @@ export function StreamObsDashboard({
 
   const cueOverlaySfxByProfile = useMutation(api.streamObsProfiles.cueOverlaySfxByProfile);
   const envOrigin = (overlayPublicOrigin ?? "").trim();
+  const requestOrigin = (overlayRequestOrigin ?? "").trim();
   const [clientOrigin, setClientOrigin] = useState("");
   useEffect(() => {
-    if (!envOrigin) {
-      setClientOrigin(window.location.origin);
-    }
-  }, [envOrigin]);
+    setClientOrigin(window.location.origin);
+  }, []);
 
-  const publicOrigin = envOrigin || clientOrigin;
+  /** Env wins; then server-derived (LAN IP when dashboard was opened via localhost); then tab origin. */
+  const publicOrigin = envOrigin || requestOrigin || clientOrigin;
 
   const overlaySfxListenUrl =
     overlayAudioKey && publicOrigin
@@ -225,7 +235,13 @@ export function StreamObsDashboard({
       const data = await obsClientSetBrowserSourceUrl(
         obsCredentials,
         scoreboardBrowserSourceName.trim() || DEFAULT_SCOREBOARD_BROWSER_SOURCE_NAME,
-        url
+        url,
+        {
+          pixelSize: {
+            width: SCOREBOARD_PREVIEW_CARD_OUTER_WIDTH_PX,
+            height: SCOREBOARD_PREVIEW_CARD_OUTER_HEIGHT_PX,
+          },
+        }
       );
       if (!data.ok) {
         setWireScoreboardError(data.error ?? "Could not update OBS browser source.");
@@ -248,15 +264,32 @@ export function StreamObsDashboard({
     setWireResultsError(null);
     try {
       await saveProfileNow();
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      });
+      const measured = readResultsPreviewOuterDimensionsPx(resultsPreviewOuterRef.current);
+      let width = RESULTS_PREVIEW_CARD_OUTER_WIDTH_PX;
+      let height = RESULTS_PREVIEW_CARD_OUTER_HEIGHT_PX;
+      if (measured.ok) {
+        width = measured.width;
+        height = measured.height;
+      } else if (measured.reason === "missing") {
+        setWireResultsError(
+          "Connect to OBS and keep the Scoreboard Overlay section on this page mounted, then export again."
+        );
+        return;
+      } else {
+        setWireResultsError(
+          "Expand the Scoreboard Overlay card so the results preview is fully visible, then export again."
+        );
+        return;
+      }
       const url = `${publicOrigin}/overlay/results?k=${encodeURIComponent(overlayAudioKey)}`;
       const data = await obsClientSetBrowserSourceUrl(
         obsCredentials,
         resultsBrowserSourceName.trim() || DEFAULT_RESULTS_BROWSER_SOURCE_NAME,
         url,
-        {
-          width: RESULTS_PREVIEW_CARD_OUTER_WIDTH_PX,
-          height: RESULTS_PREVIEW_CARD_OUTER_HEIGHT_PX,
-        }
+        { pixelSize: { width, height } }
       );
       if (!data.ok) {
         setWireResultsError(data.error ?? "Could not update OBS browser source.");
@@ -283,7 +316,16 @@ export function StreamObsDashboard({
       const data = await obsClientSetBrowserSourceUrl(
         obsCredentials,
         sfxBrowserSourceName.trim() || DEFAULT_SFX_BROWSER_SOURCE_NAME,
-        url
+        url,
+        {
+          pixelSize: {
+            width: SFX_BROWSER_SOURCE_WIDTH_PX,
+            height: SFX_BROWSER_SOURCE_HEIGHT_PX,
+          },
+          rerouteAudio: true,
+          audioMonitorAndOutput: true,
+          initialInputVolumeDb: SFX_BROWSER_SOURCE_INITIAL_VOLUME_DB,
+        }
       );
       if (!data.ok) {
         setWireSfxError(data.error ?? "Could not update OBS browser source.");
@@ -354,39 +396,8 @@ export function StreamObsDashboard({
     [normalizedEmail, connectionName, cueOverlaySfxByProfile, saveProfileNow, setLastSfx]
   );
 
-  const scoreboardSyncKey = useMemo(() => JSON.stringify(scoreboard), [scoreboard]);
-  /** Last scoreboard JSON we successfully pushed a browser refresh for (OBS embed often drops live Convex). */
-  const lastObsScoreboardRefreshRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (!connected) lastObsScoreboardRefreshRef.current = null;
-  }, [connected]);
-
-  useEffect(() => {
-    if (!connected || !obsCredentials) return;
-
-    const json = scoreboardSyncKey;
-    if (lastObsScoreboardRefreshRef.current === null) {
-      lastObsScoreboardRefreshRef.current = json;
-      return;
-    }
-    if (lastObsScoreboardRefreshRef.current === json) return;
-
-    const inputName =
-      scoreboardBrowserSourceName.trim() || DEFAULT_SCOREBOARD_BROWSER_SOURCE_NAME;
-    const pending = json;
-    const t = setTimeout(() => {
-      void (async () => {
-        try {
-          const data = await obsClientRefreshBrowserSource(obsCredentials, inputName);
-          if (data.ok) lastObsScoreboardRefreshRef.current = pending;
-        } catch {
-          /* OBS off or wrong source name */
-        }
-      })();
-    }, 450);
-    return () => clearTimeout(t);
-  }, [connected, obsCredentials, scoreboardSyncKey, scoreboardBrowserSourceName]);
+  /** Border box of the stream page results preview; drives OBS browser source width/height on export. */
+  const resultsPreviewOuterRef = useRef<HTMLDivElement | null>(null);
 
   return (
     <ObsStreamCardOpenProvider email={normalizedEmail}>
@@ -442,13 +453,13 @@ export function StreamObsDashboard({
               connectionName={connectionName}
               soundboardEffects={soundboardEffects}
               obsCredentials={obsCredentials}
+              resultsPreviewOuterRef={resultsPreviewOuterRef}
               activeScene={activeScene}
               scenes={scenes}
               scenesLoading={scenesLoading}
               scenesError={scenesError}
               onSelectScene={(name) => void selectScene(name)}
               switchingScene={switchingScene}
-              lastSfx={lastSfx}
               onTriggerSfx={triggerSfx}
               sources={sources}
               onToggleSource={toggleSource}

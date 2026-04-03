@@ -1,11 +1,21 @@
+"use client";
+
 import {
   DEFAULT_SCOREBOARD_NAME_FONT_SIZE_PX,
   type ScoreboardState,
 } from "@/components/stream/streamObsFormDefaults";
 import styles from "@/components/stream/scorecard.module.css";
+import { useLayoutEffect, useRef, useState } from "react";
 
 /** Dashboard preview scales overlay name size (historically ~14px when overlay was 26px). */
 const DASHBOARD_NAME_FONT_SCALE = 14 / 26;
+
+/** Matches `padding-inline: max(50px, 1.5rem)` on player rows. */
+function horizontalPlayerPaddingPx(): number {
+  if (typeof document === "undefined") return 50;
+  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+  return Math.max(50, 1.5 * rem);
+}
 
 type ScoreboardOverlayViewProps = {
   value: ScoreboardState;
@@ -37,7 +47,6 @@ export function ScoreboardOverlayView({ value, variant }: ScoreboardOverlayViewP
     ? Math.max(10, Math.round(overlayNamePx * DASHBOARD_NAME_FONT_SCALE))
     : overlayNamePx;
   const nameStyle = { fontSize: `${nameFontSizePx}px` } as const;
-  /** Overlay: VS matches name (30px). Compact: VS matches scaled name. */
   const vsFontSizePx = nameFontSizePx;
   const vsPadY = compact ? Math.max(4, Math.round(vsFontSizePx * (6 / 16))) : Math.max(6, Math.round(vsFontSizePx * (10 / 32)));
   const vsPadX = compact ? Math.max(8, Math.round(vsFontSizePx * (12 / 16))) : Math.max(12, Math.round(vsFontSizePx * (20 / 32)));
@@ -48,9 +57,49 @@ export function ScoreboardOverlayView({ value, variant }: ScoreboardOverlayViewP
     letterSpacing: `${vsLetterSpacing}px`,
   } as const;
 
+  const measureHomeRef = useRef<HTMLSpanElement>(null);
+  const measureAwayRef = useRef<HTMLSpanElement>(null);
+  const [playerBoxWidthPx, setPlayerBoxWidthPx] = useState<number | null>(null);
+
+  useLayoutEffect(() => {
+    if (!compact) {
+      setPlayerBoxWidthPx(null);
+      return;
+    }
+    const h = measureHomeRef.current?.offsetWidth ?? 0;
+    const a = measureAwayRef.current?.offsetWidth ?? 0;
+    const textW = Math.max(h, a, 1);
+    const padX = horizontalPlayerPaddingPx();
+    const borderX = 4;
+    setPlayerBoxWidthPx(Math.ceil(textW + 2 * padX + borderX));
+  }, [compact, homeLabel, awayLabel, nameFontSizePx]);
+
+  const playerBoxStyle =
+    compact && playerBoxWidthPx != null
+      ? ({
+          width: playerBoxWidthPx,
+          minWidth: playerBoxWidthPx,
+          maxWidth: playerBoxWidthPx,
+        } as const)
+      : undefined;
+
   return (
     <div className={`${styles.scorecard} ${compact ? styles.scorecardCompact : ""}`.trim()}>
-      <div className={`${styles.player} ${styles.playerLeft} player player-left`}>
+      {compact ? (
+        <>
+          <span ref={measureHomeRef} className={styles.measureName} style={nameStyle}>
+            {homeLabel}
+          </span>
+          <span ref={measureAwayRef} className={styles.measureName} style={nameStyle}>
+            {awayLabel}
+          </span>
+        </>
+      ) : null}
+
+      <div
+        className={`${styles.player} ${styles.playerLeft} player player-left`}
+        style={playerBoxStyle}
+      >
         <div className={styles.name} style={nameStyle}>
           {homeLabel}
         </div>
@@ -60,7 +109,10 @@ export function ScoreboardOverlayView({ value, variant }: ScoreboardOverlayViewP
         VS
       </div>
 
-      <div className={`${styles.player} ${styles.playerRight} player player-right`}>
+      <div
+        className={`${styles.player} ${styles.playerRight} player player-right`}
+        style={playerBoxStyle}
+      >
         <div className={styles.name} style={nameStyle}>
           {awayLabel}
         </div>

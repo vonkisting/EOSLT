@@ -36,7 +36,7 @@ type ObsConnectionOverlayUrlsSectionProps = {
 };
 
 /**
- * SFX, scoreboard, and tournament results overlay blocks with “Import to OBS Scene” actions.
+ * SFX, scoreboard, and tournament results overlay blocks with “Export to OBS Scene” actions.
  */
 export function ObsConnectionOverlayUrlsSection({
   connected,
@@ -72,7 +72,7 @@ export function ObsConnectionOverlayUrlsSection({
     <>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:gap-3">
         <label className="min-w-0 flex-1 text-xs font-medium text-slate-400">
-          {labelTitleCase("OBS browser source name")}
+          {labelTitleCase("OBS Audio Source")}
           <input
             type="text"
             value={sfxBrowserSourceName ?? ""}
@@ -96,7 +96,7 @@ export function ObsConnectionOverlayUrlsSection({
           onClick={() => void onWireSfxToObs()}
           className="w-full shrink-0 rounded-lg bg-gradient-to-r from-purple-700 to-purple-500 py-2 text-sm font-medium text-white shadow-md shadow-purple-900/40 transition hover:from-purple-600 hover:to-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-400/60 disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto sm:whitespace-nowrap sm:px-5"
         >
-          {wireSfxPending ? "Importing…" : "Import to OBS Scene"}
+          {wireSfxPending ? "Exporting…" : "Export to OBS Scene"}
         </button>
       </div>
       {wireSfxError ? (
@@ -111,7 +111,7 @@ export function ObsConnectionOverlayUrlsSection({
     <>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:gap-3">
         <label className="min-w-0 flex-1 text-xs font-medium text-slate-400">
-          {labelTitleCase("OBS browser source name")}
+          {labelTitleCase("OBS Scoreboard Overlay")}
           <input
             type="text"
             value={scoreboardBrowserSourceName ?? ""}
@@ -135,7 +135,7 @@ export function ObsConnectionOverlayUrlsSection({
           onClick={() => void onWireScoreboardToObs()}
           className="w-full shrink-0 rounded-lg bg-gradient-to-r from-purple-700 to-purple-500 py-2 text-sm font-medium text-white shadow-md shadow-purple-900/40 transition hover:from-purple-600 hover:to-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-400/60 disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto sm:whitespace-nowrap sm:px-5"
         >
-          {wireScoreboardPending ? "Importing…" : "Import to OBS Scene"}
+          {wireScoreboardPending ? "Exporting…" : "Export to OBS Scene"}
         </button>
       </div>
       {wireScoreboardError ? (
@@ -150,7 +150,7 @@ export function ObsConnectionOverlayUrlsSection({
     <>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:gap-3">
         <label className="min-w-0 flex-1 text-xs font-medium text-slate-400">
-          {labelTitleCase("OBS browser source name")}
+          {labelTitleCase("OBS Browser Results Overlay")}
           <input
             type="text"
             value={resultsBrowserSourceName ?? ""}
@@ -174,7 +174,7 @@ export function ObsConnectionOverlayUrlsSection({
           onClick={() => void onWireResultsToObs()}
           className="w-full shrink-0 rounded-lg bg-gradient-to-r from-purple-700 to-purple-500 py-2 text-sm font-medium text-white shadow-md shadow-purple-900/40 transition hover:from-purple-600 hover:to-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-400/60 disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto sm:whitespace-nowrap sm:px-5"
         >
-          {wireResultsPending ? "Importing…" : "Import to OBS Scene"}
+          {wireResultsPending ? "Exporting…" : "Export to OBS Scene"}
         </button>
       </div>
       {wireResultsError ? (
@@ -188,7 +188,7 @@ export function ObsConnectionOverlayUrlsSection({
   return (
     <div
       className="space-y-3 border-t border-white/10 pt-4"
-      aria-label="OBS browser source URLs"
+      aria-label="OBS overlay and audio source URLs"
     >
       <ObsOverlaySfxUrlRow
         listenUrl={overlaySfxListenUrl}
@@ -200,12 +200,14 @@ export function ObsConnectionOverlayUrlsSection({
         showPendingPlaceholder={scoreboardOverlayKeyPending && !scoreboardOverlayUrl}
         footer={scoreboardFooter}
         hideUrlAndCopy
+        plain
       />
       <ObsOverlayCopyUrlBlock
         url={resultsOverlayUrl}
         showPendingPlaceholder={resultsOverlayKeyPending && !resultsOverlayUrl}
         footer={resultsFooter}
         hideUrlAndCopy
+        plain
       />
     </div>
   );

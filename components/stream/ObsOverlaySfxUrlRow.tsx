@@ -12,7 +12,7 @@ type ObsOverlaySfxUrlRowProps = {
 };
 
 /**
- * SFX overlay card: Import to OBS Scene (URL is applied via API, not shown here).
+ * SFX overlay row: Export to OBS Scene (URL is applied via API, not shown here).
  */
 export function ObsOverlaySfxUrlRow({ listenUrl, pendingKey, footer }: ObsOverlaySfxUrlRowProps) {
   return (
@@ -21,6 +21,7 @@ export function ObsOverlaySfxUrlRow({ listenUrl, pendingKey, footer }: ObsOverla
       showPendingPlaceholder={pendingKey && !listenUrl}
       footer={footer}
       hideUrlAndCopy
+      plain
     />
   );
 }

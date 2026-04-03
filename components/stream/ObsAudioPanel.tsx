@@ -35,10 +35,8 @@ export function ObsAudioPanel({
       collapseLabel="Audio Mixer"
       open={open}
       onOpenChange={setOpen}
+      bodyTopDivider={false}
     >
-      <p className="text-xs text-slate-500">
-        Volumes and mute follow OBS audio inputs (sources with a mixer fader). Lists update when OBS changes.
-      </p>
       {error ? (
         <p className="rounded-lg border border-red-500/35 bg-red-950/35 px-3 py-2 text-xs text-red-200" role="alert">
           {error}

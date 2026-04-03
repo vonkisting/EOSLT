@@ -13,6 +13,7 @@
   width: max-content;
   max-width: 100%;
   margin-inline: auto;
+  position: relative;
   padding: 20px 40px;
   background: rgba(0, 0, 0, 0.55);
   border-radius: 14px;
@@ -42,7 +43,7 @@
   background: linear-gradient(135deg, #050b18 0%, #0f2744 45%, #1e4a72 100%);
   box-shadow: 0 0 14px rgba(10, 30, 60, 0.55);
   padding-block: 10px;
-  padding-inline: max(75px, 1.5rem);
+  padding-inline: max(50px, 1.5rem);
 }
 
 /* Away / right: dark cherry (right) → light cherry (left). */
@@ -53,7 +54,7 @@
   background: linear-gradient(to left, #2c050c 0%, #6b0f1f 42%, #c43d55 100%);
   box-shadow: 0 0 14px rgba(80, 10, 25, 0.5);
   padding-block: 10px;
-  padding-inline: max(75px, 1.5rem);
+  padding-inline: max(50px, 1.5rem);
 }
 
 .name {
@@ -83,20 +84,39 @@
   gap: 0;
   padding: 10px 16px;
   border-radius: 10px;
+  grid-template-columns: auto auto auto;
+  width: max-content;
+  max-width: none;
 }
 
 .scorecardCompact .player {
   border-radius: 8px;
+  box-sizing: border-box;
 }
 
 .scorecardCompact .playerLeft,
 .scorecardCompact .playerRight {
   padding-block: 6px;
-  padding-inline: max(75px, 1.5rem);
+  padding-inline: max(50px, 1.5rem);
 }
 
 .scorecardCompact .name {
-  /* Inline style from ScoreboardOverlayView; ~16px when overlay names are 30px */
-  font-size: 16px;
+  /* Inline font-size from ScoreboardOverlayView; ~16px when overlay names are 30px */
+  letter-spacing: 0.5px;
+  overflow: visible;
+  text-overflow: clip;
+  max-width: none;
+}
+
+/* Off-screen width measure for compact preview (same font as .name) */
+.measureName {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  visibility: hidden;
+  pointer-events: none;
+  white-space: nowrap;
+  font-weight: 700;
+  font-family: "Segoe UI", sans-serif;
   letter-spacing: 0.5px;
 }

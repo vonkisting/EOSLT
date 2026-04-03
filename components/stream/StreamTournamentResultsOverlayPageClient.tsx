@@ -10,11 +10,6 @@ import {
   parseTournamentSettingsJson,
   type TournamentSettingsState,
 } from "@/components/stream/tournamentSettingsDefaults";
-import {
-  RESULTS_PREVIEW_CARD_OUTER_HEIGHT_PX,
-  RESULTS_PREVIEW_CARD_OUTER_WIDTH_PX,
-} from "@/lib/streamObsResultsPreviewDimensions";
-
 const lastMergedByOverlayKey = new Map<string, TournamentSettingsState>();
 
 type StreamTournamentResultsOverlayPageClientProps = {
@@ -75,13 +70,7 @@ export function StreamTournamentResultsOverlayPageClient({
   }
 
   return (
-    <div
-      className="box-border overflow-y-auto overflow-x-hidden rounded-lg border border-white/10 bg-black/50 p-3 text-sm text-slate-200"
-      style={{
-        width: RESULTS_PREVIEW_CARD_OUTER_WIDTH_PX,
-        height: RESULTS_PREVIEW_CARD_OUTER_HEIGHT_PX,
-      }}
-    >
+    <div className="box-border h-auto w-full max-w-full overflow-x-hidden rounded-lg border border-white/10 bg-black/50 px-3 py-3 text-sm text-slate-200">
       <TournamentResultsTable settings={value} variant="dashboard" />
     </div>
   );

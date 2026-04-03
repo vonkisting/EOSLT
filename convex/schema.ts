@@ -375,11 +375,11 @@ export default defineSchema({
     scoreboardJson: v.optional(v.string()),
     /** JSON: tournament name + player list for stream dashboard. */
     tournamentSettingsJson: v.optional(v.string()),
-    /** OBS Browser Source input name for Import to OBS Scene (scoreboard overlay). */
+    /** OBS Browser Source input name for Export to OBS Scene (scoreboard overlay). */
     scoreboardBrowserSourceName: v.optional(v.string()),
     /** OBS Browser Source input name for tournament results overlay. */
     resultsBrowserSourceName: v.optional(v.string()),
-    /** OBS Browser Source input name for Import to OBS Scene (SFX / audio overlay). */
+    /** OBS Browser Source input name for Export to OBS Scene (SFX / audio overlay). */
     sfxBrowserSourceName: v.optional(v.string()),
     lastSfx: v.optional(v.string()),
     overlayPushedAt: v.optional(v.string()),
