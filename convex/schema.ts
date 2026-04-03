@@ -334,8 +334,12 @@ export default defineSchema({
     liveScoreGames45: v.optional(v.string()),
     liveScoreGames46: v.optional(v.string()),
     liveScoreGames47: v.optional(v.string()),
-    /** Week 2 bracket: 4 cards × 12 slots. JSON: string[48]. */
+    /** Week 2 bracket: 4 cards × 6 slots (4-person). JSON: string[24]. Legacy string[48] is migrated in the client. */
     week2BracketSlots: v.optional(v.string()),
+    /** Week 2 bracket cell scores (same order as week2BracketSlots). JSON: string[24]. */
+    week2BracketScores: v.optional(v.string()),
+    /** Week 2 per-matchup status (4 cards × 3 matches). JSON: string[12]. */
+    week2BracketMatchStatuses: v.optional(v.string()),
     /** Finals bracket: 4-person, 6 slots. JSON: string[6]. */
     finalsBracketSlots: v.optional(v.string()),
     /** Finals bracket scores. JSON: string[6] (same order as slots). */

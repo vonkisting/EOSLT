@@ -27,7 +27,7 @@ export default async function LiveScoringPage({
     : Math.max(0, Math.min(stage === "week1" ? 7 : stage === "week2" ? 3 : 0, cardNum));
   const matchIndex = Number.isNaN(matchNum)
     ? -1
-    : Math.max(0, Math.min(stage === "finals" ? 2 : 5, matchNum));
+    : Math.max(0, Math.min(stage === "finals" || stage === "week2" ? 2 : 5, matchNum));
 
   return (
     <LiveScoringCard

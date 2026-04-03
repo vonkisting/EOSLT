@@ -88,6 +88,10 @@ function mapDocToSettings(doc: Doc<"dashboardSettings">) {
   }
   const week2Raw = d.week2BracketSlots;
   out.week2BracketSlots = typeof week2Raw === "string" ? week2Raw : null;
+  const week2ScoresRaw = d.week2BracketScores;
+  out.week2BracketScores = typeof week2ScoresRaw === "string" ? week2ScoresRaw : null;
+  const week2StatusRaw = d.week2BracketMatchStatuses;
+  out.week2BracketMatchStatuses = typeof week2StatusRaw === "string" ? week2StatusRaw : null;
   const finalsRaw = d.finalsBracketSlots;
   out.finalsBracketSlots = typeof finalsRaw === "string" ? finalsRaw : null;
   const finalsScoresRaw = d.finalsBracketScores;
@@ -104,7 +108,7 @@ function mapDocToSettings(doc: Doc<"dashboardSettings">) {
     leagueGuid: string | null;
     tournamentStarted: boolean;
     tournamentPaused: boolean;
-  } & Record<(typeof locationKeys)[number], string | null> & { locationStartMeta: string | null } & Record<`bracketSlot${number}`, string | null> & Record<`bracketMatchStatus${number}`, string | null> & Record<`bracketScoreTop${number}` | `bracketScoreBottom${number}`, string | null> & Record<`liveScoreGames${number}`, string | null> & { week2BracketSlots: string | null; finalsBracketSlots: string | null; finalsBracketScores: string | null; week1BracketsRandomized: boolean; showBracketsOnHomeScreen: boolean } & Record<(typeof uiCollapsedKeys)[number], boolean>;
+  } & Record<(typeof locationKeys)[number], string | null> & { locationStartMeta: string | null } & Record<`bracketSlot${number}`, string | null> & Record<`bracketMatchStatus${number}`, string | null> & Record<`bracketScoreTop${number}` | `bracketScoreBottom${number}`, string | null> & Record<`liveScoreGames${number}`, string | null> & { week2BracketSlots: string | null; week2BracketScores: string | null; week2BracketMatchStatuses: string | null; finalsBracketSlots: string | null; finalsBracketScores: string | null; week1BracketsRandomized: boolean; showBracketsOnHomeScreen: boolean } & Record<(typeof uiCollapsedKeys)[number], boolean>;
 }
 
 /**
@@ -239,6 +243,10 @@ function buildPatch(args: Record<string, unknown>) {
     if (val !== undefined) patch[key] = val as string;
   }
   if (args.week2BracketSlots !== undefined) patch.week2BracketSlots = args.week2BracketSlots as string ?? undefined;
+  if (args.week2BracketScores !== undefined) patch.week2BracketScores = args.week2BracketScores as string ?? undefined;
+  if (args.week2BracketMatchStatuses !== undefined) {
+    patch.week2BracketMatchStatuses = args.week2BracketMatchStatuses as string ?? undefined;
+  }
   if (args.finalsBracketSlots !== undefined) patch.finalsBracketSlots = args.finalsBracketSlots as string ?? undefined;
   if (args.finalsBracketScores !== undefined) patch.finalsBracketScores = args.finalsBracketScores as string ?? undefined;
   if (args.week1BracketsRandomized !== undefined) patch.week1BracketsRandomized = args.week1BracketsRandomized as boolean;
@@ -285,6 +293,8 @@ export const set = mutation({
     ...bracketScoreArgs,
     ...liveScoreGamesArgs,
     week2BracketSlots: v.optional(v.string()),
+    week2BracketScores: v.optional(v.string()),
+    week2BracketMatchStatuses: v.optional(v.string()),
     finalsBracketSlots: v.optional(v.string()),
     finalsBracketScores: v.optional(v.string()),
     week1BracketsRandomized: v.optional(v.boolean()),
@@ -312,6 +322,8 @@ export const setShared = mutation({
     ...bracketScoreArgs,
     ...liveScoreGamesArgs,
     week2BracketSlots: v.optional(v.string()),
+    week2BracketScores: v.optional(v.string()),
+    week2BracketMatchStatuses: v.optional(v.string()),
     finalsBracketSlots: v.optional(v.string()),
     finalsBracketScores: v.optional(v.string()),
     week1BracketsRandomized: v.optional(v.boolean()),

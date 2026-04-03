@@ -6,6 +6,11 @@ import { useSession } from "next-auth/react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Modal } from "@/components/ui/Modal";
+import {
+  parseWeek2BracketScoresJson,
+  parseWeek2BracketSlotsJson,
+  week2SlotPairIndices,
+} from "@/lib/week2BracketSlots";
 
 type StatsRow = Record<string, string | number | null | undefined>;
 function getStatValue(row: StatsRow, ...keys: string[]): string | number | null | undefined {
@@ -146,7 +151,9 @@ export function LiveScoringCard({
       : stage === "week2"
         ? cardIndex >= 0 && cardIndex <= 3
         : cardIndex === 0;
-  const validMatch = matchIndex >= 0 && matchIndex <= (stage === "finals" ? 2 : 5);
+  const validMatch =
+    matchIndex >= 0 &&
+    matchIndex <= (stage === "finals" ? 2 : stage === "week2" ? 2 : 5);
 
   const router = useRouter();
   const email = useSession().data?.user?.email?.toLowerCase().trim();
@@ -325,12 +332,12 @@ export function LiveScoringCard({
     if (s == null || !validCard || !validMatch) {
       return { player1Name: "—", player2Name: "—", storedTopScore: "0", storedBottomScore: "0" };
     }
-    const [topSlot, bottomSlot] = slotIndicesForMatch(matchIndex);
     let p1 = "";
     let p2 = "";
     let topScore = "0";
     let bottomScore = "0";
     if (stage === "week1") {
+      const [topSlot, bottomSlot] = slotIndicesForMatch(matchIndex);
       const base = cardIndex * 12;
       p1 = ((s[`bracketSlot${base + topSlot}`] as string) ?? "").trim();
       p2 = ((s[`bracketSlot${base + bottomSlot}`] as string) ?? "").trim();
@@ -338,19 +345,17 @@ export function LiveScoringCard({
       topScore = ((s[`bracketScoreTop${globalIndex}`] as string) ?? "0").trim() || "0";
       bottomScore = ((s[`bracketScoreBottom${globalIndex}`] as string) ?? "0").trim() || "0";
     } else if (stage === "week2") {
-      const raw = s.week2BracketSlots;
-      if (typeof raw === "string" && raw.trim()) {
-        try {
-          const arr = JSON.parse(raw) as unknown[];
-          const base = cardIndex * 12;
-          p1 = typeof arr[base + topSlot] === "string" ? String(arr[base + topSlot]).trim() : "";
-          p2 = typeof arr[base + bottomSlot] === "string" ? String(arr[base + bottomSlot]).trim() : "";
-        } catch {
-          p1 = "";
-          p2 = "";
-        }
-      }
+      const slots = parseWeek2BracketSlotsJson(s.week2BracketSlots);
+      const scores = parseWeek2BracketScoresJson(s.week2BracketScores);
+      const base = cardIndex * 6;
+      const [topSlot, bottomSlot] = week2SlotPairIndices(matchIndex);
+      p1 = (slots[base + topSlot] ?? "").trim();
+      p2 = (slots[base + bottomSlot] ?? "").trim();
+      const si = base + matchIndex * 2;
+      topScore = (scores[si] ?? "0").trim() || "0";
+      bottomScore = (scores[si + 1] ?? "0").trim() || "0";
     } else {
+      const [topSlot, bottomSlot] = slotIndicesForMatch(matchIndex);
       const rawSlots = s.finalsBracketSlots;
       const rawScores = s.finalsBracketScores;
       if (typeof rawSlots === "string" && rawSlots.trim()) {

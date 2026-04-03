@@ -13,6 +13,12 @@ import { Modal } from "@/components/ui/Modal";
 import { formatLocationDate, formatLocationTime } from "@/lib/formatDateTime";
 import { selectOptionsFullPool } from "@/lib/dropdownOptions";
 import { canAccessDashboard } from "@/lib/dashboard-access";
+import {
+  parseWeek2BracketMatchStatusesJson,
+  parseWeek2BracketScoresJson,
+  parseWeek2BracketSlotsJson,
+  week2SlotPairIndices,
+} from "@/lib/week2BracketSlots";
 
 const PLAYER_SLOTS = 64;
 const BYE_LABEL = "-- Bye --";
@@ -459,31 +465,30 @@ export function DashboardContent() {
     return allFirstRoundSelections.some((v) => typeof v === "string" && v.trim() !== "");
   }, [allFirstRoundSelections]);
 
-  /** Week 2 bracket slots: 4 cards × 12 slots = 48. Parsed from savedSettings.week2BracketSlots JSON. */
+  /** Week 2 bracket slots: 4 cards × 6 (4-person). Parsed from week2BracketSlots JSON (migrates legacy 48). */
   const week2BracketSlotsArray = useMemo(() => {
-    const raw = savedSettings && typeof savedSettings === "object"
-      ? (savedSettings as Record<string, unknown>).week2BracketSlots
-      : undefined;
-    if (typeof raw !== "string" || !raw.trim()) return Array(48).fill("") as string[];
-    try {
-      const arr = JSON.parse(raw) as unknown;
-      if (!Array.isArray(arr) || arr.length !== 48) return Array(48).fill("") as string[];
-      return arr.map((v) => (typeof v === "string" ? v : ""));
-    } catch {
-      return Array(48).fill("") as string[];
-    }
+    const raw =
+      savedSettings && typeof savedSettings === "object"
+        ? (savedSettings as Record<string, unknown>).week2BracketSlots
+        : undefined;
+    return parseWeek2BracketSlotsJson(raw);
   }, [savedSettings]);
 
-  /** First-round slot values for all 4 Week 2 cards (4×8=32). For dropdown exclusions. */
-  const allFirstRoundSelectionsWeek2 = useMemo(() => {
-    const out: string[] = [];
-    for (let c = 0; c < 4; c++) {
-      for (let i = 0; i < 8; i++) {
-        out.push(week2BracketSlotsArray[c * 12 + i] ?? "");
-      }
-    }
-    return out;
-  }, [week2BracketSlotsArray]);
+  const week2BracketScoresArray = useMemo(() => {
+    const raw =
+      savedSettings && typeof savedSettings === "object"
+        ? (savedSettings as Record<string, unknown>).week2BracketScores
+        : undefined;
+    return parseWeek2BracketScoresJson(raw);
+  }, [savedSettings]);
+
+  const week2BracketMatchStatusesArray = useMemo(() => {
+    const raw =
+      savedSettings && typeof savedSettings === "object"
+        ? (savedSettings as Record<string, unknown>).week2BracketMatchStatuses
+        : undefined;
+    return parseWeek2BracketMatchStatusesJson(raw);
+  }, [savedSettings]);
 
   /** Finals bracket slots: 6 (2 semis + 1 final). Parsed from savedSettings.finalsBracketSlots JSON. */
   const finalsBracketSlotsArray = useMemo(() => {
@@ -544,15 +549,12 @@ export function DashboardContent() {
 
   const getWeek2MatchStatusByIndex = useCallback(
     (cardIndex: number): (string | null)[] => {
-      if (!savedSettings || typeof savedSettings !== "object") return Array(6).fill(null);
-      const s = savedSettings as Record<string, unknown>;
-      const base = 48 + cardIndex * 6;
-      return Array.from({ length: 6 }, (_, i) => {
-        const val = (s[`bracketMatchStatus${base + i}`] as string) ?? "";
+      return Array.from({ length: 3 }, (_, i) => {
+        const val = week2BracketMatchStatusesArray[cardIndex * 3 + i] ?? "";
         return val.trim() || null;
       });
     },
-    [savedSettings]
+    [week2BracketMatchStatusesArray]
   );
 
   const getFinalsMatchStatusByIndex = useCallback((): (string | null)[] => {
@@ -822,12 +824,23 @@ export function DashboardContent() {
     [email, selectedLeagueName, selectedSeason, tournamentStarted, tournamentPaused, savedSettings, slotIndicesForMatch, setDashboardSettings]
   );
 
-  /** Save the 12 bracket slots for one Week 2 card (cardIndex 0–3). Persists to week2BracketSlots JSON. */
+  /** Save the 6 bracket slots for one Week 2 card (cardIndex 0–3). Persists week2BracketSlots + match statuses JSON. */
   const saveWeek2BracketSlots = useCallback(
     (cardIndex: number, slots: string[]) => {
-      if (!email || slots.length !== 12 || cardIndex < 0 || cardIndex > 3) return;
+      if (!email || slots.length !== 6 || cardIndex < 0 || cardIndex > 3) return;
       const next = [...week2BracketSlotsArray];
-      for (let i = 0; i < 12; i++) next[cardIndex * 12 + i] = slots[i] ?? "";
+      for (let i = 0; i < 6; i++) next[cardIndex * 6 + i] = slots[i] ?? "";
+      const nextStatuses = [...week2BracketMatchStatusesArray];
+      for (let m = 0; m < 3; m++) {
+        const [top, bottom] = week2SlotPairIndices(m);
+        const topVal = (slots[top] ?? "").trim();
+        const bottomVal = (slots[bottom] ?? "").trim();
+        const idx = cardIndex * 3 + m;
+        if (topVal && bottomVal) {
+          const cur = (nextStatuses[idx] ?? "").trim();
+          if (!cur) nextStatuses[idx] = "Match Ready";
+        }
+      }
       setDashboardSettings({
         email,
         leagueName: selectedLeagueName,
@@ -835,9 +848,46 @@ export function DashboardContent() {
         tournamentStarted,
         tournamentPaused,
         week2BracketSlots: JSON.stringify(next),
+        week2BracketMatchStatuses: JSON.stringify(nextStatuses),
       } as Parameters<typeof setDashboardSettings>[0]);
     },
-    [email, selectedLeagueName, selectedSeason, tournamentStarted, tournamentPaused, week2BracketSlotsArray, setDashboardSettings]
+    [
+      email,
+      selectedLeagueName,
+      selectedSeason,
+      tournamentStarted,
+      tournamentPaused,
+      week2BracketSlotsArray,
+      week2BracketMatchStatusesArray,
+      setDashboardSettings,
+    ]
+  );
+
+  /** Save one Week 2 bracket score (matchIndex 0–2). Persists week2BracketScores JSON. */
+  const saveWeek2ScoreChange = useCallback(
+    (cardIndex: number, matchIndex: number, side: "top" | "bottom", value: string) => {
+      if (!email || cardIndex < 0 || cardIndex > 3 || matchIndex < 0 || matchIndex > 2) return;
+      const scoreIndex = cardIndex * 6 + matchIndex * 2 + (side === "top" ? 0 : 1);
+      const next = [...week2BracketScoresArray];
+      next[scoreIndex] = value;
+      setDashboardSettings({
+        email,
+        leagueName: selectedLeagueName,
+        season: selectedSeason,
+        tournamentStarted,
+        tournamentPaused,
+        week2BracketScores: JSON.stringify(next),
+      } as Parameters<typeof setDashboardSettings>[0]);
+    },
+    [
+      email,
+      selectedLeagueName,
+      selectedSeason,
+      tournamentStarted,
+      tournamentPaused,
+      week2BracketScoresArray,
+      setDashboardSettings,
+    ]
   );
 
   /** Save the 6 Finals bracket slots. Persists to finalsBracketSlots JSON. */
@@ -2613,7 +2663,7 @@ export function DashboardContent() {
         ))}
       </div>
 
-      {/* Column 3: Week 2 location slot cards (4 cards, 8-player brackets) – all cards match width of widest (expanded) card */}
+      {/* Column 3: Week 2 location slot cards (4 cards, 4-person brackets like Finals) */}
       <div className="flex w-max min-w-0 flex-col gap-6">
         {WEEK_2_KEYS.map((key, index) => (
           <div
@@ -2661,23 +2711,25 @@ export function DashboardContent() {
                 aria-labelledby={`week2-slot-${index}-heading`}
                 className="w-fit overflow-visible rounded-b-xl border-t border-white/40 bg-black pb-2 pt-2 pl-4"
               >
-                <Bracket8TwoRounds
+                <Bracket4
                   players={playerDisplayNames}
                   playerRaceToMap={Object.fromEntries(
                     playerRows.map((r) => [r.playerName, r.raceTo])
                   )}
                   initialSlotSelections={(() => {
-                    const base = index * 12;
+                    const base = index * 6;
                     let byeNum = 0;
-                    return Array.from({ length: 12 }, (_, i) => {
+                    return Array.from({ length: 6 }, (_, i) => {
                       const val = week2BracketSlotsArray[base + i] ?? "";
                       if (val === BYE_LABEL) return `-- Bye ${++byeNum} --`;
                       return val;
                     });
                   })()}
                   onBracketSlotsChange={(slots) => saveWeek2BracketSlots(index, slots)}
-                  cardIndex={index}
-                  allFirstRoundSelections={allFirstRoundSelectionsWeek2}
+                  initialScores={week2BracketScoresArray.slice(index * 6, index * 6 + 6)}
+                  onScoreChange={(matchIndex, side, value) =>
+                    saveWeek2ScoreChange(index, matchIndex, side, value)
+                  }
                   disabled={tournamentPaused}
                   matchStatusByIndex={getWeek2MatchStatusByIndex(index)}
                 />

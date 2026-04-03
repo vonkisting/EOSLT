@@ -9,6 +9,11 @@ import { api } from "@/convex/_generated/api";
 import { Bracket8TwoRounds } from "@/components/Bracket8TwoRounds";
 import { Bracket4 } from "@/components/Bracket4";
 import { formatLocationDate, formatLocationTime } from "@/lib/formatDateTime";
+import {
+  parseWeek2BracketMatchStatusesJson,
+  parseWeek2BracketScoresJson,
+  parseWeek2BracketSlotsJson,
+} from "@/lib/week2BracketSlots";
 
 const PLAYER_SLOTS = 64;
 const BYE_LABEL = "-- Bye --";
@@ -456,14 +461,23 @@ export function HomeBracketCards() {
       settings && typeof settings === "object"
         ? (settings as Record<string, unknown>).week2BracketSlots
         : undefined;
-    if (typeof raw !== "string" || !raw.trim()) return Array(48).fill("") as string[];
-    try {
-      const arr = JSON.parse(raw) as unknown;
-      if (!Array.isArray(arr) || arr.length !== 48) return Array(48).fill("") as string[];
-      return arr.map((v) => (typeof v === "string" ? v : ""));
-    } catch {
-      return Array(48).fill("") as string[];
-    }
+    return parseWeek2BracketSlotsJson(raw);
+  }, [settings]);
+
+  const week2BracketScoresArray = useMemo(() => {
+    const raw =
+      settings && typeof settings === "object"
+        ? (settings as Record<string, unknown>).week2BracketScores
+        : undefined;
+    return parseWeek2BracketScoresJson(raw);
+  }, [settings]);
+
+  const week2BracketMatchStatusesArray = useMemo(() => {
+    const raw =
+      settings && typeof settings === "object"
+        ? (settings as Record<string, unknown>).week2BracketMatchStatuses
+        : undefined;
+    return parseWeek2BracketMatchStatusesJson(raw);
   }, [settings]);
 
   const finalsBracketSlotsArray = useMemo(() => {
@@ -496,27 +510,14 @@ export function HomeBracketCards() {
     }
   }, [settings]);
 
-  const allFirstRoundSelectionsWeek2 = useMemo(() => {
-    const out: string[] = [];
-    for (let c = 0; c < 4; c++) {
-      for (let i = 0; i < 8; i++) {
-        out.push(week2BracketSlotsArray[c * 12 + i] ?? "");
-      }
-    }
-    return out;
-  }, [week2BracketSlotsArray]);
-
   const getWeek2MatchStatusByIndex = useCallback(
     (cardIndex: number): (string | null)[] => {
-      if (!settings || typeof settings !== "object") return Array(6).fill(null);
-      const s = settings as Record<string, unknown>;
-      const base = 48 + cardIndex * 6;
-      return Array.from({ length: 6 }, (_, i) => {
-        const val = (s[`bracketMatchStatus${base + i}`] as string) ?? "";
+      return Array.from({ length: 3 }, (_, i) => {
+        const val = week2BracketMatchStatusesArray[cardIndex * 3 + i] ?? "";
         return val.trim() || null;
       });
     },
-    [settings]
+    [week2BracketMatchStatusesArray]
   );
 
   const getFinalsMatchStatusByIndex = useCallback((): (string | null)[] => {
@@ -754,26 +755,25 @@ export function HomeBracketCards() {
                     aria-labelledby={`home-week2-slot-${index}-heading`}
                     className="min-h-0 overflow-auto rounded-b-xl border-t border-white/40 bg-black pb-4 pt-4 pl-4"
                   >
-                    <Bracket8TwoRounds
+                    <Bracket4
                       players={playerDisplayNames}
                       playerRaceToMap={playerRaceToMap}
                       initialSlotSelections={(() => {
-                        const base = index * 12;
+                        const base = index * 6;
                         let byeNum = 0;
-                        return Array.from({ length: 12 }, (_, i) => {
+                        return Array.from({ length: 6 }, (_, i) => {
                           const val = week2BracketSlotsArray[base + i] ?? "";
                           if (val === BYE_LABEL) return `-- Bye ${++byeNum} --`;
                           return val;
                         });
                       })()}
-                      cardIndex={index}
-                      allFirstRoundSelections={allFirstRoundSelectionsWeek2}
+                      initialScores={week2BracketScoresArray.slice(index * 6, index * 6 + 6)}
                       disabled
                       placeholderText="TBD..."
                       matchStatusByIndex={getWeek2MatchStatusByIndex(index)}
-                    onMatchClickByIndex={(matchIndex) =>
-                      openReadOnlyScorecard("week2", index, matchIndex)
-                    }
+                      onMatchClickByIndex={(matchIndex) =>
+                        openReadOnlyScorecard("week2", index, matchIndex)
+                      }
                     />
                   </div>
                 ) : null}
