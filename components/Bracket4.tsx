@@ -3,38 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "@/app/home-bracket.css";
 import { isBye, MatchWithDropdowns } from "@/components/Bracket8TwoRounds";
-
-/** Options for one slot: pool minus names selected in other slots, plus current value. */
-function optionsForSlot(
-  slotIndex: number,
-  slotSelections: string[],
-  pool: string[]
-): string[] {
-  const current = slotSelections[slotIndex];
-  return pool.filter(
-    (name) =>
-      name === current ||
-      !slotSelections.some((s, j) => j !== slotIndex && s === name)
-  );
-}
-
-/** Options for final top (slot 4): only the two semi 1 players (slots 0, 1). */
-function optionsForFinalTop(slotSelections: string[]): string[] {
-  const current = slotSelections[4];
-  const opts = [slotSelections[0], slotSelections[1]].filter(Boolean);
-  const uniq = [...new Set(opts)];
-  if (current && !uniq.includes(current)) uniq.unshift(current);
-  return uniq;
-}
-
-/** Options for final bottom (slot 5): only the two semi 2 players (slots 2, 3). */
-function optionsForFinalBottom(slotSelections: string[]): string[] {
-  const current = slotSelections[5];
-  const opts = [slotSelections[2], slotSelections[3]].filter(Boolean);
-  const uniq = [...new Set(opts)];
-  if (current && !uniq.includes(current)) uniq.unshift(current);
-  return uniq;
-}
+import { selectOptionsFullPool } from "@/lib/dropdownOptions";
 
 const EMPTY_SLOTS = Array(6).fill("") as string[];
 const DEFAULT_SCORES = Array(6).fill("0") as string[];
@@ -61,7 +30,7 @@ function applyByeAdvancesToBracket4(slots: string[]): string[] {
 
 /**
  * 4-person bracket: 2 semi-finals (slots 0–3) and 1 final (slots 4–5).
- * Final dropdowns only offer the two players from the corresponding semi.
+ * Each slot dropdown lists the full player pool.
  */
 export function Bracket4({
   players,
@@ -153,11 +122,8 @@ export function Bracket4({
   );
 
   const getOptions = useCallback(
-    (slotIndex: number) => {
-      if (slotIndex === 4) return optionsForFinalTop(slotSelections);
-      if (slotIndex === 5) return optionsForFinalBottom(slotSelections);
-      return optionsForSlot(slotIndex, slotSelections, pool);
-    },
+    (slotIndex: number) =>
+      selectOptionsFullPool(pool, slotSelections[slotIndex] ?? ""),
     [slotSelections, pool]
   );
 

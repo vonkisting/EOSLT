@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import { labelTitleCase } from "@/lib/labelTitleCase";
 
 type ObsConnectionNameComboboxProps = {
   value: string;
@@ -24,8 +25,8 @@ export function ObsConnectionNameCombobox({
   const wrapRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
 
-  const q = value.trim().toLowerCase();
-  const filtered = savedNames.filter((n) => !q || n.toLowerCase().includes(q));
+  /** Always list every saved profile; input value is free text for new names, not a filter. */
+  const listNames = savedNames;
 
   useEffect(() => {
     if (!open) return;
@@ -40,7 +41,7 @@ export function ObsConnectionNameCombobox({
   return (
     <div ref={wrapRef} className="relative min-w-0 flex-1">
       <label htmlFor={inputId} className="text-xs font-medium text-slate-400">
-        Connection Name
+        {labelTitleCase("connection name")}
       </label>
       <div className="mt-1 flex gap-1">
         <input
@@ -61,7 +62,7 @@ export function ObsConnectionNameCombobox({
         />
         <button
           type="button"
-          aria-label="Show Saved Connection Names"
+          aria-label={labelTitleCase("show saved connection names")}
           aria-expanded={open}
           aria-controls={listId}
           disabled={disabled || savedNames.length === 0}
@@ -73,13 +74,13 @@ export function ObsConnectionNameCombobox({
           </svg>
         </button>
       </div>
-      {open && filtered.length > 0 ? (
+      {open && listNames.length > 0 ? (
         <ul
           id={listId}
           role="listbox"
           className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-auto rounded-lg border border-white/15 bg-[#1a1428] py-1 shadow-xl shadow-black/50"
         >
-          {filtered.map((name) => (
+          {listNames.map((name) => (
             <li key={name} role="presentation">
               <button
                 type="button"

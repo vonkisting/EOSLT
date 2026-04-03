@@ -1,14 +1,8 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useTransition } from "react";
 import { ObsCollapsibleCard } from "@/components/stream/ObsCollapsibleCard";
-import { ObsOverlaySfxUrlRow } from "@/components/stream/ObsOverlaySfxUrlRow";
 import { STREAM_OBS_CARD_IDS } from "@/components/stream/streamObsCardIds";
 import { useObsStreamCardOpen } from "@/components/stream/ObsStreamCardOpenContext";
-
-const REFRESH_PILL =
-  "rounded-full px-2.5 py-0.5 text-xs font-medium bg-blue-500/20 text-blue-300 ring-1 ring-blue-500/40 transition hover:bg-blue-500/30 hover:ring-blue-400/55 focus:outline-none focus:ring-2 focus:ring-blue-400/50 disabled:cursor-not-allowed disabled:opacity-50";
 
 export type SoundboardEffect = { id: string; label: string };
 
@@ -18,24 +12,18 @@ type ObsSoundboardPanelProps = {
   effects: SoundboardEffect[];
   lastTriggered: string | null;
   onTrigger: (soundId: string) => void;
-  overlaySfxListenUrl: string | null;
-  overlaySfxKeyPending: boolean;
 };
 
 /**
- * Sound effects: cues Convex so a browser source at `/overlay/sfx` can play `/stream-sfx/*.mp3`.
+ * Sound effects: cues Convex so the OBS SFX browser source (URL in OBS Connection) can play clips.
  */
 export function ObsSoundboardPanel({
   sfxCueEnabled,
   effects,
   lastTriggered,
   onTrigger,
-  overlaySfxListenUrl,
-  overlaySfxKeyPending,
 }: ObsSoundboardPanelProps) {
   const { open, setOpen } = useObsStreamCardOpen(STREAM_OBS_CARD_IDS.soundEffects);
-  const router = useRouter();
-  const [refreshPending, startRefresh] = useTransition();
 
   return (
     <ObsCollapsibleCard
@@ -44,17 +32,6 @@ export function ObsSoundboardPanel({
       open={open}
       onOpenChange={setOpen}
     >
-      <div className="flex justify-end">
-        <button
-          type="button"
-          disabled={refreshPending}
-          onClick={() => startRefresh(() => router.refresh())}
-          className={REFRESH_PILL}
-        >
-          {refreshPending ? "Refreshing…" : "Refresh List"}
-        </button>
-      </div>
-      <ObsOverlaySfxUrlRow listenUrl={overlaySfxListenUrl} pendingKey={overlaySfxKeyPending} />
       {!sfxCueEnabled ? (
         <p className="text-xs text-slate-500">
           Set a connection name and save the profile so sound cues can reach the overlay.
@@ -63,7 +40,7 @@ export function ObsSoundboardPanel({
       {effects.length === 0 ? (
         <p className="text-xs text-slate-500">
           No MP3 files in <code className="text-slate-400">public/stream-sfx/</code>. Add{" "}
-          <code className="text-slate-400">.mp3</code> files and reload this page.
+          <code className="text-slate-400">.mp3</code> files and refresh the page (this list is not synced from OBS).
         </p>
       ) : (
         <div className="flex flex-wrap gap-2">

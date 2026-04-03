@@ -11,7 +11,6 @@ type ObsAudioPanelProps = {
   channels: AudioChannel[];
   loading?: boolean;
   error?: string | null;
-  onRefresh?: () => void;
   onVolumeChange: (id: string, volume: number) => void;
   /** Desired mute state after click (OBS `SetInputMute`). */
   onMuteToggle: (id: string, nextMuted: boolean) => void;
@@ -25,7 +24,6 @@ export function ObsAudioPanel({
   channels,
   loading = false,
   error = null,
-  onRefresh,
   onVolumeChange,
   onMuteToggle,
 }: ObsAudioPanelProps) {
@@ -39,20 +37,8 @@ export function ObsAudioPanel({
       onOpenChange={setOpen}
     >
       <p className="text-xs text-slate-500">
-        Volumes and mute follow OBS audio inputs (sources with a mixer fader).
+        Volumes and mute follow OBS audio inputs (sources with a mixer fader). Lists update when OBS changes.
       </p>
-      {connected && onRefresh ? (
-        <div className="flex justify-end">
-          <button
-            type="button"
-            disabled={loading}
-            onClick={() => onRefresh()}
-            className="rounded-full px-2.5 py-0.5 text-xs font-medium bg-blue-500/20 text-blue-300 ring-1 ring-blue-500/40 transition hover:bg-blue-500/30 hover:ring-blue-400/55 focus:outline-none focus:ring-2 focus:ring-blue-400/50 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {loading ? "Refreshing…" : "Refresh List"}
-          </button>
-        </div>
-      ) : null}
       {error ? (
         <p className="rounded-lg border border-red-500/35 bg-red-950/35 px-3 py-2 text-xs text-red-200" role="alert">
           {error}

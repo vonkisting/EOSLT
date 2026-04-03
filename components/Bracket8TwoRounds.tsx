@@ -2,69 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "@/app/home-bracket.css";
+import { selectOptionsFullPool } from "@/lib/dropdownOptions";
 
-/** Options for one slot: pool minus names selected in other slots, plus current value so it displays. */
-function optionsForSlot(
-  slotIndex: number,
-  slotSelections: string[],
-  pool: string[]
-): string[] {
-  const current = slotSelections[slotIndex];
-  return pool.filter(
-    (name) =>
-      name === current ||
-      !slotSelections.some((s, j) => j !== slotIndex && s === name)
-  );
-}
-
-/** First round = slots 0–7. Exclude names selected in any other first-round slot (this card or others). */
-const FIRST_ROUND_SLOT_COUNT = 8;
-/** Second round = slots 8–11. Each slot's options are only the two first-round players that feed into it. */
 const SECOND_ROUND_FIRST_SLOT = 8;
 
-/** Options for a second-round slot: only the two first-round players that feed into this match (plus current so it displays). */
-function optionsForSecondRoundSlot(
-  slotIndex: number,
-  slotSelections: string[]
-): string[] {
-  const current = slotSelections[slotIndex];
-  const pairIndex = slotIndex - SECOND_ROUND_FIRST_SLOT; // 0,1,2,3
-  const top = slotSelections[pairIndex * 2];     // slots 0,2,4,6
-  const bottom = slotSelections[pairIndex * 2 + 1]; // slots 1,3,5,7
-  const opts = [top, bottom].filter(Boolean);
-  const uniq = [...new Set(opts)];
-  if (current && !uniq.includes(current)) uniq.unshift(current);
-  return uniq;
-}
-
-function optionsForFirstRoundSlot(
-  slotIndex: number,
-  slotSelections: string[],
-  pool: string[],
-  cardIndex: number,
-  allFirstRoundSelections: string[]
-): string[] {
-  const current = slotSelections[slotIndex];
-  return pool.filter((name) => {
-    if (name === current) return true;
-    // Exclude if selected in another first-round slot in this card
-    for (let j = 0; j < FIRST_ROUND_SLOT_COUNT; j++)
-      if (j !== slotIndex && slotSelections[j] === name) return false;
-    // Exclude if selected in any first-round slot in another card
-    const myGlobalStart = cardIndex * FIRST_ROUND_SLOT_COUNT;
-    for (let k = 0; k < allFirstRoundSelections.length; k++) {
-      if (k >= myGlobalStart && k < myGlobalStart + FIRST_ROUND_SLOT_COUNT)
-        continue;
-      if (allFirstRoundSelections[k] === name) return false;
-    }
-    return true;
-  });
-}
-
-/**
- * Single match row with dropdowns for top/bottom names.
- * Slot indices identify which global slot each side uses for selection state.
- */
 export function matchStatusClass(status: string | null | undefined): string {
   if (!status) return "";
   if (status === "In Progress...") return "match-status-in-progress";
@@ -73,6 +14,9 @@ export function matchStatusClass(status: string | null | undefined): string {
   return "";
 }
 
+/**
+ * Single match row with dropdowns for top/bottom names.
+ */
 export function MatchWithDropdowns({
   winner,
   topSlotIndex,
@@ -225,7 +169,7 @@ export function MatchWithDropdowns({
 
 /**
  * 8-person bracket showing round 1 (4 matches) and round 2 (2 matches).
- * Each matchup side has a dropdown; selecting a player removes them from other dropdowns.
+ * Each slot dropdown lists the full player pool.
  */
 /** Matches unnumbered or numbered bye labels (dashboard uses "-- Bye --", we display "-- Bye N --"). */
 export function isBye(name: string): boolean {
@@ -271,8 +215,8 @@ export function Bracket8TwoRounds({
   onBracketSlotsChange,
   initialScores,
   onScoreChange,
-  cardIndex,
-  allFirstRoundSelections,
+  cardIndex: _cardIndex,
+  allFirstRoundSelections: _allFirstRoundSelections,
   disabled,
   matchStatusByIndex,
   placeholderText,
@@ -285,7 +229,7 @@ export function Bracket8TwoRounds({
   /** Length 12: [top0, bottom0, top1, bottom1, ...] for the 6 matchups. */
   initialScores?: string[] | null;
   onScoreChange?: (matchIndex: number, side: "top" | "bottom", value: string) => void;
-  /** When set with allFirstRoundSelections, first-round dropdowns exclude names selected in other cards. */
+  /** Retained for callers; dropdowns always list the full pool. */
   cardIndex?: number;
   allFirstRoundSelections?: AllFirstRoundSelections;
   /** When true, all slot dropdowns are disabled (e.g. tournament started). */
@@ -359,25 +303,9 @@ export function Bracket8TwoRounds({
   );
 
   const getOptions = useCallback(
-    (slotIndex: number) => {
-      if (slotIndex >= SECOND_ROUND_FIRST_SLOT)
-        return optionsForSecondRoundSlot(slotIndex, slotSelections);
-      const useGlobalFirstRound =
-        cardIndex != null &&
-        allFirstRoundSelections != null &&
-        (allFirstRoundSelections.length === 64 || allFirstRoundSelections.length === 32) &&
-        slotIndex < FIRST_ROUND_SLOT_COUNT;
-      if (useGlobalFirstRound)
-        return optionsForFirstRoundSlot(
-          slotIndex,
-          slotSelections,
-          pool,
-          cardIndex,
-          allFirstRoundSelections
-        );
-      return optionsForSlot(slotIndex, slotSelections, pool);
-    },
-    [slotSelections, pool, cardIndex, allFirstRoundSelections]
+    (slotIndex: number) =>
+      selectOptionsFullPool(pool, slotSelections[slotIndex] ?? ""),
+    [slotSelections, pool]
   );
 
   const matchupHasBye = useCallback(

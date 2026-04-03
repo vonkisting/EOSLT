@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { StreamObsDashboard } from "@/components/stream/StreamObsDashboard";
 import { canAccessStream } from "@/lib/stream-access";
 import { listStreamSfxMp3Basenames } from "@/lib/list-stream-sfx-mp3";
+import { getStreamOverlayPublicOrigin } from "@/lib/stream-overlay-public-origin";
 import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
@@ -23,5 +24,12 @@ export default async function StreamPage() {
   const name = session.user.name ?? null;
   const sfxBasenames = listStreamSfxMp3Basenames();
 
-  return <StreamObsDashboard userEmail={email} userName={name} sfxBasenames={sfxBasenames} />;
+  return (
+    <StreamObsDashboard
+      userEmail={email}
+      userName={name}
+      sfxBasenames={sfxBasenames}
+      overlayPublicOrigin={getStreamOverlayPublicOrigin()}
+    />
+  );
 }

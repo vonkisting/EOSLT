@@ -44,7 +44,9 @@ type ObsStreamCardOpenProviderProps = {
 };
 
 /**
- * Persists which stream OBS dashboard cards are expanded (per signed-in user, Convex).
+ * Persists which stream OBS dashboard cards and nested sections are expanded (per user, Convex
+ * `streamObsUiState.cardOpenByIdJson`). Add a stable id in `STREAM_OBS_CARD_IDS` for each collapsible.
+ * The OBS Connection card is expanded on each full page load; it collapses when a connection succeeds.
  */
 export function ObsStreamCardOpenProvider({ email, children }: ObsStreamCardOpenProviderProps) {
   const normalized = email.toLowerCase().trim();
@@ -87,6 +89,8 @@ export function ObsStreamCardOpenProvider({ email, children }: ObsStreamCardOpen
   const setOpen = useCallback(
     (cardId: string, open: boolean) => {
       setLocal((prev) => {
+        const prevOpen = prev[cardId] !== undefined ? prev[cardId] : true;
+        if (prevOpen === open) return prev;
         const next = { ...prev, [cardId]: open };
         scheduleSave(next);
         return next;
@@ -121,8 +125,14 @@ export function useObsStreamCardOpen(cardId: string) {
   if (!ctx) {
     throw new Error("useObsStreamCardOpen must be used within ObsStreamCardOpenProvider");
   }
+  const setOpen = useCallback(
+    (next: boolean) => {
+      ctx.setOpen(cardId, next);
+    },
+    [ctx.setOpen, cardId]
+  );
   return {
     open: ctx.getOpen(cardId),
-    setOpen: (next: boolean) => ctx.setOpen(cardId, next),
+    setOpen,
   };
 }

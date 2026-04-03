@@ -11,6 +11,7 @@ import { Bracket4 } from "@/components/Bracket4";
 import { isBye } from "@/components/Bracket8TwoRounds";
 import { Modal } from "@/components/ui/Modal";
 import { formatLocationDate, formatLocationTime } from "@/lib/formatDateTime";
+import { selectOptionsFullPool } from "@/lib/dropdownOptions";
 import { canAccessDashboard } from "@/lib/dashboard-access";
 
 const PLAYER_SLOTS = 64;
@@ -32,23 +33,14 @@ const WEEK_2_KEYS: readonly LocationKey[] = [
   "secondWeekLocation1", "secondWeekLocation2", "secondWeekLocation3", "secondWeekLocation4",
 ];
 
-/** Venue names available for this dropdown: exclude venues selected in other dropdowns in the same week. */
+/** Every venue is listed in each location dropdown (same venue may be chosen in multiple slots). */
 function venueOptionsFor(
   key: LocationKey,
   locations: Record<LocationKey, string>,
   venueNames: string[]
 ): string[] {
   if (venueNames.length === 0) return [];
-  const sameWeekKeys =
-    WEEK_1_KEYS.includes(key) ? WEEK_1_KEYS
-    : WEEK_2_KEYS.includes(key) ? WEEK_2_KEYS
-    : [];
-  const currentValue = locations[key] ?? "";
-  return venueNames.filter(
-    (name) =>
-      name === currentValue ||
-      !sameWeekKeys.some((k) => k !== key && (locations[k] ?? "") === name)
-  );
+  return selectOptionsFullPool(venueNames, locations[key] ?? "");
 }
 
 const LOCATION_LABELS: Record<LocationKey, string> = {
@@ -418,7 +410,7 @@ export function DashboardContent() {
     );
   }, [pendingWeek1RandomizeCards, playerRows]);
 
-  /** First-round slot values for all 8 Week 1 cards (8×8=64). Used so each first-round dropdown excludes names selected in any other card’s first round. */
+  /** First-round slot values for all 8 Week 1 cards (8×8=64). Used for overlap checks and bracket props. */
   const allFirstRoundSelections = useMemo(() => {
     if (!savedSettings || typeof savedSettings !== "object") {
       return Array(64).fill("") as string[];

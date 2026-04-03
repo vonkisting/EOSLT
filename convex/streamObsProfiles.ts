@@ -1,5 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { resolveStreamLogosForProfile } from "./streamObsLogos";
 import { isSafeStreamSfxBasename } from "./streamSfxBasename";
 
 function newOverlayAudioKey(): string {
@@ -34,12 +35,15 @@ export const get = query({
     const normalized = email.toLowerCase().trim();
     const name = connectionName.trim();
     if (!name) return null;
-    return await ctx.db
+    const doc = await ctx.db
       .query("streamObsProfiles")
       .withIndex("by_email_and_name", (q) =>
         q.eq("email", normalized).eq("connectionName", name)
       )
       .unique();
+    if (!doc) return null;
+    const streamLogos = await resolveStreamLogosForProfile(ctx, doc.streamLogosJson);
+    return { ...doc, streamLogos };
   },
 });
 
@@ -64,18 +68,25 @@ export const getScoreboardByOverlayKey = query({
       return {
         awayName: typeof o.awayName === "string" ? o.awayName : "",
         homeName: typeof o.homeName === "string" ? o.homeName : "",
-        awayScore:
-          typeof o.awayScore === "number"
-            ? o.awayScore
-            : Number(o.awayScore) || 0,
-        homeScore:
-          typeof o.homeScore === "number"
-            ? o.homeScore
-            : Number(o.homeScore) || 0,
       };
     } catch {
       return null;
     }
+  },
+});
+
+/** Public read for tournament results browser overlay (same `k` as scoreboard / SFX). */
+export const getTournamentResultsByOverlayKey = query({
+  args: { key: v.string() },
+  handler: async (ctx, { key }) => {
+    const trimmed = key.trim();
+    if (!trimmed) return null;
+    const doc = await ctx.db
+      .query("streamObsProfiles")
+      .withIndex("by_overlay_audio_key", (q) => q.eq("overlayAudioKey", trimmed))
+      .unique();
+    if (!doc) return null;
+    return { tournamentSettingsJson: doc.tournamentSettingsJson ?? "" };
   },
 });
 
@@ -169,6 +180,10 @@ export const upsert = mutation({
     activeScene: v.optional(v.string()),
     audioChannelsJson: v.optional(v.string()),
     scoreboardJson: v.optional(v.string()),
+    tournamentSettingsJson: v.optional(v.string()),
+    scoreboardBrowserSourceName: v.optional(v.string()),
+    resultsBrowserSourceName: v.optional(v.string()),
+    sfxBrowserSourceName: v.optional(v.string()),
     lastSfx: v.optional(v.string()),
     overlayPushedAt: v.optional(v.string()),
   },
@@ -199,6 +214,18 @@ export const upsert = mutation({
         ...(args.activeScene !== undefined ? { activeScene: args.activeScene } : {}),
         ...(args.audioChannelsJson !== undefined ? { audioChannelsJson: args.audioChannelsJson } : {}),
         ...(args.scoreboardJson !== undefined ? { scoreboardJson: args.scoreboardJson } : {}),
+        ...(args.tournamentSettingsJson !== undefined
+          ? { tournamentSettingsJson: args.tournamentSettingsJson }
+          : {}),
+        ...(args.scoreboardBrowserSourceName !== undefined
+          ? { scoreboardBrowserSourceName: args.scoreboardBrowserSourceName }
+          : {}),
+        ...(args.resultsBrowserSourceName !== undefined
+          ? { resultsBrowserSourceName: args.resultsBrowserSourceName }
+          : {}),
+        ...(args.sfxBrowserSourceName !== undefined
+          ? { sfxBrowserSourceName: args.sfxBrowserSourceName }
+          : {}),
         ...(args.lastSfx !== undefined ? { lastSfx: args.lastSfx } : {}),
         ...(args.overlayPushedAt !== undefined ? { overlayPushedAt: args.overlayPushedAt } : {}),
       });
@@ -216,6 +243,18 @@ export const upsert = mutation({
       ...(args.activeScene !== undefined ? { activeScene: args.activeScene } : {}),
       ...(args.audioChannelsJson !== undefined ? { audioChannelsJson: args.audioChannelsJson } : {}),
       ...(args.scoreboardJson !== undefined ? { scoreboardJson: args.scoreboardJson } : {}),
+      ...(args.tournamentSettingsJson !== undefined
+        ? { tournamentSettingsJson: args.tournamentSettingsJson }
+        : {}),
+      ...(args.scoreboardBrowserSourceName !== undefined
+        ? { scoreboardBrowserSourceName: args.scoreboardBrowserSourceName }
+        : {}),
+      ...(args.resultsBrowserSourceName !== undefined
+        ? { resultsBrowserSourceName: args.resultsBrowserSourceName }
+        : {}),
+      ...(args.sfxBrowserSourceName !== undefined
+        ? { sfxBrowserSourceName: args.sfxBrowserSourceName }
+        : {}),
       ...(args.lastSfx !== undefined ? { lastSfx: args.lastSfx } : {}),
       ...(args.overlayPushedAt !== undefined ? { overlayPushedAt: args.overlayPushedAt } : {}),
     });

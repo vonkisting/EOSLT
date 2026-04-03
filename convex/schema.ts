@@ -373,6 +373,14 @@ export default defineSchema({
     activeScene: v.optional(v.string()),
     audioChannelsJson: v.optional(v.string()),
     scoreboardJson: v.optional(v.string()),
+    /** JSON: tournament name + player list for stream dashboard. */
+    tournamentSettingsJson: v.optional(v.string()),
+    /** OBS Browser Source input name for Import to OBS Scene (scoreboard overlay). */
+    scoreboardBrowserSourceName: v.optional(v.string()),
+    /** OBS Browser Source input name for tournament results overlay. */
+    resultsBrowserSourceName: v.optional(v.string()),
+    /** OBS Browser Source input name for Import to OBS Scene (SFX / audio overlay). */
+    sfxBrowserSourceName: v.optional(v.string()),
     lastSfx: v.optional(v.string()),
     overlayPushedAt: v.optional(v.string()),
     /** Secret for browser-source URL; public read of cue only with this key. */
@@ -380,6 +388,8 @@ export default defineSchema({
     /** Monotonic; overlay plays when this changes. */
     sfxCueSeq: v.optional(v.number()),
     sfxCueSoundId: v.optional(v.string()),
+    /** JSON: stream logo rows (storage ids, filenames, OBS image source names). */
+    streamLogosJson: v.optional(v.string()),
     updatedAt: v.number(),
   })
     .index("by_email", ["email"])

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 export const metadata: Metadata = {
-  title: "Stream control | EOSLT",
+  title: "Stream control",
   description: "OBS stream control dashboard",
 };
 

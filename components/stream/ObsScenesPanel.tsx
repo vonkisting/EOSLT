@@ -11,7 +11,6 @@ type ObsScenesPanelProps = {
   onSelectScene: (name: string) => void | Promise<void>;
   loading?: boolean;
   error?: string | null;
-  onRefresh?: () => void;
   switchingScene?: string | null;
 };
 
@@ -25,7 +24,6 @@ export function ObsScenesPanel({
   onSelectScene,
   loading = false,
   error = null,
-  onRefresh,
   switchingScene = null,
 }: ObsScenesPanelProps) {
   const { open, setOpen } = useObsStreamCardOpen(STREAM_OBS_CARD_IDS.sceneSelection);
@@ -37,18 +35,9 @@ export function ObsScenesPanel({
       open={open}
       onOpenChange={setOpen}
     >
-      {connected && onRefresh && (
-        <div className="flex justify-end">
-          <button
-            type="button"
-            disabled={loading}
-            onClick={() => onRefresh()}
-            className="rounded-full px-2.5 py-0.5 text-xs font-medium bg-blue-500/20 text-blue-300 ring-1 ring-blue-500/40 transition hover:bg-blue-500/30 hover:ring-blue-400/55 focus:outline-none focus:ring-2 focus:ring-blue-400/50 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {loading ? "Refreshing…" : "Refresh Scenes"}
-          </button>
-        </div>
-      )}
+      {connected ? (
+        <p className="text-xs text-slate-500">Scene list and program scene update when OBS changes.</p>
+      ) : null}
       {error && (
         <p className="rounded-lg border border-red-500/35 bg-red-950/35 px-3 py-2 text-xs text-red-200" role="alert">
           {error}

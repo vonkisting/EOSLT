@@ -1,12 +1,19 @@
 "use client";
 
+import { useCallback, useMemo } from "react";
 import { ObsAudioPanel, type AudioChannel } from "@/components/stream/ObsAudioPanel";
 import { ObsScenesPanel } from "@/components/stream/ObsScenesPanel";
 import { ObsScoreboardPanel, type ScoreboardState } from "@/components/stream/ObsScoreboardPanel";
+import {
+  ObsTournamentSettingsPanel,
+  type TournamentSettingsState,
+} from "@/components/stream/ObsTournamentSettingsPanel";
+import { tournamentPlayerDisplayNames } from "@/components/stream/tournamentSettingsDefaults";
 import { ObsSoundboardPanel, type SoundboardEffect } from "@/components/stream/ObsSoundboardPanel";
 import { ObsSourcesPanel, type SourceToggle } from "@/components/stream/ObsSourcesPanel";
 import type { ObsCredentials } from "@/components/stream/useObsProgramSources";
 import { useObsScenes } from "@/components/stream/useObsScenes";
+import { useObsRealtimeSync } from "@/components/stream/useObsRealtimeSync";
 
 type StreamObsConnectedPanelsProps = {
   connectionName: string;
@@ -16,8 +23,6 @@ type StreamObsConnectedPanelsProps = {
   setActiveScene: (scene: string | null) => void;
   lastSfx: string | null;
   onTriggerSfx: (soundId: string) => void;
-  overlaySfxListenUrl: string | null;
-  overlaySfxKeyPending: boolean;
   sources: SourceToggle[];
   onToggleSource: (item: SourceToggle) => void | Promise<void>;
   sourcesLoading: boolean;
@@ -32,14 +37,9 @@ type StreamObsConnectedPanelsProps = {
   onAudioMute: (id: string, nextMuted: boolean) => void;
   scoreboard: ScoreboardState;
   onScoreboardChange: (next: ScoreboardState) => void;
-  scoreboardOverlayUrl: string | null;
-  overlayKeyPending: boolean;
-  scoreboardBrowserSourceName: string;
-  onScoreboardBrowserSourceNameChange: (name: string) => void;
-  onWireScoreboardToObs: () => void | Promise<void>;
-  wireScoreboardPending: boolean;
-  wireScoreboardError: string | null;
-  wireScoreboardSuccessAt: string | null;
+  tournamentSettings: TournamentSettingsState;
+  onTournamentSettingsChange: (next: TournamentSettingsState) => void;
+  onTournamentPersistRequest: () => void | Promise<void>;
 };
 
 export function StreamObsConnectedPanels({
@@ -50,8 +50,6 @@ export function StreamObsConnectedPanels({
   setActiveScene,
   lastSfx,
   onTriggerSfx,
-  overlaySfxListenUrl,
-  overlaySfxKeyPending,
   sources,
   onToggleSource,
   sourcesLoading,
@@ -66,14 +64,9 @@ export function StreamObsConnectedPanels({
   onAudioMute,
   scoreboard,
   onScoreboardChange,
-  scoreboardOverlayUrl,
-  overlayKeyPending,
-  scoreboardBrowserSourceName,
-  onScoreboardBrowserSourceNameChange,
-  onWireScoreboardToObs,
-  wireScoreboardPending,
-  wireScoreboardError,
-  wireScoreboardSuccessAt,
+  tournamentSettings,
+  onTournamentSettingsChange,
+  onTournamentPersistRequest,
 }: StreamObsConnectedPanelsProps) {
   const {
     scenes,
@@ -83,6 +76,19 @@ export function StreamObsConnectedPanels({
     selectScene,
     switchingScene,
   } = useObsScenes(obsCredentials, true, setActiveScene);
+
+  const refetchObsPanels = useCallback(() => {
+    void refetchScenes();
+    onRefreshSources();
+    onRefreshAudio();
+  }, [refetchScenes, onRefreshSources, onRefreshAudio]);
+
+  useObsRealtimeSync(obsCredentials, true, refetchObsPanels);
+
+  const tournamentPlayerNames = useMemo(
+    () => tournamentPlayerDisplayNames(tournamentSettings),
+    [tournamentSettings]
+  );
 
   return (
     <div className="mt-6 grid gap-6 lg:grid-cols-12">
@@ -94,7 +100,6 @@ export function StreamObsConnectedPanels({
           onSelectScene={(name) => void selectScene(name)}
           loading={scenesLoading}
           error={scenesError}
-          onRefresh={refetchScenes}
           switchingScene={switchingScene}
         />
         <ObsSoundboardPanel
@@ -102,8 +107,6 @@ export function StreamObsConnectedPanels({
           effects={soundboardEffects}
           lastTriggered={lastSfx}
           onTrigger={onTriggerSfx}
-          overlaySfxListenUrl={overlaySfxListenUrl}
-          overlaySfxKeyPending={overlaySfxKeyPending}
         />
       </div>
       <div className="space-y-6 lg:col-span-7">
@@ -113,7 +116,6 @@ export function StreamObsConnectedPanels({
           onToggle={onToggleSource}
           loading={sourcesLoading}
           error={sourcesError}
-          onRefresh={onRefreshSources}
           togglingKey={togglingKey}
         />
         <ObsAudioPanel
@@ -121,21 +123,19 @@ export function StreamObsConnectedPanels({
           channels={audioChannels}
           loading={audioLoading}
           error={audioError}
-          onRefresh={onRefreshAudio}
           onVolumeChange={onAudioVolumeChange}
           onMuteToggle={onAudioMute}
+        />
+        <ObsTournamentSettingsPanel
+          value={tournamentSettings}
+          onChange={onTournamentSettingsChange}
+          onPersistRequest={onTournamentPersistRequest}
         />
         <ObsScoreboardPanel
           value={scoreboard}
           onChange={onScoreboardChange}
-          scoreboardOverlayUrl={scoreboardOverlayUrl}
-          overlayKeyPending={overlayKeyPending}
-          browserSourceName={scoreboardBrowserSourceName}
-          onBrowserSourceNameChange={onScoreboardBrowserSourceNameChange}
-          onWireToObs={onWireScoreboardToObs}
-          wirePending={wireScoreboardPending}
-          wireError={wireScoreboardError}
-          wireSuccessAt={wireScoreboardSuccessAt}
+          tournamentPlayerNames={tournamentPlayerNames}
+          tournamentSettings={tournamentSettings}
         />
       </div>
     </div>

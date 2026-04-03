@@ -1,0 +1,102 @@
+/**
+ * Scorecard overlay / preview — matches standalone OBS scorecard markup & styling.
+ * Font and container styles live on `.scorecard` so the module works inside the app shell.
+ */
+
+.scorecard {
+  /* Equal-width player columns: each 1fr matches the wider side’s intrinsic width. */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  justify-items: stretch;
+  column-gap: 0;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  padding: 20px 40px;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 14px;
+  backdrop-filter: blur(6px);
+  font-family: "Segoe UI", sans-serif;
+}
+
+.player {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: 2px solid #353535;
+  box-sizing: border-box;
+  background: linear-gradient(180deg, #1e1e1e, #0f0f0f);
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.4);
+}
+
+/* Home / left: dark navy → lighter navy, diagonal (top-left toward bottom-right). */
+.playerLeft {
+  justify-self: stretch;
+  width: 100%;
+  max-width: 100%;
+  background: linear-gradient(135deg, #050b18 0%, #0f2744 45%, #1e4a72 100%);
+  box-shadow: 0 0 14px rgba(10, 30, 60, 0.55);
+  padding-block: 10px;
+  padding-inline: max(75px, 1.5rem);
+}
+
+/* Away / right: dark cherry (right) → light cherry (left). */
+.playerRight {
+  justify-self: stretch;
+  width: 100%;
+  max-width: 100%;
+  background: linear-gradient(to left, #2c050c 0%, #6b0f1f 42%, #c43d55 100%);
+  box-shadow: 0 0 14px rgba(80, 10, 25, 0.5);
+  padding-block: 10px;
+  padding-inline: max(75px, 1.5rem);
+}
+
+.name {
+  font-size: 30px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 1px;
+  min-width: 0;
+  max-width: 100%;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vs {
+  justify-self: center;
+  /* font-size, padding, letter-spacing overridden inline from name size in ScoreboardOverlayView */
+  font-weight: 800;
+  color: #000000;
+  border-radius: 0;
+  background: #ffffff;
+}
+
+/* Dashboard preview: same layout, tighter scale */
+.scorecardCompact {
+  gap: 0;
+  padding: 10px 16px;
+  border-radius: 10px;
+}
+
+.scorecardCompact .player {
+  border-radius: 8px;
+}
+
+.scorecardCompact .playerLeft,
+.scorecardCompact .playerRight {
+  padding-block: 6px;
+  padding-inline: max(75px, 1.5rem);
+}
+
+.scorecardCompact .name {
+  /* Inline style from ScoreboardOverlayView; ~16px when overlay names are 30px */
+  font-size: 16px;
+  letter-spacing: 0.5px;
+}

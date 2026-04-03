@@ -1,41 +1,69 @@
-import type { ScoreboardState } from "@/components/stream/streamObsFormDefaults";
+import {
+  DEFAULT_SCOREBOARD_NAME_FONT_SIZE_PX,
+  type ScoreboardState,
+} from "@/components/stream/streamObsFormDefaults";
+import styles from "@/components/stream/scorecard.module.css";
+
+/** Dashboard preview scales overlay name size (historically ~14px when overlay was 26px). */
+const DASHBOARD_NAME_FONT_SCALE = 14 / 26;
 
 type ScoreboardOverlayViewProps = {
   value: ScoreboardState;
   variant: "dashboard" | "overlay";
 };
 
+/** Title case each word: first letter uppercase, rest lowercase. */
+function formatScorecardPlayerName(raw: string, fallback: string): string {
+  const t = raw.trim();
+  if (!t) return fallback;
+  return t
+    .split(/\s+/)
+    .map((word) => {
+      if (!word) return word;
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    })
+    .join(" ");
+}
+
 /**
- * Shared scoreboard layout: dashboard preview vs OBS browser overlay (larger type).
+ * Name + VS layout for overlay URL and stream dashboard preview (structure matches OBS HTML/CSS).
  */
 export function ScoreboardOverlayView({ value, variant }: ScoreboardOverlayViewProps) {
-  const overlay = variant === "overlay";
-  const nameCls = overlay
-    ? "truncate text-xl font-semibold sm:text-2xl"
-    : "truncate font-semibold text-slate-200";
-  const scoreCls = overlay
-    ? "text-5xl font-bold tabular-nums sm:text-6xl"
-    : "text-2xl font-bold tabular-nums text-blue-300";
-  const vsCls = overlay
-    ? "text-sm font-semibold uppercase tracking-widest text-yellow-300 sm:text-base"
-    : "text-xs font-medium uppercase tracking-widest text-yellow-400";
+  const compact = variant === "dashboard";
+  const homeLabel = formatScorecardPlayerName(value.homeName, "Player 1");
+  const awayLabel = formatScorecardPlayerName(value.awayName, "Player 2");
+  const overlayNamePx = DEFAULT_SCOREBOARD_NAME_FONT_SIZE_PX;
+  const nameFontSizePx = compact
+    ? Math.max(10, Math.round(overlayNamePx * DASHBOARD_NAME_FONT_SCALE))
+    : overlayNamePx;
+  const nameStyle = { fontSize: `${nameFontSizePx}px` } as const;
+  /** Overlay: VS matches name (30px). Compact: VS matches scaled name. */
+  const vsFontSizePx = nameFontSizePx;
+  const vsPadY = compact ? Math.max(4, Math.round(vsFontSizePx * (6 / 16))) : Math.max(6, Math.round(vsFontSizePx * (10 / 32)));
+  const vsPadX = compact ? Math.max(8, Math.round(vsFontSizePx * (12 / 16))) : Math.max(12, Math.round(vsFontSizePx * (20 / 32)));
+  const vsLetterSpacing = compact ? Math.max(0.5, vsFontSizePx * (1 / 16)) : Math.max(1, vsFontSizePx * (2 / 32));
+  const vsStyle = {
+    fontSize: `${vsFontSizePx}px`,
+    padding: `${vsPadY}px ${vsPadX}px`,
+    letterSpacing: `${vsLetterSpacing}px`,
+  } as const;
 
   return (
-    <div
-      className={
-        overlay
-          ? "flex w-full max-w-4xl items-center justify-between gap-6 px-4 py-2 text-white sm:gap-10 sm:px-8"
-          : "mt-2 flex items-center justify-between gap-4 text-sm"
-      }
-    >
-      <div className="min-w-0 flex-1 text-center">
-        <div className={nameCls}>{value.awayName || "Away"}</div>
-        <div className={`${scoreCls} ${overlay ? "text-blue-300" : ""}`}>{value.awayScore}</div>
+    <div className={`${styles.scorecard} ${compact ? styles.scorecardCompact : ""}`.trim()}>
+      <div className={`${styles.player} ${styles.playerLeft} player player-left`}>
+        <div className={styles.name} style={nameStyle}>
+          {homeLabel}
+        </div>
       </div>
-      <span className={`shrink-0 ${vsCls}`}>vs</span>
-      <div className="min-w-0 flex-1 text-center">
-        <div className={nameCls}>{value.homeName || "Home"}</div>
-        <div className={`${scoreCls} ${overlay ? "text-blue-300" : ""}`}>{value.homeScore}</div>
+
+      <div className={`${styles.vs} vs`} style={vsStyle}>
+        VS
+      </div>
+
+      <div className={`${styles.player} ${styles.playerRight} player player-right`}>
+        <div className={styles.name} style={nameStyle}>
+          {awayLabel}
+        </div>
       </div>
     </div>
   );

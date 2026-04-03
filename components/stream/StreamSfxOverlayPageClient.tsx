@@ -20,7 +20,7 @@ export function StreamSfxOverlayPageClient({ overlayKey }: StreamSfxOverlayPageC
 
   return (
     <div className="flex h-full flex-col items-center justify-center p-4">
-      <p className="max-w-sm text-center text-[10px] uppercase tracking-wider text-slate-600">
+      <p className="max-w-sm text-center text-[10px] text-slate-600">
         SFX listener active — keep this source unmuted in OBS
       </p>
       <StreamSfxOverlayListener overlayKey={overlayKey} />

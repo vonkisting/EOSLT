@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Stream OBS dashboard: scenes, cameras/sources, and audio panels refresh automatically via a browser-side OBS WebSocket listener (debounced); manual refresh buttons removed. Sound effects list still comes from `public/stream-sfx/` at page load—reload the page after adding MP3s.
+- Scoreboard overlay and dashboard preview: flex scorecard with two player columns, VS pill, frosted dark container, cyan glow scores — styled to match the provided OBS HTML/CSS (Segoe UI; compact scale in dashboard preview).
+
 ### Added
 
 - Next.js 16 project with TypeScript, App Router, and Turbopack.

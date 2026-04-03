@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation } from "convex/react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/convex/_generated/api";
 import { ObsConnectionPanel } from "@/components/stream/ObsConnectionPanel";
 import { ObsStreamCardOpenProvider } from "@/components/stream/ObsStreamCardOpenContext";
@@ -13,20 +13,39 @@ import {
 } from "@/components/stream/useObsProgramSources";
 import { StreamObsPageHeader } from "@/components/stream/StreamObsPageHeader";
 import { useStreamObsPersistedForm } from "@/components/stream/useStreamObsPersistedForm";
+import {
+  RESULTS_PREVIEW_CARD_OUTER_HEIGHT_PX,
+  RESULTS_PREVIEW_CARD_OUTER_WIDTH_PX,
+} from "@/lib/streamObsResultsPreviewDimensions";
 import { formatStreamSfxButtonLabel } from "@/lib/stream-sfx-basename";
+import {
+  DEFAULT_RESULTS_BROWSER_SOURCE_NAME,
+  DEFAULT_SCOREBOARD_BROWSER_SOURCE_NAME,
+  DEFAULT_SFX_BROWSER_SOURCE_NAME,
+} from "@/components/stream/streamObsFormDefaults";
 
 type StreamObsDashboardProps = {
   userEmail: string;
   userName: string | null;
   /** Basenames of `public/stream-sfx/*.mp3` discovered at request time. */
   sfxBasenames: string[];
+  /**
+   * When set (e.g. `NEXT_PUBLIC_STREAM_OVERLAY_ORIGIN`), overlay URLs use this instead of
+   * `window.location.origin` so OBS browser sources stay valid after LAN IP changes.
+   */
+  overlayPublicOrigin?: string | null;
 };
 
 /**
  * Stream OBS dashboard: connection is verified via POST /api/stream/obs/connect (server → OBS WebSocket).
  * Named connection profiles persist to Convex when Connection name is set.
  */
-export function StreamObsDashboard({ userEmail, userName, sfxBasenames }: StreamObsDashboardProps) {
+export function StreamObsDashboard({
+  userEmail,
+  userName,
+  sfxBasenames,
+  overlayPublicOrigin,
+}: StreamObsDashboardProps) {
   const normalizedEmail = userEmail.toLowerCase().trim();
 
   const soundboardEffects = useMemo(
@@ -55,27 +74,50 @@ export function StreamObsDashboard({ userEmail, userName, sfxBasenames }: Stream
     setLastSfx,
     scoreboard,
     setScoreboard,
+    tournamentSettings,
+    setTournamentSettings,
+    scoreboardBrowserSourceName,
+    setScoreboardBrowserSourceName,
+    sfxBrowserSourceName,
+    setSfxBrowserSourceName,
+    resultsBrowserSourceName,
+    setResultsBrowserSourceName,
     overlayAudioKey,
     overlayAudioKeyPending,
+    streamLogos,
   } = useStreamObsPersistedForm(userEmail, normalizedEmail);
 
   const cueOverlaySfxByProfile = useMutation(api.streamObsProfiles.cueOverlaySfxByProfile);
-  const [origin, setOrigin] = useState("");
+  const envOrigin = (overlayPublicOrigin ?? "").trim();
+  const [clientOrigin, setClientOrigin] = useState("");
   useEffect(() => {
-    setOrigin(window.location.origin);
-  }, []);
+    if (!envOrigin) {
+      setClientOrigin(window.location.origin);
+    }
+  }, [envOrigin]);
+
+  const publicOrigin = envOrigin || clientOrigin;
 
   const overlaySfxListenUrl =
-    overlayAudioKey && origin ? `${origin}/overlay/sfx?k=${encodeURIComponent(overlayAudioKey)}` : null;
+    overlayAudioKey && publicOrigin
+      ? `${publicOrigin}/overlay/sfx?k=${encodeURIComponent(overlayAudioKey)}`
+      : null;
   const scoreboardOverlayUrl =
-    overlayAudioKey && origin
-      ? `${origin}/overlay/scoreboard?k=${encodeURIComponent(overlayAudioKey)}`
+    overlayAudioKey && publicOrigin
+      ? `${publicOrigin}/overlay/scoreboard?k=${encodeURIComponent(overlayAudioKey)}`
+      : null;
+  const resultsOverlayUrl =
+    overlayAudioKey && publicOrigin
+      ? `${publicOrigin}/overlay/results?k=${encodeURIComponent(overlayAudioKey)}`
       : null;
 
-  const [scoreboardBrowserSourceName, setScoreboardBrowserSourceName] = useState("EOSLT Scoreboard");
   const [wireScoreboardPending, setWireScoreboardPending] = useState(false);
   const [wireScoreboardError, setWireScoreboardError] = useState<string | null>(null);
-  const [wireScoreboardSuccessAt, setWireScoreboardSuccessAt] = useState<string | null>(null);
+  const [wireResultsPending, setWireResultsPending] = useState(false);
+  const [wireResultsError, setWireResultsError] = useState<string | null>(null);
+
+  const [wireSfxPending, setWireSfxPending] = useState(false);
+  const [wireSfxError, setWireSfxError] = useState<string | null>(null);
 
   const [connected, setConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -102,7 +144,7 @@ export function StreamObsDashboard({ userEmail, userName, sfxBasenames }: Stream
   } = useObsAudioInputs(obsCredentials, connected);
 
   const wireScoreboardToObs = useCallback(async () => {
-    if (!obsCredentials || !overlayAudioKey || !origin) {
+    if (!obsCredentials || !overlayAudioKey || !publicOrigin) {
       setWireScoreboardError("Overlay URL or OBS connection is not ready yet.");
       return;
     }
@@ -110,7 +152,7 @@ export function StreamObsDashboard({ userEmail, userName, sfxBasenames }: Stream
     setWireScoreboardError(null);
     try {
       await saveProfileNow();
-      const url = `${origin}/overlay/scoreboard?k=${encodeURIComponent(overlayAudioKey)}`;
+      const url = `${publicOrigin}/overlay/scoreboard?k=${encodeURIComponent(overlayAudioKey)}`;
       const res = await fetch("/api/stream/obs/set-browser-source-url", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -119,25 +161,96 @@ export function StreamObsDashboard({ userEmail, userName, sfxBasenames }: Stream
           host: obsCredentials.host,
           port: obsCredentials.port,
           password: obsCredentials.password,
-          inputName: scoreboardBrowserSourceName.trim() || "EOSLT Scoreboard",
+          inputName:
+            scoreboardBrowserSourceName.trim() || DEFAULT_SCOREBOARD_BROWSER_SOURCE_NAME,
           url,
         }),
       });
       const data = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok || !data.ok) {
-        setWireScoreboardSuccessAt(null);
         setWireScoreboardError(data.error ?? `Request failed (${res.status})`);
         return;
       }
       setWireScoreboardError(null);
-      setWireScoreboardSuccessAt(new Date().toLocaleTimeString());
     } catch {
-      setWireScoreboardSuccessAt(null);
       setWireScoreboardError("Network error — could not reach OBS.");
     } finally {
       setWireScoreboardPending(false);
     }
-  }, [obsCredentials, overlayAudioKey, origin, saveProfileNow, scoreboardBrowserSourceName]);
+  }, [obsCredentials, overlayAudioKey, publicOrigin, saveProfileNow, scoreboardBrowserSourceName]);
+
+  const wireResultsToObs = useCallback(async () => {
+    if (!obsCredentials || !overlayAudioKey || !publicOrigin) {
+      setWireResultsError("Overlay URL or OBS connection is not ready yet.");
+      return;
+    }
+    setWireResultsPending(true);
+    setWireResultsError(null);
+    try {
+      await saveProfileNow();
+      const url = `${publicOrigin}/overlay/results?k=${encodeURIComponent(overlayAudioKey)}`;
+      const res = await fetch("/api/stream/obs/set-browser-source-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          host: obsCredentials.host,
+          port: obsCredentials.port,
+          password: obsCredentials.password,
+          inputName:
+            resultsBrowserSourceName.trim() || DEFAULT_RESULTS_BROWSER_SOURCE_NAME,
+          url,
+          browserWidth: RESULTS_PREVIEW_CARD_OUTER_WIDTH_PX,
+          browserHeight: RESULTS_PREVIEW_CARD_OUTER_HEIGHT_PX,
+        }),
+      });
+      const data = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !data.ok) {
+        setWireResultsError(data.error ?? `Request failed (${res.status})`);
+        return;
+      }
+      setWireResultsError(null);
+    } catch {
+      setWireResultsError("Network error — could not reach OBS.");
+    } finally {
+      setWireResultsPending(false);
+    }
+  }, [obsCredentials, overlayAudioKey, publicOrigin, saveProfileNow, resultsBrowserSourceName]);
+
+  const wireSfxToObs = useCallback(async () => {
+    if (!obsCredentials || !overlayAudioKey || !publicOrigin) {
+      setWireSfxError("Overlay URL or OBS connection is not ready yet.");
+      return;
+    }
+    setWireSfxPending(true);
+    setWireSfxError(null);
+    try {
+      await saveProfileNow();
+      const url = `${publicOrigin}/overlay/sfx?k=${encodeURIComponent(overlayAudioKey)}`;
+      const res = await fetch("/api/stream/obs/set-browser-source-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          host: obsCredentials.host,
+          port: obsCredentials.port,
+          password: obsCredentials.password,
+          inputName: sfxBrowserSourceName.trim() || DEFAULT_SFX_BROWSER_SOURCE_NAME,
+          url,
+        }),
+      });
+      const data = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !data.ok) {
+        setWireSfxError(data.error ?? `Request failed (${res.status})`);
+        return;
+      }
+      setWireSfxError(null);
+    } catch {
+      setWireSfxError("Network error — could not reach OBS.");
+    } finally {
+      setWireSfxPending(false);
+    }
+  }, [obsCredentials, overlayAudioKey, publicOrigin, saveProfileNow, sfxBrowserSourceName]);
 
   const handleConnect = useCallback(async (h: string, p: string, pw: string) => {
     setConnectError(null);
@@ -204,6 +317,51 @@ export function StreamObsDashboard({ userEmail, userName, sfxBasenames }: Stream
     [normalizedEmail, connectionName, cueOverlaySfxByProfile, saveProfileNow, setLastSfx]
   );
 
+  const scoreboardSyncKey = useMemo(() => JSON.stringify(scoreboard), [scoreboard]);
+  /** Last scoreboard JSON we successfully pushed a browser refresh for (OBS embed often drops live Convex). */
+  const lastObsScoreboardRefreshRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!connected) lastObsScoreboardRefreshRef.current = null;
+  }, [connected]);
+
+  useEffect(() => {
+    if (!connected || !obsCredentials) return;
+
+    const json = scoreboardSyncKey;
+    if (lastObsScoreboardRefreshRef.current === null) {
+      lastObsScoreboardRefreshRef.current = json;
+      return;
+    }
+    if (lastObsScoreboardRefreshRef.current === json) return;
+
+    const inputName =
+      scoreboardBrowserSourceName.trim() || DEFAULT_SCOREBOARD_BROWSER_SOURCE_NAME;
+    const pending = json;
+    const t = setTimeout(() => {
+      void (async () => {
+        try {
+          const res = await fetch("/api/stream/obs/refresh-browser-source", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              host: obsCredentials.host,
+              port: obsCredentials.port,
+              password: obsCredentials.password,
+              inputName,
+            }),
+          });
+          const data = (await res.json()) as { ok?: boolean };
+          if (res.ok && data.ok) lastObsScoreboardRefreshRef.current = pending;
+        } catch {
+          /* OBS off or wrong source name */
+        }
+      })();
+    }, 450);
+    return () => clearTimeout(t);
+  }, [connected, obsCredentials, scoreboardSyncKey, scoreboardBrowserSourceName]);
+
   return (
     <ObsStreamCardOpenProvider email={normalizedEmail}>
       <div className="min-h-[calc(100vh-3.5rem)] w-full bg-black px-4 py-6 md:px-6 md:py-8">
@@ -226,6 +384,31 @@ export function StreamObsDashboard({ userEmail, userName, sfxBasenames }: Stream
             onPasswordChange={setPassword}
             onConnect={handleConnect}
             onDisconnect={handleDisconnect}
+            overlaySfxListenUrl={overlaySfxListenUrl}
+            overlaySfxKeyPending={overlayAudioKeyPending}
+            sfxBrowserSourceName={sfxBrowserSourceName}
+            onSfxBrowserSourceNameChange={setSfxBrowserSourceName}
+            onWireSfxToObs={wireSfxToObs}
+            wireSfxPending={wireSfxPending}
+            wireSfxError={wireSfxError}
+            scoreboardOverlayUrl={scoreboardOverlayUrl}
+            scoreboardOverlayKeyPending={overlayAudioKeyPending}
+            scoreboardBrowserSourceName={scoreboardBrowserSourceName}
+            onScoreboardBrowserSourceNameChange={setScoreboardBrowserSourceName}
+            onWireScoreboardToObs={wireScoreboardToObs}
+            wireScoreboardPending={wireScoreboardPending}
+            wireScoreboardError={wireScoreboardError}
+            resultsOverlayUrl={resultsOverlayUrl}
+            resultsOverlayKeyPending={overlayAudioKeyPending}
+            resultsBrowserSourceName={resultsBrowserSourceName}
+            onResultsBrowserSourceNameChange={setResultsBrowserSourceName}
+            onWireResultsToObs={wireResultsToObs}
+            wireResultsPending={wireResultsPending}
+            wireResultsError={wireResultsError}
+            emailNormalized={normalizedEmail}
+            streamLogos={streamLogos}
+            obsCredentials={obsCredentials}
+            onSaveStreamProfile={saveProfileNow}
           />
 
           {connected && obsCredentials ? (
@@ -237,8 +420,6 @@ export function StreamObsDashboard({ userEmail, userName, sfxBasenames }: Stream
               setActiveScene={setActiveScene}
               lastSfx={lastSfx}
               onTriggerSfx={triggerSfx}
-              overlaySfxListenUrl={overlaySfxListenUrl}
-              overlaySfxKeyPending={overlayAudioKeyPending}
               sources={sources}
               onToggleSource={toggleSource}
               sourcesLoading={sourcesLoading}
@@ -253,14 +434,9 @@ export function StreamObsDashboard({ userEmail, userName, sfxBasenames }: Stream
               onAudioMute={setObsInputMute}
               scoreboard={scoreboard}
               onScoreboardChange={setScoreboard}
-              scoreboardOverlayUrl={scoreboardOverlayUrl}
-              overlayKeyPending={overlayAudioKeyPending}
-              scoreboardBrowserSourceName={scoreboardBrowserSourceName}
-              onScoreboardBrowserSourceNameChange={setScoreboardBrowserSourceName}
-              onWireScoreboardToObs={wireScoreboardToObs}
-              wireScoreboardPending={wireScoreboardPending}
-              wireScoreboardError={wireScoreboardError}
-              wireScoreboardSuccessAt={wireScoreboardSuccessAt}
+              tournamentSettings={tournamentSettings}
+              onTournamentSettingsChange={setTournamentSettings}
+              onTournamentPersistRequest={() => void saveProfileNow()}
             />
           ) : null}
         </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState, type ReactNode } from "react";
+import { labelTitleCase } from "@/lib/labelTitleCase";
 
 type ObsCollapsibleCardProps = {
   title: string;
@@ -43,7 +44,8 @@ export function ObsCollapsibleCard({
     if (controlled) onOpenChange?.(next);
     else setInternalOpen(next);
   };
-  const a11yName = collapseLabel ?? title;
+  const displayTitle = labelTitleCase(title);
+  const a11yName = labelTitleCase(collapseLabel ?? title);
 
   return (
     <section
@@ -52,8 +54,8 @@ export function ObsCollapsibleCard({
     >
       <div className="w-full">
         <div className={`flex items-center gap-3 ${open ? "pb-1.5" : ""}`}>
-          <h2 id={headingId} className="text-sm font-semibold uppercase tracking-wide text-blue-300">
-            {title}
+          <h2 id={headingId} className="text-sm font-semibold text-blue-300">
+            {displayTitle}
           </h2>
           <div className="ml-auto flex items-center gap-2">
             {headerExtra}
