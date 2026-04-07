@@ -558,16 +558,22 @@
   border-color: rgba(255, 255, 255, 0.2);
 }
 
-/* Per-matchup status: soft background and bright white text on both player row race cells */
-.home-bracket-root.bracket-8-two-rounds .match-status-in-progress .team .race {
+/*
+ * Per-matchup status on race cells (Week 1 eight-player + Week 2 / Finals four-player).
+ * Include .theme-dark-trendy so these beat `.theme-dark-trendy .match .team .race` (#000 / blue text).
+ */
+.home-bracket-root.bracket-8-two-rounds .theme-dark-trendy .match.match-status-in-progress .team .race,
+.home-bracket-root.bracket-4 .theme-dark-trendy .match.match-status-in-progress .team .race {
   background-color: #16a34a;
   color: #fff;
 }
-.home-bracket-root.bracket-8-two-rounds .match-status-paused .team .race {
+.home-bracket-root.bracket-8-two-rounds .theme-dark-trendy .match.match-status-paused .team .race,
+.home-bracket-root.bracket-4 .theme-dark-trendy .match.match-status-paused .team .race {
   background-color: rgba(250, 204, 21, 0.25);
   color: #fff;
 }
-.home-bracket-root.bracket-8-two-rounds .match-status-completed .team .race {
+.home-bracket-root.bracket-8-two-rounds .theme-dark-trendy .match.match-status-completed .team .race,
+.home-bracket-root.bracket-4 .theme-dark-trendy .match.match-status-completed .team .race {
   background-color: #dc2626;
   color: #fff;
 }

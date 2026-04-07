@@ -7,10 +7,13 @@ import { selectOptionsFullPool } from "@/lib/dropdownOptions";
 const SECOND_ROUND_FIRST_SLOT = 8;
 
 export function matchStatusClass(status: string | null | undefined): string {
-  if (!status) return "";
-  if (status === "In Progress...") return "match-status-in-progress";
-  if (status === "Paused" || status === "Paused...") return "match-status-paused";
-  if (status === "Completed") return "match-status-completed";
+  const s = (status ?? "").trim();
+  if (!s) return "";
+  const lower = s.toLowerCase();
+  if (lower === "in progress..." || lower === "in progress" || lower.startsWith("in progress"))
+    return "match-status-in-progress";
+  if (lower === "paused" || lower === "paused...") return "match-status-paused";
+  if (lower === "completed") return "match-status-completed";
   return "";
 }
 
