@@ -821,7 +821,6 @@ export function DashboardContent() {
       }
 
       if (st === "Completed") {
-        qs.set("readonly", "1");
         router.push(`/live-scoring?${qs.toString()}`);
         return;
       }

@@ -751,7 +751,10 @@ export function LiveScoringCard({
                       Submit Scores
                     </button>
                   )}
-                  {!readOnly && dashboardOperator && stage === "week1" && (
+                  {!readOnly &&
+                    dashboardOperator &&
+                    stage === "week1" &&
+                    !(totalsReached && !bothHaveWinningTotals) && (
                     <button
                       type="button"
                       onClick={() => {
