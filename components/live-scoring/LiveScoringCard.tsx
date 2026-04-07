@@ -90,6 +90,19 @@ function getWinningGameIndex(
   return null;
 }
 
+/** Deep compare per-game cells (trimmed) for dashboard “any edits since load” checks. */
+function scoresEqualToBaseline(
+  p1: string[],
+  p2: string[],
+  baseline: { p1: string[]; p2: string[] }
+): boolean {
+  for (let i = 0; i < GAME_COUNT; i++) {
+    if ((p1[i] ?? "").trim() !== (baseline.p1[i] ?? "").trim()) return false;
+    if ((p2[i] ?? "").trim() !== (baseline.p2[i] ?? "").trim()) return false;
+  }
+  return true;
+}
+
 /** True iff every game row with both values has exactly one player at 10. */
 function allGameRowsValid(row1: string[], row2: string[]): boolean {
   for (let i = 0; i < row1.length; i++) {
@@ -182,10 +195,13 @@ export function LiveScoringCard({
   const skipNextSaveRef = useRef(false);
   /** Last raw we wrote to Convex; skip applying it when it comes back so we don't re-render from our own echo. */
   const lastWrittenRawRef = useRef<string | null>(null);
+  /** Scores last applied from Convex (or empty init) for this matchup — dashboard: legal-win + submit only if current state differs. */
+  const baselineSnapshotRef = useRef<{ p1: string[]; p2: string[] } | null>(null);
 
   useEffect(() => {
     lastSyncedRawRef.current = null;
     lastWrittenRawRef.current = null;
+    baselineSnapshotRef.current = null;
   }, [cardIndex, matchIndex, stage]);
 
   useEffect(() => {
@@ -212,6 +228,9 @@ export function LiveScoringCard({
         ) {
           const p1 = parsed.p1.map((c) => (c != null && c !== "" ? String(c).trim() : ""));
           const p2 = parsed.p2.map((c) => (c != null && c !== "" ? String(c).trim() : ""));
+          if (dashboardOperator) {
+            baselineSnapshotRef.current = { p1: [...p1], p2: [...p2] };
+          }
           setPlayer1Scores(p1);
           setPlayer2Scores(p2);
         }
@@ -226,6 +245,9 @@ export function LiveScoringCard({
       p2: Array.from({ length: GAME_COUNT }, () => ""),
     });
     lastSyncedRawRef.current = emptyGames;
+    if (dashboardOperator) {
+      baselineSnapshotRef.current = { p1: [...EMPTY_ROW], p2: [...EMPTY_ROW] };
+    }
     setPlayer1Scores([...EMPTY_ROW]);
     setPlayer2Scores([...EMPTY_ROW]);
     setDashboardSettings({
@@ -236,7 +258,7 @@ export function LiveScoringCard({
       [`bracketScoreTop${key}`]: "0",
       [`bracketScoreBottom${key}`]: "0",
     } as Parameters<typeof setDashboardSettings>[0]);
-  }, [settings, cardIndex, matchIndex, validCard, validMatch, email, setDashboardSettings, stage, readOnly]);
+  }, [settings, cardIndex, matchIndex, validCard, validMatch, email, setDashboardSettings, stage, readOnly, dashboardOperator]);
 
   const updateScore = useCallback(
     (playerIndex: 0 | 1, gameIndex: number, value: string) => {
@@ -441,6 +463,15 @@ export function LiveScoringCard({
   const displayTotal1 = readOnly ? Number.parseInt(storedTopScore, 10) || 0 : total1;
   const displayTotal2 = readOnly ? Number.parseInt(storedBottomScore, 10) || 0 : total2;
 
+  /** Dashboard (week 1): winning-ball flow + submit only after the user changes at least one cell vs loaded snapshot. */
+  const hasUserEditedScores = useMemo(() => {
+    if (!dashboardOperator || readOnly) return true;
+    if (stage !== "week1") return true;
+    const b = baselineSnapshotRef.current;
+    if (b == null) return false;
+    return !scoresEqualToBaseline(player1Scores, player2Scores, b);
+  }, [dashboardOperator, readOnly, player1Scores, player2Scores, stage]);
+
   const [legalWinConfirmed, setLegalWinConfirmed] = useState(false);
   const [requireStrictExceedPlayer1, setRequireStrictExceedPlayer1] = useState(false);
   const [requireStrictExceedPlayer2, setRequireStrictExceedPlayer2] = useState(false);
@@ -450,6 +481,15 @@ export function LiveScoringCard({
     if (readOnly) return;
     setLegalWinConfirmed(false);
   }, [total1, total2, readOnly]);
+
+  useEffect(() => {
+    if (readOnly || !dashboardOperator) return;
+    if (hasUserEditedScores) return;
+    setLegalWinConfirmed(false);
+    setLegalWinModalOpen(false);
+    setRequireStrictExceedPlayer1(false);
+    setRequireStrictExceedPlayer2(false);
+  }, [hasUserEditedScores, readOnly, dashboardOperator]);
 
   const p1Won = useMemo(
     () =>
@@ -495,6 +535,14 @@ export function LiveScoringCard({
       setLegalWinModalOpen(false);
       return;
     }
+    if (dashboardOperator && !hasUserEditedScores) {
+      if (winningBallDelayRef.current != null) {
+        clearTimeout(winningBallDelayRef.current);
+        winningBallDelayRef.current = null;
+      }
+      setLegalWinModalOpen(false);
+      return;
+    }
     if (singleWinnerName == null || legalWinConfirmed) return;
     winningBallDelayRef.current = setTimeout(() => {
       winningBallDelayRef.current = null;
@@ -506,7 +554,14 @@ export function LiveScoringCard({
         winningBallDelayRef.current = null;
       }
     };
-  }, [singleWinnerName, legalWinConfirmed, winningGameHasBothScores, readOnly]);
+  }, [
+    singleWinnerName,
+    legalWinConfirmed,
+    winningGameHasBothScores,
+    readOnly,
+    dashboardOperator,
+    hasUserEditedScores,
+  ]);
 
   const handleScoreChange = useCallback(
     (playerIndex: 0 | 1, gameIndex: number, value: string) => {
@@ -553,8 +608,12 @@ export function LiveScoringCard({
 
   /** Allow submit when one player has won (under strict rule if set), not both, and user confirmed legal win. */
   const canSubmitScores = useMemo(
-    () => totalsReached && !bothHaveWinningTotals && legalWinConfirmed,
-    [totalsReached, bothHaveWinningTotals, legalWinConfirmed]
+    () =>
+      totalsReached &&
+      !bothHaveWinningTotals &&
+      legalWinConfirmed &&
+      (!dashboardOperator || hasUserEditedScores),
+    [totalsReached, bothHaveWinningTotals, legalWinConfirmed, dashboardOperator, hasUserEditedScores]
   );
 
   const [submitSuccessModalOpen, setSubmitSuccessModalOpen] = useState(false);
@@ -745,7 +804,7 @@ export function LiveScoringCard({
                         updateMatchStatus("Completed");
                         setSubmitSuccessModalOpen(true);
                       }}
-                      disabled={!legalWinConfirmed}
+                      disabled={!canSubmitScores}
                       className="rounded-lg bg-gradient-to-r from-blue-700 to-blue-500 px-5 py-2.5 font-semibold text-white shadow transition-opacity hover:from-blue-600 hover:to-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-800 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:from-blue-700 disabled:hover:to-blue-500"
                     >
                       Submit Scores
@@ -758,10 +817,12 @@ export function LiveScoringCard({
                     <button
                       type="button"
                       onClick={() => {
+                        if (!hasUserEditedScores) return;
                         updateMatchStatus("Completed");
                         setSubmitSuccessModalOpen(true);
                       }}
-                      className="rounded-lg bg-gradient-to-r from-emerald-700 to-emerald-500 px-5 py-2.5 font-semibold text-white shadow transition-opacity hover:from-emerald-600 hover:to-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-slate-800"
+                      disabled={!hasUserEditedScores}
+                      className="rounded-lg bg-gradient-to-r from-emerald-700 to-emerald-500 px-5 py-2.5 font-semibold text-white shadow transition-opacity hover:from-emerald-600 hover:to-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-slate-800 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:from-emerald-700 disabled:hover:to-emerald-500"
                       aria-label="Submit scores and mark matchup completed"
                     >
                       Submit scores
