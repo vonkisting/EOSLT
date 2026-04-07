@@ -1,6 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { useSession } from "next-auth/react";
@@ -331,7 +340,11 @@ export function DashboardContent() {
   const email = session?.user?.email?.toLowerCase().trim();
   const router = useRouter();
   const savedSettings = useQuery(api.dashboardSettings.getShared, {});
+  /** Tournament/bracket data and shared writes (canonical doc). */
   const setDashboardSettings = useMutation(api.dashboardSettings.setShared);
+  /** Logged-in user’s own row: collapsible UI only (not global). */
+  const myUserSettings = useQuery(api.dashboardSettings.get, email ? { email } : "skip");
+  const patchUserDashboardSettings = useMutation(api.dashboardSettings.set);
   const hasAppliedInitialSettings = useRef(false);
   const settingsQueryHasReturned = useRef(false);
 
@@ -720,17 +733,39 @@ export function DashboardContent() {
         /* ignore invalid JSON */
       }
     }
-    const ui = rest as Record<string, unknown>;
-    if (ui.uiUsersCardOpen === true) setUsersCardOpen(true);
-    if (ui.uiLeagueCardOpen === true) setLeagueCardOpen(true);
-    if (ui.uiPlayersCardOpen === true) setPlayersCardOpen(true);
-    if (ui.uiWeek1SectionOpen === true) setWeek1SectionOpen(true);
-    if (ui.uiWeek2SectionOpen === true) setWeek2SectionOpen(true);
-    if (ui.uiFinalsSectionOpen === true) setFinalsSectionOpen(true);
-    setWeek1SlotCardsOpen((prev) =>
-      prev.map((_, i) => (ui[`uiWeek1Slot${i}Open`] === true) || prev[i])
-    );
   }, [savedSettings, leagueNames]);
+
+  /** Restore collapsible sections from the signed-in user’s dashboard row (not the shared tournament doc). */
+  useEffect(() => {
+    if (!email || myUserSettings === undefined) return;
+    if (myUserSettings === null) return;
+    const ui = myUserSettings as Record<string, unknown>;
+    const applyBool = (key: string, set: Dispatch<SetStateAction<boolean>>) => {
+      const v = ui[key];
+      if (v === true || v === false) set(v);
+    };
+    applyBool("uiUsersCardOpen", setUsersCardOpen);
+    applyBool("uiLeagueCardOpen", setLeagueCardOpen);
+    applyBool("uiPlayersCardOpen", setPlayersCardOpen);
+    applyBool("uiWeek1SectionOpen", setWeek1SectionOpen);
+    applyBool("uiWeek2SectionOpen", setWeek2SectionOpen);
+    applyBool("uiFinalsSectionOpen", setFinalsSectionOpen);
+    setWeek1SlotCardsOpen((prev) =>
+      prev.map((p, i) => {
+        const v = ui[`uiWeek1Slot${i}Open`];
+        if (v === true || v === false) return v;
+        return p;
+      })
+    );
+    setWeek2SlotCardsOpen((prev) =>
+      prev.map((p, i) => {
+        const v = ui[`uiWeek2Slot${i}Open`];
+        if (v === true || v === false) return v;
+        return p;
+      })
+    );
+    applyBool("uiFinalsCardOpen", setFinalsCardOpen);
+  }, [email, myUserSettings]);
 
   useEffect(() => {
     if (pendingSeasonFromSettings.current == null || !seasonNames.length) return;
@@ -890,7 +925,16 @@ export function DashboardContent() {
   /** Save the 6 bracket slots for one Week 2 card (cardIndex 0–3). Persists week2BracketSlots + match statuses JSON. */
   const saveWeek2BracketSlots = useCallback(
     (cardIndex: number, slots: string[]) => {
-      if (!email || slots.length !== 6 || cardIndex < 0 || cardIndex > 3) return;
+      if (
+        !email ||
+        !selectedLeagueName?.trim() ||
+        !selectedSeason?.trim() ||
+        slots.length !== 6 ||
+        cardIndex < 0 ||
+        cardIndex > 3
+      ) {
+        return;
+      }
       const next = [...week2BracketSlotsArray];
       for (let i = 0; i < 6; i++) next[cardIndex * 6 + i] = slots[i] ?? "";
       const nextStatuses = [...week2BracketMatchStatusesArray];
@@ -956,7 +1000,7 @@ export function DashboardContent() {
   /** Save the 6 Finals bracket slots. Persists to finalsBracketSlots JSON. */
   const saveFinalsBracketSlots = useCallback(
     (slots: string[]) => {
-      if (!email || slots.length !== 6) return;
+      if (!email || !selectedLeagueName?.trim() || !selectedSeason?.trim() || slots.length !== 6) return;
       setDashboardSettings({
         email,
         leagueName: selectedLeagueName,
@@ -1207,20 +1251,27 @@ export function DashboardContent() {
     } as Parameters<typeof setDashboardSettings>[0]);
   }, [email, selectedLeagueName, selectedSeason, tournamentPaused, setDashboardSettings]);
 
-  /** Persist collapsible open/closed state to Convex so it survives reload. */
+  /** Persist collapsible open/closed state to the signed-in user’s Convex row (not the shared tournament doc). */
   const persistUiCollapsed = useCallback(
     (patch: Record<string, boolean>) => {
-      if (!email) return;
-      setDashboardSettings({
+      if (!email || !selectedLeagueName?.trim() || !selectedSeason?.trim()) return;
+      void patchUserDashboardSettings({
         email,
         leagueName: selectedLeagueName,
         season: selectedSeason,
         tournamentStarted,
         tournamentPaused,
         ...patch,
-      } as Parameters<typeof setDashboardSettings>[0]);
+      } as Parameters<typeof patchUserDashboardSettings>[0]);
     },
-    [email, selectedLeagueName, selectedSeason, tournamentStarted, tournamentPaused, setDashboardSettings]
+    [
+      email,
+      selectedLeagueName,
+      selectedSeason,
+      tournamentStarted,
+      tournamentPaused,
+      patchUserDashboardSettings,
+    ]
   );
 
   // Debounced save when any location or start date/time input changes (skip until we've applied initial settings from Convex so we don't overwrite with empty state)
@@ -2746,6 +2797,7 @@ export function DashboardContent() {
                   setWeek2SlotCardsOpen((prev) => {
                     const next = [...prev];
                     next[index] = !next[index];
+                    persistUiCollapsed({ [`uiWeek2Slot${index}Open`]: next[index] });
                     return next;
                   });
                 }}
@@ -2778,6 +2830,7 @@ export function DashboardContent() {
                 className="w-fit overflow-visible rounded-b-xl border-t border-white/40 bg-black pb-2 pt-2 pl-4"
               >
                 <Bracket4
+                  key={`week2-bracket-${index}-${selectedLeagueName}-${selectedSeason}`}
                   players={playerDisplayNames}
                   playerRaceToMap={Object.fromEntries(
                     playerRows.map((r) => [r.playerName, r.raceTo])
@@ -2814,7 +2867,13 @@ export function DashboardContent() {
           >
             <button
               type="button"
-              onClick={() => setFinalsCardOpen((o) => !o)}
+              onClick={() =>
+                setFinalsCardOpen((o) => {
+                  const next = !o;
+                  persistUiCollapsed({ uiFinalsCardOpen: next });
+                  return next;
+                })
+              }
               className="flex min-w-0 cursor-pointer items-center justify-center gap-4 text-left transition-opacity hover:opacity-90"
               aria-expanded={finalsCardOpen}
               aria-controls="finals-slot-body"
@@ -2844,6 +2903,7 @@ export function DashboardContent() {
               className="w-fit overflow-visible rounded-b-xl border-t border-white/40 bg-black pb-2 pt-2 pl-4"
             >
               <Bracket4
+                key={`finals-bracket-${selectedLeagueName}-${selectedSeason}`}
                 players={playerDisplayNames}
                 playerRaceToMap={Object.fromEntries(
                   playerRows.map((r) => [r.playerName, r.raceTo])

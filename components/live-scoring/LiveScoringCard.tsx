@@ -127,7 +127,8 @@ function allGameRowsValid(row1: string[], row2: string[]): boolean {
 function getGameRowErrorMessage(
   row1: string[],
   row2: string[],
-  index: number
+  index: number,
+  options?: { hasPlayerReachedRaceTo?: boolean }
 ): string | null {
   const v1 = (row1[index] ?? "").trim();
   const v2 = (row2[index] ?? "").trim();
@@ -135,7 +136,10 @@ function getGameRowErrorMessage(
   const n1 = parseInt(v1, 10);
   const n2 = parseInt(v2, 10);
   if (n1 === 10 && n2 === 10) return "Only 1 player can score a 10 per game.";
-  if (n1 !== 10 && n2 !== 10) return "One player MUST score a 10 each game.";
+  if (n1 !== 10 && n2 !== 10) {
+    if (options?.hasPlayerReachedRaceTo) return null;
+    return "One player MUST score a 10 each game.";
+  }
   return null;
 }
 
@@ -570,16 +574,8 @@ export function LiveScoringCard({
   const winningBallDelayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (readOnly) return;
+    if (readOnly || dashboardOperator) return;
     if (!winningGameHasBothScores) {
-      if (winningBallDelayRef.current != null) {
-        clearTimeout(winningBallDelayRef.current);
-        winningBallDelayRef.current = null;
-      }
-      setLegalWinModalOpen(false);
-      return;
-    }
-    if (dashboardOperator && !hasUserEditedScores) {
       if (winningBallDelayRef.current != null) {
         clearTimeout(winningBallDelayRef.current);
         winningBallDelayRef.current = null;
@@ -604,7 +600,6 @@ export function LiveScoringCard({
     winningGameHasBothScores,
     readOnly,
     dashboardOperator,
-    hasUserEditedScores,
   ]);
 
   const handleScoreChange = useCallback(
@@ -805,7 +800,9 @@ export function LiveScoringCard({
                           </tr>
                           {(() => {
                             if (readOnly || (totalsReached && legalWinConfirmed)) return null;
-                            const msg = getGameRowErrorMessage(player1Scores, player2Scores, i);
+                            const msg = getGameRowErrorMessage(player1Scores, player2Scores, i, {
+                              hasPlayerReachedRaceTo: totalsReached,
+                            });
                             return msg ? (
                               <tr>
                                 <td colSpan={3} className="border border-slate-300 bg-red-50 px-3 py-1.5 text-center text-sm font-medium text-red-600">
@@ -840,7 +837,19 @@ export function LiveScoringCard({
                   </p>
                 )}
                 <div className="flex flex-wrap justify-center gap-3">
-                  {!readOnly && totalsReached && !bothHaveWinningTotals && (
+                  {!readOnly && dashboardOperator && stage === "week1" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        updateMatchStatus("Completed");
+                        setSubmitSuccessModalOpen(true);
+                      }}
+                      className="rounded-lg bg-gradient-to-r from-blue-700 to-blue-500 px-5 py-2.5 font-semibold text-white shadow transition-opacity hover:from-blue-600 hover:to-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-800"
+                    >
+                      Submit Scores
+                    </button>
+                  )}
+                  {!readOnly && !dashboardOperator && totalsReached && !bothHaveWinningTotals && (
                     <button
                       type="button"
                       onClick={() => {
@@ -852,24 +861,6 @@ export function LiveScoringCard({
                       className="rounded-lg bg-gradient-to-r from-blue-700 to-blue-500 px-5 py-2.5 font-semibold text-white shadow transition-opacity hover:from-blue-600 hover:to-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-800 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:from-blue-700 disabled:hover:to-blue-500"
                     >
                       Submit Scores
-                    </button>
-                  )}
-                  {!readOnly &&
-                    dashboardOperator &&
-                    stage === "week1" &&
-                    !(totalsReached && !bothHaveWinningTotals) && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!hasUserEditedScores) return;
-                        updateMatchStatus("Completed");
-                        setSubmitSuccessModalOpen(true);
-                      }}
-                      disabled={!hasUserEditedScores}
-                      className="rounded-lg bg-gradient-to-r from-emerald-700 to-emerald-500 px-5 py-2.5 font-semibold text-white shadow transition-opacity hover:from-emerald-600 hover:to-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-slate-800 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:from-emerald-700 disabled:hover:to-emerald-500"
-                      aria-label="Submit scores and mark matchup completed"
-                    >
-                      Submit scores
                     </button>
                   )}
                   <button

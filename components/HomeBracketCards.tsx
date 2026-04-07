@@ -79,6 +79,8 @@ export function HomeBracketCards() {
   const email = session?.user?.email?.toLowerCase().trim();
   const settings = useQuery(api.dashboardSettings.getPublic, {});
   const setDashboardSettings = useMutation(api.dashboardSettings.set);
+  /** Per-user row (collapse prefs); tournament data still comes from getPublic. */
+  const myUserSettings = useQuery(api.dashboardSettings.get, email ? { email } : "skip");
   const convexUser = useQuery(
     api.users.getByEmail,
     email ? { email } : "skip"
@@ -122,36 +124,88 @@ export function HomeBracketCards() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    try {
-      const raw = window.localStorage.getItem(collapseStorageKey);
-      if (!raw) {
+    if (email && myUserSettings === undefined) return;
+
+    const readLocal = () => {
+      try {
+        const raw = window.localStorage.getItem(collapseStorageKey);
+        if (!raw) {
+          setWeek2CardsOpen(Array(4).fill(true));
+          setFinalsCardOpen(true);
+          return;
+        }
+        const parsed = JSON.parse(raw) as {
+          week2CardsOpen?: unknown;
+          finalsCardOpen?: unknown;
+        };
+        setWeek2CardsOpen(
+          Array.isArray(parsed.week2CardsOpen) && parsed.week2CardsOpen.length === 4
+            ? parsed.week2CardsOpen.map((value) => value === true)
+            : Array(4).fill(true)
+        );
+        setFinalsCardOpen(parsed.finalsCardOpen === false ? false : true);
+      } catch {
         setWeek2CardsOpen(Array(4).fill(true));
         setFinalsCardOpen(true);
+      }
+    };
+
+    if (email && myUserSettings !== undefined) {
+      if (myUserSettings !== null) {
+        const ui = myUserSettings as Record<string, unknown>;
+        setWeek2CardsOpen(
+          [0, 1, 2, 3].map((i) => {
+            const v = ui[`uiWeek2Slot${i}Open`];
+            if (v === true || v === false) return v;
+            return true;
+          })
+        );
+        const fv = ui.uiFinalsCardOpen;
+        setFinalsCardOpen(fv === true ? true : fv === false ? false : true);
         return;
       }
-      const parsed = JSON.parse(raw) as {
-        week2CardsOpen?: unknown;
-        finalsCardOpen?: unknown;
-      };
-      setWeek2CardsOpen(
-        Array.isArray(parsed.week2CardsOpen) && parsed.week2CardsOpen.length === 4
-          ? parsed.week2CardsOpen.map((value) => value === true)
-          : Array(4).fill(true)
-      );
-      setFinalsCardOpen(parsed.finalsCardOpen === false ? false : true);
-    } catch {
-      setWeek2CardsOpen(Array(4).fill(true));
-      setFinalsCardOpen(true);
+      readLocal();
+      return;
     }
-  }, [collapseStorageKey]);
+
+    readLocal();
+  }, [email, myUserSettings, collapseStorageKey]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (email) {
+      if (!settings || typeof settings !== "object") return;
+      const s = settings as Record<string, unknown>;
+      const leagueName = String(s.leagueName ?? "").trim();
+      const season = String(s.season ?? "").trim();
+      if (!leagueName || !season || myUserSettings === undefined) return;
+      void setDashboardSettings({
+        email,
+        leagueName,
+        season,
+        tournamentStarted: s.tournamentStarted === true,
+        tournamentPaused: s.tournamentPaused === true,
+        uiWeek2Slot0Open: week2CardsOpen[0],
+        uiWeek2Slot1Open: week2CardsOpen[1],
+        uiWeek2Slot2Open: week2CardsOpen[2],
+        uiWeek2Slot3Open: week2CardsOpen[3],
+        uiFinalsCardOpen: finalsCardOpen,
+      } as Parameters<typeof setDashboardSettings>[0]);
+      return;
+    }
     window.localStorage.setItem(
       collapseStorageKey,
       JSON.stringify({ week2CardsOpen, finalsCardOpen })
     );
-  }, [collapseStorageKey, week2CardsOpen, finalsCardOpen]);
+  }, [
+    email,
+    myUserSettings,
+    collapseStorageKey,
+    week2CardsOpen,
+    finalsCardOpen,
+    settings,
+    setDashboardSettings,
+  ]);
 
   const hasLeagueAndSeason =
     settings &&

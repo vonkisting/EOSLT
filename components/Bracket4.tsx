@@ -73,6 +73,9 @@ export function Bracket4({
       : EMPTY_SLOTS
   );
   const userDidEditRef = useRef(false);
+  const onBracketSlotsChangeRef = useRef(onBracketSlotsChange);
+  onBracketSlotsChangeRef.current = onBracketSlotsChange;
+
   const initialSlotSelectionsSerialized =
     initialSlotSelections?.length === 6 ? JSON.stringify(initialSlotSelections) : null;
 
@@ -92,10 +95,10 @@ export function Bracket4({
   }, []);
 
   useEffect(() => {
-    if (!userDidEditRef.current || !onBracketSlotsChange) return;
+    if (!userDidEditRef.current || !onBracketSlotsChangeRef.current) return;
     userDidEditRef.current = false;
-    onBracketSlotsChange(slotSelections);
-  }, [slotSelections, onBracketSlotsChange]);
+    onBracketSlotsChangeRef.current(slotSelections);
+  }, [slotSelections]);
 
   const [scores, setScores] = useState<string[]>(() =>
     initialScores?.length === 6 ? [...initialScores] : DEFAULT_SCORES

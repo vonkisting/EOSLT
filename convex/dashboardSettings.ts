@@ -13,7 +13,9 @@ const uiCollapsedKeys = [
   "uiUsersCardOpen", "uiLeagueCardOpen", "uiPlayersCardOpen",
   "uiWeek1SectionOpen", "uiWeek2SectionOpen", "uiFinalsSectionOpen",
   "uiWeek1Slot0Open", "uiWeek1Slot1Open", "uiWeek1Slot2Open", "uiWeek1Slot3Open",
-  "uiWeek1Slot4Open", "uiWeek1Slot5Open",   "uiWeek1Slot6Open", "uiWeek1Slot7Open",
+  "uiWeek1Slot4Open", "uiWeek1Slot5Open", "uiWeek1Slot6Open", "uiWeek1Slot7Open",
+  "uiWeek2Slot0Open", "uiWeek2Slot1Open", "uiWeek2Slot2Open", "uiWeek2Slot3Open",
+  "uiFinalsCardOpen",
   /** Side "Tournament Setup" panel: true when collapsed (default open when unset). */
   "uiTournamentSetupCollapsed",
 ] as const;
@@ -102,7 +104,9 @@ function mapDocToSettings(doc: Doc<"dashboardSettings">) {
   out.showBracketsOnHomeScreen = d.showBracketsOnHomeScreen === true;
   for (const key of uiCollapsedKeys) {
     const val = d[key];
-    out[key] = val === true;
+    if (val === true) out[key] = true;
+    else if (val === false) out[key] = false;
+    else out[key] = null;
   }
   return out as {
     leagueName: string;
@@ -110,7 +114,7 @@ function mapDocToSettings(doc: Doc<"dashboardSettings">) {
     leagueGuid: string | null;
     tournamentStarted: boolean;
     tournamentPaused: boolean;
-  } & Record<(typeof locationKeys)[number], string | null> & { locationStartMeta: string | null } & Record<`bracketSlot${number}`, string | null> & Record<`bracketMatchStatus${number}`, string | null> & Record<`bracketScoreTop${number}` | `bracketScoreBottom${number}`, string | null> & Record<`liveScoreGames${number}`, string | null> & { week2BracketSlots: string | null; week2BracketScores: string | null; week2BracketMatchStatuses: string | null; finalsBracketSlots: string | null; finalsBracketScores: string | null; week1BracketsRandomized: boolean; showBracketsOnHomeScreen: boolean } & Record<(typeof uiCollapsedKeys)[number], boolean>;
+  } & Record<(typeof locationKeys)[number], string | null> & { locationStartMeta: string | null } & Record<`bracketSlot${number}`, string | null> & Record<`bracketMatchStatus${number}`, string | null> & Record<`bracketScoreTop${number}` | `bracketScoreBottom${number}`, string | null> & Record<`liveScoreGames${number}`, string | null> & { week2BracketSlots: string | null; week2BracketScores: string | null; week2BracketMatchStatuses: string | null; finalsBracketSlots: string | null; finalsBracketScores: string | null; week1BracketsRandomized: boolean; showBracketsOnHomeScreen: boolean   } & Record<(typeof uiCollapsedKeys)[number], boolean | null>;
 }
 
 /**

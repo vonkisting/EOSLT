@@ -359,6 +359,13 @@ export default defineSchema({
     uiWeek1Slot5Open: v.optional(v.boolean()),
     uiWeek1Slot6Open: v.optional(v.boolean()),
     uiWeek1Slot7Open: v.optional(v.boolean()),
+    /** Week 2 bracket cards (4 locations): open/closed; per-user via dashboardSettings.set. */
+    uiWeek2Slot0Open: v.optional(v.boolean()),
+    uiWeek2Slot1Open: v.optional(v.boolean()),
+    uiWeek2Slot2Open: v.optional(v.boolean()),
+    uiWeek2Slot3Open: v.optional(v.boolean()),
+    /** Finals bracket card body open/closed (distinct from uiFinalsSectionOpen). */
+    uiFinalsCardOpen: v.optional(v.boolean()),
     uiTournamentSetupCollapsed: v.optional(v.boolean()),
   }).index("by_email", ["email"]),
   /** Venue names for location dropdowns (synced from PoolHub, exclusions applied). */
