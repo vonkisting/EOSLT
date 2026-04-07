@@ -1,17 +1,18 @@
 "use client";
 
 import { useMutation } from "convex/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/convex/_generated/api";
 import { ObsConnectionPanel } from "@/components/stream/ObsConnectionPanel";
 import { ObsStreamCardOpenProvider } from "@/components/stream/ObsStreamCardOpenContext";
+import { StreamObsLayoutProvider } from "@/components/stream/StreamObsLayoutContext";
 import { StreamObsConnectedPanels } from "@/components/stream/StreamObsConnectedPanels";
 import { useObsAudioInputs } from "@/components/stream/useObsAudioInputs";
 import {
   type ObsCredentials,
   useObsProgramSources,
 } from "@/components/stream/useObsProgramSources";
-import { StreamObsPageHeader } from "@/components/stream/StreamObsPageHeader";
 import { useStreamObsPersistedForm } from "@/components/stream/useStreamObsPersistedForm";
 import {
   RESULTS_PREVIEW_CARD_OUTER_HEIGHT_PX,
@@ -32,16 +33,34 @@ import {
   DEFAULT_RESULTS_BROWSER_SOURCE_NAME,
   DEFAULT_SCOREBOARD_BROWSER_SOURCE_NAME,
   DEFAULT_SFX_BROWSER_SOURCE_NAME,
+  DEFAULT_VIDEO_PLAYER_SCENE_NAME,
 } from "@/components/stream/streamObsFormDefaults";
 import { useObsScenes } from "@/components/stream/useObsScenes";
 import { fetchObsPanelsSnapshot } from "@/lib/stream-obs-fetch-panels-snapshot";
-import { obsClientConnect, obsClientSetBrowserSourceUrl } from "@/lib/stream-obs-client-actions";
+import {
+  applyPersistedAudioToObs,
+  applyPersistedSourcesToObs,
+} from "@/lib/streamObsApplyPersistedPanels";
+import {
+  mergeObsAudioInputsWithPersist,
+  mergeObsSceneItemsWithPersist,
+  parseAudioChannelsPersistJson,
+  parseProgramSourcesPersistJson,
+  serializeAudioChannelsForPersist,
+  serializeProgramSourcesForPersist,
+} from "@/lib/streamObsPanelsPersist";
+import {
+  obsClientConnect,
+  obsClientEnsureGraphicsScene,
+  obsClientSetBrowserSourceUrl,
+} from "@/lib/stream-obs-client-actions";
 
 type StreamObsDashboardProps = {
   userEmail: string;
-  userName: string | null;
-  /** Basenames of `public/stream-sfx/*.mp3` discovered at request time. */
+  /** SFX ids (filename without extension) under `public/stream-sfx/` at request time. */
   sfxBasenames: string[];
+  /** Graphics video ids under `public/stream-graphics/` at request time. */
+  graphicsBasenames: string[];
   /**
    * When set (`NEXT_PUBLIC_STREAM_OVERLAY_ORIGIN`), overlay URLs use this instead of server/client origins.
    */
@@ -60,11 +79,12 @@ type StreamObsDashboardProps = {
  */
 export function StreamObsDashboard({
   userEmail,
-  userName,
   sfxBasenames,
+  graphicsBasenames,
   overlayPublicOrigin,
   overlayRequestOrigin,
 }: StreamObsDashboardProps) {
+  const router = useRouter();
   const normalizedEmail = userEmail.toLowerCase().trim();
 
   const soundboardEffects = useMemo(
@@ -74,6 +94,15 @@ export function StreamObsDashboard({
         label: formatStreamSfxButtonLabel(id),
       })),
     [sfxBasenames]
+  );
+
+  const graphicsEffects = useMemo(
+    () =>
+      graphicsBasenames.map((id) => ({
+        id,
+        label: formatStreamSfxButtonLabel(id),
+      })),
+    [graphicsBasenames]
   );
 
   const {
@@ -98,12 +127,21 @@ export function StreamObsDashboard({
     setScoreboardBrowserSourceName,
     sfxBrowserSourceName,
     setSfxBrowserSourceName,
+    videoPlayerSceneName,
+    setVideoPlayerSceneName,
     resultsBrowserSourceName,
     setResultsBrowserSourceName,
     overlayAudioKey,
     overlayAudioKeyPending,
     streamLogos,
+    streamObsProfile,
+    syncPanelsPersistSnapshot,
   } = useStreamObsPersistedForm(userEmail, normalizedEmail);
+
+  const streamObsProfileRef = useRef(streamObsProfile);
+  useLayoutEffect(() => {
+    streamObsProfileRef.current = streamObsProfile;
+  }, [streamObsProfile]);
 
   const cueOverlaySfxByProfile = useMutation(api.streamObsProfiles.cueOverlaySfxByProfile);
   const envOrigin = (overlayPublicOrigin ?? "").trim();
@@ -137,11 +175,25 @@ export function StreamObsDashboard({
   const [wireSfxPending, setWireSfxPending] = useState(false);
   const [wireSfxError, setWireSfxError] = useState<string | null>(null);
 
+  const [wireVideoPlayerScenePending, setWireVideoPlayerScenePending] = useState(false);
+  const [wireVideoPlayerSceneError, setWireVideoPlayerSceneError] = useState<string | null>(null);
+  const [graphicsTriggerError, setGraphicsTriggerError] = useState<string | null>(null);
+
   const [connected, setConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectError, setConnectError] = useState<string | null>(null);
   const [obsServerInfo, setObsServerInfo] = useState<string | null>(null);
   const [obsCredentials, setObsCredentials] = useState<ObsCredentials | null>(null);
+
+  const appliedPersistedObsFromProfileRef = useRef(false);
+  useEffect(() => {
+    if (!connected) appliedPersistedObsFromProfileRef.current = false;
+  }, [connected]);
+
+  const trimmedStreamConnection = connectionName.trim();
+  useEffect(() => {
+    appliedPersistedObsFromProfileRef.current = false;
+  }, [trimmedStreamConnection]);
 
   const refetchPanelsRef = useRef<() => Promise<void>>(async () => {});
   const triggerBatchedPanelsRefetch = useCallback(async () => {
@@ -194,12 +246,48 @@ export function StreamObsDashboard({
       ingestAudioError(msg);
       return;
     }
+
+    const prof = streamObsProfileRef.current;
+    const persistAudio = prof?.audioChannelsJson ?? "";
+    const persistSources =
+      (prof as { programSourcesJson?: string | null } | null)?.programSourcesJson ?? "";
+
+    const audioMap = parseAudioChannelsPersistJson(persistAudio);
+    const sourcesMap = parseProgramSourcesPersistJson(
+      typeof persistSources === "string" ? persistSources : ""
+    );
+    const mergedInputs = mergeObsAudioInputsWithPersist(result.inputs, audioMap);
+    const mergedItems = mergeObsSceneItemsWithPersist(result.items, sourcesMap);
+
+    const shouldPushPersist =
+      !appliedPersistedObsFromProfileRef.current &&
+      (persistAudio.trim().length > 0 || String(persistSources).trim().length > 0);
+    if (shouldPushPersist) {
+      appliedPersistedObsFromProfileRef.current = true;
+      if (persistAudio.trim()) {
+        await applyPersistedAudioToObs(obsCredentials, result.inputs, persistAudio);
+      }
+      if (String(persistSources).trim()) {
+        await applyPersistedSourcesToObs(
+          obsCredentials,
+          result.items,
+          typeof persistSources === "string" ? persistSources : ""
+        );
+      }
+    }
+
     ingestScenesPanels({
       scenes: result.scenes,
       currentProgramSceneName: result.currentProgramSceneName,
     });
-    ingestSourcesPanels({ items: result.items });
-    ingestAudioPanels({ inputs: result.inputs });
+    ingestSourcesPanels({ items: mergedItems });
+    ingestAudioPanels({ inputs: mergedInputs });
+
+    const want = prof?.activeScene?.trim() ?? "";
+    const obsCur = result.currentProgramSceneName?.trim() ?? "";
+    if (want && result.scenes.includes(want) && want !== obsCur) {
+      await selectScene(want);
+    }
   }, [
     obsCredentials,
     scenesRefetchStart,
@@ -211,6 +299,7 @@ export function StreamObsDashboard({
     ingestScenesPanels,
     ingestSourcesPanels,
     ingestAudioPanels,
+    selectScene,
   ]);
 
   useEffect(() => {
@@ -221,6 +310,34 @@ export function StreamObsDashboard({
     if (!connected || !obsCredentials) return;
     void refetchAllObsPanels();
   }, [connected, obsCredentials, refetchAllObsPanels]);
+
+  useEffect(() => {
+    if (!connected || !obsCredentials || obsAudioLoading || sourcesLoading) return;
+    syncPanelsPersistSnapshot(
+      serializeAudioChannelsForPersist(
+        obsAudioChannels.map((c) => ({
+          inputName: c.id,
+          volume: c.volume,
+          muted: c.muted,
+        }))
+      ),
+      serializeProgramSourcesForPersist(
+        sources.map((s) => ({
+          sceneName: s.sceneName,
+          sceneItemId: s.sceneItemId,
+          visible: s.visible,
+        }))
+      )
+    );
+  }, [
+    connected,
+    obsCredentials,
+    obsAudioLoading,
+    sourcesLoading,
+    obsAudioChannels,
+    sources,
+    syncPanelsPersistSnapshot,
+  ]);
 
   const wireScoreboardToObs = useCallback(async () => {
     if (!obsCredentials || !overlayAudioKey || !publicOrigin) {
@@ -396,15 +513,59 @@ export function StreamObsDashboard({
     [normalizedEmail, connectionName, cueOverlaySfxByProfile, saveProfileNow, setLastSfx]
   );
 
+  const wireVideoPlayerSceneToObs = useCallback(async () => {
+    if (!obsCredentials) {
+      setWireVideoPlayerSceneError("Connect to OBS first.");
+      return;
+    }
+    const scene = videoPlayerSceneName.trim() || DEFAULT_VIDEO_PLAYER_SCENE_NAME;
+    setWireVideoPlayerScenePending(true);
+    setWireVideoPlayerSceneError(null);
+    try {
+      await saveProfileNow();
+      const data = await obsClientEnsureGraphicsScene(obsCredentials, scene);
+      if (!data.ok) {
+        setWireVideoPlayerSceneError(data.error ?? "Could not create scene in OBS.");
+        return;
+      }
+      setWireVideoPlayerSceneError(null);
+    } catch {
+      setWireVideoPlayerSceneError("Network error — could not reach OBS.");
+    } finally {
+      setWireVideoPlayerScenePending(false);
+    }
+  }, [obsCredentials, saveProfileNow, videoPlayerSceneName]);
+
+  const triggerGraphics = useCallback(
+    async (graphicId: string) => {
+      setGraphicsTriggerError(null);
+      if (!obsCredentials || !publicOrigin) {
+        setGraphicsTriggerError("Connect to OBS and ensure the stream URL origin is available.");
+        return;
+      }
+      try {
+        await saveProfileNow();
+        const sceneLabel = formatStreamSfxButtonLabel(graphicId);
+        const videoUrl = `${publicOrigin}/api/stream/graphics/play?graphicId=${encodeURIComponent(graphicId)}`;
+        const data = await obsClientEnsureGraphicsScene(obsCredentials, sceneLabel, videoUrl);
+        if (!data.ok) {
+          setGraphicsTriggerError(data.error ?? "Could not update OBS.");
+          return;
+        }
+      } catch {
+        setGraphicsTriggerError("Network error — could not reach OBS.");
+      }
+    },
+    [obsCredentials, publicOrigin, saveProfileNow]
+  );
+
   /** Border box of the stream page results preview; drives OBS browser source width/height on export. */
   const resultsPreviewOuterRef = useRef<HTMLDivElement | null>(null);
 
   return (
     <ObsStreamCardOpenProvider email={normalizedEmail}>
-      <div className="min-h-[calc(100vh-3.5rem)] w-full bg-black px-4 py-6 md:px-6 md:py-8">
-        <div className="mx-auto max-w-6xl">
-          <StreamObsPageHeader connected={connected} userEmail={userEmail} userName={userName} />
-
+      <div className="min-h-[calc(100vh-3.5rem)] w-full box-border bg-black px-4 py-6 md:px-6 md:py-8">
+        <div className="w-full max-w-none">
           <ObsConnectionPanel
             connected={connected}
             isConnecting={isConnecting}
@@ -428,6 +589,11 @@ export function StreamObsDashboard({
             onWireSfxToObs={wireSfxToObs}
             wireSfxPending={wireSfxPending}
             wireSfxError={wireSfxError}
+            videoPlayerSceneName={videoPlayerSceneName}
+            onVideoPlayerSceneNameChange={setVideoPlayerSceneName}
+            onWireVideoPlayerScene={wireVideoPlayerSceneToObs}
+            wireVideoPlayerScenePending={wireVideoPlayerScenePending}
+            wireVideoPlayerSceneError={wireVideoPlayerSceneError}
             scoreboardOverlayUrl={scoreboardOverlayUrl}
             scoreboardOverlayKeyPending={overlayAudioKeyPending}
             scoreboardBrowserSourceName={scoreboardBrowserSourceName}
@@ -449,35 +615,43 @@ export function StreamObsDashboard({
           />
 
           {connected && obsCredentials ? (
-            <StreamObsConnectedPanels
-              connectionName={connectionName}
-              soundboardEffects={soundboardEffects}
-              obsCredentials={obsCredentials}
-              resultsPreviewOuterRef={resultsPreviewOuterRef}
-              activeScene={activeScene}
-              scenes={scenes}
-              scenesLoading={scenesLoading}
-              scenesError={scenesError}
-              onSelectScene={(name) => void selectScene(name)}
-              switchingScene={switchingScene}
-              onTriggerSfx={triggerSfx}
-              sources={sources}
-              onToggleSource={toggleSource}
-              sourcesLoading={sourcesLoading}
-              sourcesError={sourcesError}
-              onRefreshObsPanels={() => void refetchAllObsPanels()}
-              togglingKey={togglingKey}
-              audioChannels={obsAudioChannels}
-              audioLoading={obsAudioLoading}
-              audioError={obsAudioError}
-              onAudioVolumeChange={setObsInputVolume}
-              onAudioMute={setObsInputMute}
-              scoreboard={scoreboard}
-              onScoreboardChange={setScoreboard}
-              tournamentSettings={tournamentSettings}
-              onTournamentSettingsChange={setTournamentSettings}
-              onTournamentPersistRequest={() => void saveProfileNow()}
-            />
+            <StreamObsLayoutProvider email={normalizedEmail}>
+              <StreamObsConnectedPanels
+                connectionName={connectionName}
+                soundboardEffects={soundboardEffects}
+                graphicsEffects={graphicsEffects}
+                graphicsObsReady={connected && Boolean(obsCredentials)}
+                obsCredentials={obsCredentials}
+                resultsPreviewOuterRef={resultsPreviewOuterRef}
+                activeScene={activeScene}
+                scenes={scenes}
+                scenesLoading={scenesLoading}
+                scenesError={scenesError}
+                onSelectScene={(name) => void selectScene(name)}
+                switchingScene={switchingScene}
+                onTriggerSfx={triggerSfx}
+                onSfxListRefresh={() => router.refresh()}
+                onTriggerGraphics={triggerGraphics}
+                onGraphicsListRefresh={() => router.refresh()}
+                graphicsTriggerError={graphicsTriggerError}
+                sources={sources}
+                onToggleSource={toggleSource}
+                sourcesLoading={sourcesLoading}
+                sourcesError={sourcesError}
+                onRefreshObsPanels={() => void refetchAllObsPanels()}
+                togglingKey={togglingKey}
+                audioChannels={obsAudioChannels}
+                audioLoading={obsAudioLoading}
+                audioError={obsAudioError}
+                onAudioVolumeChange={setObsInputVolume}
+                onAudioMute={setObsInputMute}
+                scoreboard={scoreboard}
+                onScoreboardChange={setScoreboard}
+                tournamentSettings={tournamentSettings}
+                onTournamentSettingsChange={setTournamentSettings}
+                onTournamentPersistRequest={() => void saveProfileNow()}
+              />
+            </StreamObsLayoutProvider>
           ) : null}
         </div>
       </div>

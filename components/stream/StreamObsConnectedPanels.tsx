@@ -1,139 +1,65 @@
 "use client";
 
 import { useMemo, type RefObject } from "react";
-import { ObsAudioPanel, type AudioChannel } from "@/components/stream/ObsAudioPanel";
-import { ObsScenesPanel } from "@/components/stream/ObsScenesPanel";
-import { ObsScoreboardPanel, type ScoreboardState } from "@/components/stream/ObsScoreboardPanel";
+import { StreamObsCardChrome } from "@/components/stream/StreamObsCardChrome";
 import {
-  ObsTournamentResultsPanel,
-  type TournamentSettingsState,
-} from "@/components/stream/ObsTournamentResultsPanel";
-import { ObsTournamentSettingsPanel } from "@/components/stream/ObsTournamentSettingsPanel";
+  StreamObsGridCardById,
+  type StreamObsGridCardByIdProps,
+} from "@/components/stream/streamObsGridCardById";
+import { useStreamObsLayout } from "@/components/stream/StreamObsLayoutContext";
 import { tournamentPlayerDisplayNames } from "@/components/stream/tournamentSettingsDefaults";
-import { ObsSoundboardPanel, type SoundboardEffect } from "@/components/stream/ObsSoundboardPanel";
-import { ObsSourcesPanel, type SourceToggle } from "@/components/stream/ObsSourcesPanel";
-import type { ObsCredentials } from "@/components/stream/useObsProgramSources";
 import { useObsRealtimeSync } from "@/components/stream/useObsRealtimeSync";
+import type { ObsCredentials } from "@/components/stream/useObsProgramSources";
 
-type StreamObsConnectedPanelsProps = {
-  connectionName: string;
-  soundboardEffects: SoundboardEffect[];
+export type StreamObsConnectedPanelsProps = Omit<
+  StreamObsGridCardByIdProps,
+  "cardId" | "tournamentPlayerNames"
+> & {
   obsCredentials: ObsCredentials;
-  activeScene: string | null;
-  scenes: string[];
-  scenesLoading: boolean;
-  scenesError: string | null;
-  onSelectScene: (name: string) => void;
-  switchingScene: string | null;
-  onTriggerSfx: (soundId: string) => void;
-  sources: SourceToggle[];
-  onToggleSource: (item: SourceToggle) => void | Promise<void>;
-  sourcesLoading: boolean;
-  sourcesError: string | null;
-  /** One batched refresh (single OBS WebSocket) for scenes, sources, and audio lists. */
-  onRefreshObsPanels: () => void;
-  togglingKey: string | null;
-  audioChannels: AudioChannel[];
-  audioLoading: boolean;
-  audioError: string | null;
-  onAudioVolumeChange: (id: string, volume: number) => void;
-  onAudioMute: (id: string, nextMuted: boolean) => void;
-  scoreboard: ScoreboardState;
-  onScoreboardChange: (next: ScoreboardState) => void;
-  tournamentSettings: TournamentSettingsState;
-  onTournamentSettingsChange: (next: TournamentSettingsState) => void;
-  onTournamentPersistRequest: () => void | Promise<void>;
-  resultsPreviewOuterRef?: RefObject<HTMLDivElement | null>;
 };
 
-export function StreamObsConnectedPanels({
-  connectionName,
-  soundboardEffects,
-  obsCredentials,
-  activeScene,
-  scenes,
-  scenesLoading,
-  scenesError,
-  onSelectScene,
-  switchingScene,
-  onTriggerSfx,
-  sources,
-  onToggleSource,
-  sourcesLoading,
-  sourcesError,
-  onRefreshObsPanels,
-  togglingKey,
-  audioChannels,
-  audioLoading,
-  audioError,
-  onAudioVolumeChange,
-  onAudioMute,
-  scoreboard,
-  onScoreboardChange,
-  tournamentSettings,
-  onTournamentSettingsChange,
-  onTournamentPersistRequest,
-  resultsPreviewOuterRef,
-}: StreamObsConnectedPanelsProps) {
-  useObsRealtimeSync(obsCredentials, true, onRefreshObsPanels);
+export function StreamObsConnectedPanels(props: StreamObsConnectedPanelsProps) {
+  const { obsCredentials, ...gridProps } = props;
+  const { columns, moveCardToColumnEnd } = useStreamObsLayout();
+
+  useObsRealtimeSync(obsCredentials, true, props.onRefreshObsPanels);
 
   const tournamentPlayerNames = useMemo(
-    () => tournamentPlayerDisplayNames(tournamentSettings),
-    [tournamentSettings]
+    () => tournamentPlayerDisplayNames(props.tournamentSettings),
+    [props.tournamentSettings]
   );
 
+  const cardProps: Omit<StreamObsGridCardByIdProps, "cardId"> = {
+    ...gridProps,
+    tournamentPlayerNames,
+  };
+
   return (
-    <div className="mt-6 grid gap-6 lg:grid-cols-12">
-      <div className="space-y-6 lg:col-span-5">
-        <ObsScenesPanel
-          connected
-          scenes={scenes}
-          activeScene={activeScene}
-          onSelectScene={onSelectScene}
-          loading={scenesLoading}
-          error={scenesError}
-          switchingScene={switchingScene}
-        />
-        <ObsSoundboardPanel
-          sfxCueEnabled={connectionName.trim().length > 0}
-          effects={soundboardEffects}
-          onTrigger={onTriggerSfx}
-        />
-      </div>
-      <div className="space-y-6 lg:col-span-7">
-        <ObsSourcesPanel
-          connected
-          sources={sources}
-          onToggle={onToggleSource}
-          loading={sourcesLoading}
-          error={sourcesError}
-          togglingKey={togglingKey}
-        />
-        <ObsAudioPanel
-          connected
-          channels={audioChannels}
-          loading={audioLoading}
-          error={audioError}
-          onVolumeChange={onAudioVolumeChange}
-          onMuteToggle={onAudioMute}
-        />
-        <ObsTournamentSettingsPanel
-          value={tournamentSettings}
-          onChange={onTournamentSettingsChange}
-          onPersistRequest={onTournamentPersistRequest}
-        />
-        <ObsTournamentResultsPanel
-          settings={tournamentSettings}
-          onChange={onTournamentSettingsChange}
-          onPersistRequest={onTournamentPersistRequest}
-          resultsPreviewOuterRef={resultsPreviewOuterRef}
-        />
-        <ObsScoreboardPanel
-          value={scoreboard}
-          onChange={onScoreboardChange}
-          tournamentPlayerNames={tournamentPlayerNames}
-        />
-      </div>
+    <div className="mt-6 grid w-full grid-cols-1 items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
+      {columns.map((ids, colIndex) => (
+        <div
+          key={colIndex}
+          className={`flex min-w-0 flex-col gap-4 ${colIndex === 2 ? "md:col-span-2 xl:col-span-1" : ""}`}
+          onDragOver={(e) => e.preventDefault()}
+        >
+          {ids.map((cardId) => (
+            <StreamObsCardChrome key={cardId} cardId={cardId}>
+              <StreamObsGridCardById cardId={cardId} {...cardProps} />
+            </StreamObsCardChrome>
+          ))}
+          <div
+            className="flex min-h-10 shrink-0 items-center justify-center rounded-lg border border-dashed border-white/15 bg-white/[0.03] px-2 py-2 text-center text-[10px] text-slate-600"
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault();
+              const id = e.dataTransfer.getData("text/plain");
+              if (id) moveCardToColumnEnd(id, colIndex);
+            }}
+          >
+            Drop here for end of column
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

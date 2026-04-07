@@ -7,6 +7,7 @@ import {
   DEFAULT_RESULTS_BROWSER_SOURCE_NAME,
   DEFAULT_SCOREBOARD_BROWSER_SOURCE_NAME,
   DEFAULT_SFX_BROWSER_SOURCE_NAME,
+  DEFAULT_VIDEO_PLAYER_SCENE_NAME,
 } from "@/components/stream/streamObsFormDefaults";
 import { labelTitleCase } from "@/lib/labelTitleCase";
 
@@ -19,6 +20,11 @@ type ObsConnectionOverlayUrlsSectionProps = {
   onWireSfxToObs: () => void | Promise<void>;
   wireSfxPending: boolean;
   wireSfxError: string | null;
+  videoPlayerSceneName: string;
+  onVideoPlayerSceneNameChange: (name: string) => void;
+  onWireVideoPlayerScene: () => void | Promise<void>;
+  wireVideoPlayerScenePending: boolean;
+  wireVideoPlayerSceneError: string | null;
   scoreboardOverlayUrl: string | null;
   scoreboardOverlayKeyPending: boolean;
   scoreboardBrowserSourceName: string;
@@ -47,6 +53,11 @@ export function ObsConnectionOverlayUrlsSection({
   onWireSfxToObs,
   wireSfxPending,
   wireSfxError,
+  videoPlayerSceneName,
+  onVideoPlayerSceneNameChange,
+  onWireVideoPlayerScene,
+  wireVideoPlayerScenePending,
+  wireVideoPlayerSceneError,
   scoreboardOverlayUrl,
   scoreboardOverlayKeyPending,
   scoreboardBrowserSourceName,
@@ -102,6 +113,46 @@ export function ObsConnectionOverlayUrlsSection({
       {wireSfxError ? (
         <p className="text-xs text-red-300" role="alert">
           {wireSfxError}
+        </p>
+      ) : null}
+    </>
+  );
+
+  const videoSceneFooter = (
+    <>
+      <p className="text-[10px] font-semibold text-slate-500">{labelTitleCase("OBS Video Scene")}</p>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:gap-3">
+        <label className="min-w-0 flex-1 text-xs font-medium text-slate-400">
+          {labelTitleCase("Video Player Scene")}
+          <input
+            type="text"
+            value={videoPlayerSceneName ?? ""}
+            onChange={(e) => onVideoPlayerSceneNameChange(e.target.value)}
+            placeholder={
+              showBrowserSourcePlaceholders ? DEFAULT_VIDEO_PLAYER_SCENE_NAME : undefined
+            }
+            className="mt-1 w-full rounded-lg border border-white/15 bg-black/40 px-3 py-2 text-sm text-slate-100 outline-none focus:border-blue-400/50 focus:ring-1 focus:ring-blue-400/40"
+          />
+        </label>
+        <button
+          type="button"
+          disabled={wireVideoPlayerScenePending || !connected || !videoPlayerSceneName?.trim()}
+          title={
+            !connected
+              ? "Connect to OBS first"
+              : !videoPlayerSceneName?.trim()
+                ? "Enter a scene name"
+                : undefined
+          }
+          onClick={() => void onWireVideoPlayerScene()}
+          className="w-full shrink-0 rounded-lg bg-gradient-to-r from-purple-700 to-purple-500 py-2 text-sm font-medium text-white shadow-md shadow-purple-900/40 transition hover:from-purple-600 hover:to-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-400/60 disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto sm:whitespace-nowrap sm:px-5"
+        >
+          {wireVideoPlayerScenePending ? "Exporting…" : "Export to OBS Scene"}
+        </button>
+      </div>
+      {wireVideoPlayerSceneError ? (
+        <p className="text-xs text-red-300" role="alert">
+          {wireVideoPlayerSceneError}
         </p>
       ) : null}
     </>
@@ -194,6 +245,13 @@ export function ObsConnectionOverlayUrlsSection({
         listenUrl={overlaySfxListenUrl}
         pendingKey={overlaySfxKeyPending}
         footer={sfxFooter}
+      />
+      <ObsOverlayCopyUrlBlock
+        url={null}
+        showPendingPlaceholder={false}
+        footer={videoSceneFooter}
+        hideUrlAndCopy
+        plain
       />
       <ObsOverlayCopyUrlBlock
         url={scoreboardOverlayUrl}

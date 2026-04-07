@@ -380,13 +380,17 @@ export function HomeBracketCards() {
     [settings]
   );
 
-  /** Returns the match index (0–5) in this card where the linked user is a player, or null. */
+  /**
+   * Match index (0–5) on this Week 1 card where the linked user plays, or null.
+   * Scans matches 5→0 so Week 1 round 2 (matches 4–5) wins over round 1 (0–3): completed
+   * first-round rows often still show the player name, which hid “Live Score My Match” for round 2.
+   */
   const getMyMatchInCard = useCallback(
     (cardIndex: number): number | null => {
       if (!settings || typeof settings !== "object" || !linkedName) return null;
       const s = settings as Record<string, unknown>;
       const base = cardIndex * 12;
-      for (let m = 0; m < 6; m++) {
+      for (let m = 5; m >= 0; m--) {
         const [top, bottom] = slotIndicesForMatch(m);
         const topVal = (s[`bracketSlot${base + top}`] as string) ?? "";
         const bottomVal = (s[`bracketSlot${base + bottom}`] as string) ?? "";

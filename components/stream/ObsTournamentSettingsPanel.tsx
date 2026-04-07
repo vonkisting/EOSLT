@@ -1,6 +1,7 @@
 "use client";
 
 import { ObsCollapsibleCard } from "@/components/stream/ObsCollapsibleCard";
+import { ObsTournamentPlayerListCard } from "@/components/stream/ObsTournamentPlayerListCard";
 import { STREAM_OBS_CARD_IDS } from "@/components/stream/streamObsCardIds";
 import { useObsStreamCardOpen } from "@/components/stream/ObsStreamCardOpenContext";
 import { type TournamentSettingsState } from "@/components/stream/tournamentSettingsDefaults";
@@ -15,9 +16,7 @@ type ObsTournamentSettingsPanelProps = {
   onPersistRequest?: () => void | Promise<void>;
 };
 
-/**
- * Tournament name; player list lives in the Tournament Results collapsible (see {@link ObsTournamentPlayerListCard}).
- */
+/** Tournament name and full-width player list. */
 export function ObsTournamentSettingsPanel({
   value,
   onChange,
@@ -33,18 +32,26 @@ export function ObsTournamentSettingsPanel({
       collapseLabel="Tournament Settings"
       open={open}
       onOpenChange={setOpen}
+      bodyTopDivider={false}
     >
-      <label className="block text-xs font-medium text-slate-400">
-        {labelTitleCase("name")}
-        <input
-          type="text"
-          value={value.name}
-          onChange={(e) => set({ name: e.target.value })}
-          onBlur={() => onPersistRequest?.()}
-          className="mt-1 w-full rounded-lg border border-white/15 bg-black/40 px-3 py-2 text-sm text-slate-100 outline-none focus:border-blue-400/50 focus:ring-1 focus:ring-blue-400/40"
-          autoComplete="off"
+      <div className="flex min-w-0 w-full flex-col gap-4">
+        <label className="block text-xs font-medium text-slate-400">
+          {labelTitleCase("name")}
+          <input
+            type="text"
+            value={value.name}
+            onChange={(e) => set({ name: e.target.value })}
+            onBlur={() => onPersistRequest?.()}
+            className="mt-1 w-full rounded-lg border border-white/15 bg-black/40 px-3 py-2 text-sm text-slate-100 outline-none focus:border-blue-400/50 focus:ring-1 focus:ring-blue-400/40"
+            autoComplete="off"
+          />
+        </label>
+        <ObsTournamentPlayerListCard
+          value={value}
+          onChange={onChange}
+          onPersistRequest={onPersistRequest}
         />
-      </label>
+      </div>
     </ObsCollapsibleCard>
   );
 }

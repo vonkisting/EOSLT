@@ -3,14 +3,14 @@
 import { useQuery } from "convex/react";
 import { useEffect, useRef } from "react";
 import { api } from "@/convex/_generated/api";
-import { streamSfxMaxPlayMs, streamSfxPublicUrl } from "@/lib/stream-sfx-basename";
+import { streamSfxMaxPlayMs, streamSfxPlayApiUrl } from "@/lib/stream-sfx-basename";
 
 type StreamSfxOverlayListenerProps = {
   overlayKey: string;
 };
 
 /**
- * Subscribes to Convex sound cues and plays matching files from `/public/stream-sfx/`.
+ * Subscribes to Convex sound cues and plays matching files from `/public/stream-sfx/` via the play API.
  */
 export function StreamSfxOverlayListener({ overlayKey }: StreamSfxOverlayListenerProps) {
   const cue = useQuery(api.streamObsProfiles.getSfxCueByOverlayKey, {
@@ -53,7 +53,7 @@ export function StreamSfxOverlayListener({ overlayKey }: StreamSfxOverlayListene
 
     if (!shouldPlay) return;
 
-    const path = streamSfxPublicUrl(soundId);
+    const path = streamSfxPlayApiUrl(soundId);
     if (!path) return;
 
     const el = audioRef.current;

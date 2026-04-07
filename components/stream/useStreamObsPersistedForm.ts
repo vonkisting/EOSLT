@@ -8,6 +8,7 @@ import {
   DEFAULT_SCOREBOARD_BROWSER_SOURCE_NAME,
   DEFAULT_RESULTS_BROWSER_SOURCE_NAME,
   DEFAULT_SFX_BROWSER_SOURCE_NAME,
+  DEFAULT_VIDEO_PLAYER_SCENE_NAME,
   type ScoreboardState,
   DEFAULT_STREAM_OBS_HOST,
   DEFAULT_STREAM_OBS_PORT,
@@ -45,6 +46,7 @@ export function useStreamObsPersistedForm(userEmail: string, normalizedEmail: st
     DEFAULT_SCOREBOARD_BROWSER_SOURCE_NAME
   );
   const [sfxBrowserSourceName, setSfxBrowserSourceName] = useState(DEFAULT_SFX_BROWSER_SOURCE_NAME);
+  const [videoPlayerSceneName, setVideoPlayerSceneName] = useState(DEFAULT_VIDEO_PLAYER_SCENE_NAME);
   const [resultsBrowserSourceName, setResultsBrowserSourceName] = useState(
     DEFAULT_RESULTS_BROWSER_SOURCE_NAME
   );
@@ -53,6 +55,9 @@ export function useStreamObsPersistedForm(userEmail: string, normalizedEmail: st
   const hydrateKeyRef = useRef("");
   const lastRemoteTournamentJsonRef = useRef<string | undefined>(undefined);
   const prevPlayerCountForSaveRef = useRef<number | null>(null);
+  /** Latest serialized audio + program-source panels for Convex (updated by stream dashboard). */
+  const panelsPersistRef = useRef({ audio: "", sources: "" });
+  const [panelsPersistBump, setPanelsPersistBump] = useState(0);
 
   const profileRows = useQuery(api.streamObsProfiles.listByEmail, { email: normalizedEmail });
   const savedConnectionNames = profileRows?.map((r) => r.connectionName) ?? [];
@@ -75,7 +80,10 @@ export function useStreamObsPersistedForm(userEmail: string, normalizedEmail: st
   }, [userEmail, didInitConnectionName]);
 
   useEffect(() => {
-    if (!trimmedConnectionName) hydrateKeyRef.current = "";
+    if (!trimmedConnectionName) {
+      hydrateKeyRef.current = "";
+      panelsPersistRef.current = { audio: "", sources: "" };
+    }
   }, [trimmedConnectionName]);
 
   useEffect(() => {
@@ -129,14 +137,31 @@ export function useStreamObsPersistedForm(userEmail: string, normalizedEmail: st
       profile.scoreboardBrowserSourceName?.trim() || DEFAULT_SCOREBOARD_BROWSER_SOURCE_NAME
     );
     setSfxBrowserSourceName(profile.sfxBrowserSourceName?.trim() || DEFAULT_SFX_BROWSER_SOURCE_NAME);
+    setVideoPlayerSceneName(
+      (profile as { videoPlayerSceneName?: string }).videoPlayerSceneName?.trim() ||
+        DEFAULT_VIDEO_PLAYER_SCENE_NAME
+    );
     setResultsBrowserSourceName(
       profile.resultsBrowserSourceName?.trim() || DEFAULT_RESULTS_BROWSER_SOURCE_NAME
     );
     setLastSfx(profile.lastSfx ?? null);
+    const prof = profile as {
+      audioChannelsJson?: string | null;
+      programSourcesJson?: string | null;
+    };
+    panelsPersistRef.current = {
+      audio: typeof prof.audioChannelsJson === "string" ? prof.audioChannelsJson : "",
+      sources: typeof prof.programSourcesJson === "string" ? prof.programSourcesJson : "",
+    };
     queueMicrotask(() => {
       hydratingRef.current = false;
     });
   }, [profile, trimmedConnectionName]);
+
+  const syncPanelsPersistSnapshot = useCallback((audioJson: string, sourcesJson: string) => {
+    panelsPersistRef.current = { audio: audioJson, sources: sourcesJson };
+    setPanelsPersistBump((b) => b + 1);
+  }, []);
 
   const scoreboardJson = JSON.stringify(scoreboard);
   const tournamentSettingsJson = tournamentSettingsToJson(tournamentSettings);
@@ -155,6 +180,8 @@ export function useStreamObsPersistedForm(userEmail: string, normalizedEmail: st
     async (createIfMissing = false) => {
       const name = connectionName.trim();
       if (!name) return;
+      const pa = panelsPersistRef.current.audio.trim();
+      const ps = panelsPersistRef.current.sources.trim();
       await upsertProfile({
         email: normalizedEmail,
         connectionName: name,
@@ -164,11 +191,14 @@ export function useStreamObsPersistedForm(userEmail: string, normalizedEmail: st
         activeScene: activeScene ?? undefined,
         scoreboardJson: JSON.stringify(scoreboard),
         tournamentSettingsJson,
+        ...(pa ? { audioChannelsJson: pa } : {}),
+        ...(ps ? { programSourcesJson: ps } : {}),
         scoreboardBrowserSourceName:
           scoreboardBrowserSourceName.trim() || DEFAULT_SCOREBOARD_BROWSER_SOURCE_NAME,
         resultsBrowserSourceName:
           resultsBrowserSourceName.trim() || DEFAULT_RESULTS_BROWSER_SOURCE_NAME,
         sfxBrowserSourceName: sfxBrowserSourceName.trim() || DEFAULT_SFX_BROWSER_SOURCE_NAME,
+        videoPlayerSceneName: videoPlayerSceneName.trim() || DEFAULT_VIDEO_PLAYER_SCENE_NAME,
         lastSfx: lastSfx ?? undefined,
         createIfMissing,
       });
@@ -189,6 +219,7 @@ export function useStreamObsPersistedForm(userEmail: string, normalizedEmail: st
       scoreboardBrowserSourceName,
       resultsBrowserSourceName,
       sfxBrowserSourceName,
+      videoPlayerSceneName,
       lastSfx,
       userEmail,
       upsertProfile,
@@ -213,10 +244,12 @@ export function useStreamObsPersistedForm(userEmail: string, normalizedEmail: st
     saveProfileNow,
   ]);
 
-  /** Short debounce so OBS scoreboard overlay (Convex live query) tracks names. */
+  /** Short debounce: scoreboard + tournament + mixer/sources snapshots for overlays and reload. */
   useEffect(() => {
     if (!hasPersistedProfile) return;
     const t = setTimeout(() => {
+      const pa = panelsPersistRef.current.audio.trim();
+      const ps = panelsPersistRef.current.sources.trim();
       void upsertProfile({
         email: normalizedEmail,
         connectionName: trimmedConnectionName,
@@ -225,11 +258,15 @@ export function useStreamObsPersistedForm(userEmail: string, normalizedEmail: st
         websocketPassword: password,
         activeScene: activeScene ?? undefined,
         scoreboardJson,
+        tournamentSettingsJson,
+        ...(pa ? { audioChannelsJson: pa } : {}),
+        ...(ps ? { programSourcesJson: ps } : {}),
         scoreboardBrowserSourceName:
           scoreboardBrowserSourceName.trim() || DEFAULT_SCOREBOARD_BROWSER_SOURCE_NAME,
         resultsBrowserSourceName:
           resultsBrowserSourceName.trim() || DEFAULT_RESULTS_BROWSER_SOURCE_NAME,
         sfxBrowserSourceName: sfxBrowserSourceName.trim() || DEFAULT_SFX_BROWSER_SOURCE_NAME,
+        videoPlayerSceneName: videoPlayerSceneName.trim() || DEFAULT_VIDEO_PLAYER_SCENE_NAME,
         lastSfx: lastSfx ?? undefined,
         createIfMissing: false,
       });
@@ -244,10 +281,13 @@ export function useStreamObsPersistedForm(userEmail: string, normalizedEmail: st
     password,
     activeScene,
     scoreboardJson,
+    tournamentSettingsJson,
+    panelsPersistBump,
     lastSfx,
     scoreboardBrowserSourceName,
     resultsBrowserSourceName,
     sfxBrowserSourceName,
+    videoPlayerSceneName,
     normalizedEmail,
     userEmail,
     upsertProfile,
@@ -269,6 +309,8 @@ export function useStreamObsPersistedForm(userEmail: string, normalizedEmail: st
     setConnectionName,
     saveProfileNow,
     savedConnectionNames,
+    streamObsProfile: profile ?? null,
+    syncPanelsPersistSnapshot,
     overlayAudioKey: profile?.overlayAudioKey ?? null,
     overlayAudioKeyPending,
     host,
@@ -289,6 +331,8 @@ export function useStreamObsPersistedForm(userEmail: string, normalizedEmail: st
     setScoreboardBrowserSourceName,
     sfxBrowserSourceName,
     setSfxBrowserSourceName,
+    videoPlayerSceneName,
+    setVideoPlayerSceneName,
     resultsBrowserSourceName: resultsBrowserSourceName ?? DEFAULT_RESULTS_BROWSER_SOURCE_NAME,
     setResultsBrowserSourceName,
     streamLogos,

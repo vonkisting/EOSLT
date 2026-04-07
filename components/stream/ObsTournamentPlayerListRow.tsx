@@ -53,7 +53,7 @@ export function ObsTournamentPlayerListRow({
         className={placementSelectClassName}
         aria-label={labelTitleCase("placement")}
       >
-        <option value="">{labelTitleCase("select placement")}</option>
+        <option value="">Finish</option>
         {showLegacyPlacement ? (
           <option value={placement}>{placement}</option>
         ) : null}

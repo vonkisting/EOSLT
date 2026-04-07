@@ -18,6 +18,9 @@ export const DEFAULT_RESULTS_BROWSER_SOURCE_NAME = "Results";
 /** Default OBS Browser Source input name for SFX / audio overlay URL wiring. */
 export const DEFAULT_SFX_BROWSER_SOURCE_NAME = "SFX";
 
+/** Default OBS scene name for Export (graphics / video deck). */
+export const DEFAULT_VIDEO_PLAYER_SCENE_NAME = "EOSLT Graphics";
+
 /** When the API body omits `inputName` for generic browser URL routes. */
 export const DEFAULT_GENERIC_BROWSER_SOURCE_NAME = "Browser source";
 

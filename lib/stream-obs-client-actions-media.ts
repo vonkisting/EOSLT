@@ -5,6 +5,7 @@ import {
 } from "@/lib/stream-obs-browser-source-url";
 import { obsPortOrError, withObsWebSocketBrowser } from "@/lib/stream-obs-browser-with-connection";
 import { credBody, postObsJson } from "@/lib/stream-obs-client-post-json";
+import { ensureGraphicsSceneWithOptionalVideo } from "@/lib/stream-obs-graphics-scene";
 import { setImageSourceFileOrCreate } from "@/lib/stream-obs-image-source-file";
 import { streamObsUseBrowserTransport } from "@/lib/stream-obs-transport";
 import { obsVolumeDbToUiPercent } from "@/lib/stream-obs-volume-ui";
@@ -113,6 +114,31 @@ export async function obsClientRefreshBrowserSource(
         inputName,
         propertyName: "refreshnocache",
       })
+  );
+  return r.ok ? { ok: true } : { ok: false, error: r.error };
+}
+
+export async function obsClientEnsureGraphicsScene(
+  credentials: ObsCredentials,
+  sceneName: string,
+  videoUrl?: string
+): Promise<{ ok: boolean; error?: string }> {
+  const name = sceneName.trim();
+  if (!name) return { ok: false, error: "Scene name is required" };
+  const body: Record<string, unknown> = { ...credBody(credentials), sceneName: name };
+  if (videoUrl?.trim()) {
+    body.videoUrl = videoUrl.trim();
+  }
+  if (!streamObsUseBrowserTransport()) {
+    return postObsJson("/api/stream/obs/graphics-scene", body);
+  }
+  const p = obsPortOrError(credentials.port);
+  if (!p.ok) return { ok: false, error: p.error };
+  const r = await withObsWebSocketBrowser(
+    credentials.host.trim(),
+    p.port,
+    credentials.password,
+    (obs) => ensureGraphicsSceneWithOptionalVideo(obs, name, videoUrl?.trim())
   );
   return r.ok ? { ok: true } : { ok: false, error: r.error };
 }

@@ -89,7 +89,7 @@ export function ObsConnectionLogosSection({
       ) : null}
       {uploading ? <p className="text-xs text-slate-500">Uploading…</p> : null}
 
-      <ul className="space-y-3">
+      <div className="space-y-3">
         {logos.map((logo) => (
           <ObsConnectionLogoRow
             key={logo.id}
@@ -104,7 +104,7 @@ export function ObsConnectionLogosSection({
             wireError={wireErrorById[logo.id] ?? null}
           />
         ))}
-      </ul>
+      </div>
     </div>
   );
 }

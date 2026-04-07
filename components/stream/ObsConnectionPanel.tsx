@@ -34,6 +34,11 @@ type ObsConnectionPanelProps = {
   onWireSfxToObs: () => void | Promise<void>;
   wireSfxPending: boolean;
   wireSfxError: string | null;
+  videoPlayerSceneName: string;
+  onVideoPlayerSceneNameChange: (name: string) => void;
+  onWireVideoPlayerScene: () => void | Promise<void>;
+  wireVideoPlayerScenePending: boolean;
+  wireVideoPlayerSceneError: string | null;
   scoreboardOverlayUrl: string | null;
   scoreboardOverlayKeyPending: boolean;
   scoreboardBrowserSourceName: string;
@@ -80,6 +85,11 @@ export function ObsConnectionPanel({
   onWireSfxToObs,
   wireSfxPending,
   wireSfxError,
+  videoPlayerSceneName,
+  onVideoPlayerSceneNameChange,
+  onWireVideoPlayerScene,
+  wireVideoPlayerScenePending,
+  wireVideoPlayerSceneError,
   scoreboardOverlayUrl,
   scoreboardOverlayKeyPending,
   scoreboardBrowserSourceName,
@@ -188,6 +198,11 @@ export function ObsConnectionPanel({
           onWireSfxToObs={onWireSfxToObs}
           wireSfxPending={wireSfxPending}
           wireSfxError={wireSfxError}
+          videoPlayerSceneName={videoPlayerSceneName}
+          onVideoPlayerSceneNameChange={onVideoPlayerSceneNameChange}
+          onWireVideoPlayerScene={onWireVideoPlayerScene}
+          wireVideoPlayerScenePending={wireVideoPlayerScenePending}
+          wireVideoPlayerSceneError={wireVideoPlayerSceneError}
           scoreboardOverlayUrl={scoreboardOverlayUrl}
           scoreboardOverlayKeyPending={scoreboardOverlayKeyPending}
           scoreboardBrowserSourceName={scoreboardBrowserSourceName}

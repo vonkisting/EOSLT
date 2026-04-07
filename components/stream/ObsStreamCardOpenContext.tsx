@@ -31,6 +31,12 @@ function parseMap(json: string | null): MapState {
   }
 }
 
+/** Connection card open state is not persisted (it uses connect/collapse rules). */
+function stripConnectionFromMap(m: MapState): MapState {
+  const { [STREAM_OBS_CARD_IDS.connection]: _removed, ...rest } = m;
+  return rest;
+}
+
 type ObsStreamCardOpenContextValue = {
   getOpen: (cardId: string) => boolean;
   setOpen: (cardId: string, open: boolean) => void;
@@ -50,7 +56,7 @@ type ObsStreamCardOpenProviderProps = {
  */
 export function ObsStreamCardOpenProvider({ email, children }: ObsStreamCardOpenProviderProps) {
   const normalized = email.toLowerCase().trim();
-  const savedJson = useQuery(api.streamObsUiState.get, { email: normalized });
+  const savedRow = useQuery(api.streamObsUiState.get, { email: normalized });
   const setMapMutation = useMutation(api.streamObsUiState.setCardOpenMap);
 
   const [local, setLocal] = useState<MapState>({});
@@ -58,21 +64,21 @@ export function ObsStreamCardOpenProvider({ email, children }: ObsStreamCardOpen
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (savedJson === undefined) return;
+    if (savedRow === undefined) return;
     if (!initializedFromServer.current) {
       initializedFromServer.current = true;
       setLocal({
-        ...parseMap(savedJson),
+        ...stripConnectionFromMap(parseMap(savedRow.cardOpenByIdJson)),
         [STREAM_OBS_CARD_IDS.connection]: true,
       });
     }
-  }, [savedJson]);
+  }, [savedRow]);
 
   const flushSave = useCallback(
     (next: MapState) => {
       void setMapMutation({
         email: normalized,
-        cardOpenByIdJson: JSON.stringify(next),
+        cardOpenByIdJson: JSON.stringify(stripConnectionFromMap(next)),
       });
     },
     [normalized, setMapMutation]

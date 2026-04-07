@@ -5,27 +5,29 @@ import { ObsCollapsibleCard } from "@/components/stream/ObsCollapsibleCard";
 import { STREAM_OBS_CARD_IDS } from "@/components/stream/streamObsCardIds";
 import { useObsStreamCardOpen } from "@/components/stream/ObsStreamCardOpenContext";
 
-export type SoundboardEffect = { id: string; label: string };
+export type GraphicsEffect = { id: string; label: string };
 
-type ObsSoundboardPanelProps = {
-  /** Requires a saved connection name so Convex can find the profile row. */
-  sfxCueEnabled: boolean;
-  effects: SoundboardEffect[];
-  onTrigger: (soundId: string) => void;
-  /** Called after a successful upload so the server can rescan `public/stream-sfx/`. */
-  onSfxListRefresh?: () => void;
+type ObsGraphicsEffectsPanelProps = {
+  /** Requires OBS WebSocket connection to create scenes and media sources. */
+  graphicsObsReady: boolean;
+  effects: GraphicsEffect[];
+  onTrigger: (graphicId: string) => void;
+  onGraphicsListRefresh?: () => void;
+  /** Last OBS error from playing a graphic (cleared by parent on success or new attempt). */
+  triggerError?: string | null;
 };
 
 /**
- * Sound effects: cues Convex so the OBS SFX browser source (URL in OBS Connection) can play clips.
+ * Graphics / video effects: creates an OBS scene per clip (scene name = button label) and plays via FFmpeg URL.
  */
-export function ObsSoundboardPanel({
-  sfxCueEnabled,
+export function ObsGraphicsEffectsPanel({
+  graphicsObsReady,
   effects,
   onTrigger,
-  onSfxListRefresh,
-}: ObsSoundboardPanelProps) {
-  const { open, setOpen } = useObsStreamCardOpen(STREAM_OBS_CARD_IDS.soundEffects);
+  onGraphicsListRefresh,
+  triggerError,
+}: ObsGraphicsEffectsPanelProps) {
+  const { open, setOpen } = useObsStreamCardOpen(STREAM_OBS_CARD_IDS.graphicsEffects);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -47,20 +49,20 @@ export function ObsSoundboardPanel({
       try {
         const body = new FormData();
         body.set("file", file);
-        const res = await fetch("/api/stream/sfx/upload", { method: "POST", body });
+        const res = await fetch("/api/stream/graphics/upload", { method: "POST", body });
         const data = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
         if (!res.ok || !data?.ok) {
           setUploadError(data?.error ?? `Upload failed (${res.status})`);
           return;
         }
-        onSfxListRefresh?.();
+        onGraphicsListRefresh?.();
       } catch {
         setUploadError("Upload failed");
       } finally {
         setUploading(false);
       }
     },
-    [onSfxListRefresh],
+    [onGraphicsListRefresh],
   );
 
   const addButton = (
@@ -79,8 +81,8 @@ export function ObsSoundboardPanel({
         disabled={uploading}
         onClick={openFilePicker}
         className="rounded-lg border border-amber-500/40 bg-amber-950/40 px-2 py-1 text-base font-semibold leading-none text-amber-100 transition hover:bg-amber-900/50 focus:outline-none focus:ring-2 focus:ring-amber-400/40 disabled:cursor-not-allowed disabled:opacity-40"
-        aria-label={uploading ? "Uploading sound" : "Add sound effect file"}
-        title="Add sound effect file"
+        aria-label={uploading ? "Uploading video" : "Add graphics video file"}
+        title="Add graphics video file"
       >
         +
       </button>
@@ -89,8 +91,8 @@ export function ObsSoundboardPanel({
 
   return (
     <ObsCollapsibleCard
-      title="Sound Effects"
-      collapseLabel="Sound Effects"
+      title="Graphics Effects"
+      collapseLabel="Graphics Effects"
       open={open}
       onOpenChange={setOpen}
       bodyTopDivider={false}
@@ -101,15 +103,20 @@ export function ObsSoundboardPanel({
           {uploadError}
         </p>
       ) : null}
-      {!sfxCueEnabled ? (
+      {triggerError ? (
+        <p className="mb-2 text-xs text-red-400" role="alert">
+          {triggerError}
+        </p>
+      ) : null}
+      {!graphicsObsReady ? (
         <p className="text-xs text-slate-500">
-          Set a connection name and save the profile so sound cues can reach the overlay.
+          Connect to OBS so graphics can create scenes and FFmpeg media sources on your machine.
         </p>
       ) : null}
       {effects.length === 0 ? (
         <p className="text-xs text-slate-500">
-          No clips in <code className="text-slate-400">public/stream-sfx/</code>. Use + to upload (mp3, wav,
-          ogg, webm, m4a, aac) or add files there and refresh.
+          No videos in <code className="text-slate-400">public/stream-graphics/</code>. Use + to upload (mp4,
+          webm, mov, mkv, m4v) or add files there and refresh.
         </p>
       ) : (
         <div className="flex flex-wrap gap-2">
@@ -117,8 +124,8 @@ export function ObsSoundboardPanel({
             <button
               key={id}
               type="button"
-              disabled={!sfxCueEnabled}
-              title={!sfxCueEnabled ? "Connection name required" : undefined}
+              disabled={!graphicsObsReady}
+              title={!graphicsObsReady ? "Connect to OBS first" : `Create scene “${label}” and play video`}
               onClick={() => void onTrigger(id)}
               className="rounded-lg border border-amber-500/30 bg-amber-950/30 px-3 py-2 text-sm font-medium text-amber-100 transition hover:bg-amber-900/40 focus:outline-none focus:ring-2 focus:ring-amber-400/40 disabled:cursor-not-allowed disabled:opacity-40"
             >

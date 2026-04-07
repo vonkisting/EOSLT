@@ -16,9 +16,7 @@ type ObsTournamentPlayerListCardProps = {
   className?: string;
 };
 
-/**
- * Bordered player list block for use inside {@link ObsTournamentResultsPanel} (not a collapsible root).
- */
+/** Bordered player list block nested inside tournament settings (not a collapsible root). */
 export function ObsTournamentPlayerListCard({
   value,
   onChange,
@@ -49,13 +47,15 @@ export function ObsTournamentPlayerListCard({
 
   return (
     <section
-      className={`flex min-w-0 flex-1 flex-col rounded-lg border border-white/10 bg-black/25 p-3 ${className}`.trim()}
+      className={`flex min-w-0 w-full flex-col rounded-lg border border-white/10 bg-black/25 p-3 ${className}`.trim()}
       aria-label={labelTitleCase("player list")}
     >
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-2">
-        <h3 className="text-xs font-semibold text-blue-300">{labelTitleCase("player list")}</h3>
+        <h3 className="text-xs font-semibold text-blue-300">
+          {labelTitleCase("player list")}{" "}
+          <span className="font-normal text-slate-400">({value.players.length})</span>
+        </h3>
         <div className="flex items-center gap-2">
-          <span className="text-xs tabular-nums text-slate-400">{value.players.length}</span>
           <button
             type="button"
             onClick={addPlayer}

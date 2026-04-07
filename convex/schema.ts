@@ -376,6 +376,8 @@ export default defineSchema({
     websocketPassword: v.optional(v.string()),
     activeScene: v.optional(v.string()),
     audioChannelsJson: v.optional(v.string()),
+    /** JSON: program scene source visibility (see `lib/streamObsPanelsPersist.ts`). */
+    programSourcesJson: v.optional(v.string()),
     scoreboardJson: v.optional(v.string()),
     /** JSON: tournament name + player list for stream dashboard. */
     tournamentSettingsJson: v.optional(v.string()),
@@ -385,6 +387,8 @@ export default defineSchema({
     resultsBrowserSourceName: v.optional(v.string()),
     /** OBS Browser Source input name for Export to OBS Scene (SFX / audio overlay). */
     sfxBrowserSourceName: v.optional(v.string()),
+    /** OBS scene name for the graphics / video player deck (created on Export). */
+    videoPlayerSceneName: v.optional(v.string()),
     lastSfx: v.optional(v.string()),
     overlayPushedAt: v.optional(v.string()),
     /** Secret for browser-source URL; public read of cue only with this key. */
@@ -404,5 +408,7 @@ export default defineSchema({
     email: v.string(),
     /** JSON: Record<cardId, boolean> — true = expanded */
     cardOpenByIdJson: v.optional(v.string()),
+    /** JSON: 3-column card order + sizes (see `lib/streamObsLayout.ts`). */
+    layoutJson: v.optional(v.string()),
   }).index("by_email", ["email"]),
 });

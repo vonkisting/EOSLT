@@ -109,3 +109,12 @@ export async function ensureSourceOnProgramScene(
     sceneItemEnabled: true,
   });
 }
+
+/** Ensures `sourceName` appears as a scene item on `sceneName` (not necessarily the program scene). */
+export async function ensureSourceOnScene(
+  obs: OBSWebSocket,
+  sceneName: string,
+  sourceName: string
+): Promise<void> {
+  await ensureSourceOnProgramScene(obs, sceneName, sourceName);
+}

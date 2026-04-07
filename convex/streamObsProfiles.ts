@@ -190,11 +190,13 @@ export const upsert = mutation({
     websocketPassword: v.optional(v.string()),
     activeScene: v.optional(v.string()),
     audioChannelsJson: v.optional(v.string()),
+    programSourcesJson: v.optional(v.string()),
     scoreboardJson: v.optional(v.string()),
     tournamentSettingsJson: v.optional(v.string()),
     scoreboardBrowserSourceName: v.optional(v.string()),
     resultsBrowserSourceName: v.optional(v.string()),
     sfxBrowserSourceName: v.optional(v.string()),
+    videoPlayerSceneName: v.optional(v.string()),
     lastSfx: v.optional(v.string()),
     overlayPushedAt: v.optional(v.string()),
     /** When false and no row exists, skip insert (avoid profiles for partial connection names). */
@@ -226,6 +228,7 @@ export const upsert = mutation({
         ...(args.websocketPassword !== undefined ? { websocketPassword: args.websocketPassword } : {}),
         ...(args.activeScene !== undefined ? { activeScene: args.activeScene } : {}),
         ...(args.audioChannelsJson !== undefined ? { audioChannelsJson: args.audioChannelsJson } : {}),
+        ...(args.programSourcesJson !== undefined ? { programSourcesJson: args.programSourcesJson } : {}),
         ...(args.scoreboardJson !== undefined ? { scoreboardJson: args.scoreboardJson } : {}),
         ...(args.tournamentSettingsJson !== undefined
           ? { tournamentSettingsJson: args.tournamentSettingsJson }
@@ -238,6 +241,9 @@ export const upsert = mutation({
           : {}),
         ...(args.sfxBrowserSourceName !== undefined
           ? { sfxBrowserSourceName: args.sfxBrowserSourceName }
+          : {}),
+        ...(args.videoPlayerSceneName !== undefined
+          ? { videoPlayerSceneName: args.videoPlayerSceneName }
           : {}),
         ...(args.lastSfx !== undefined ? { lastSfx: args.lastSfx } : {}),
         ...(args.overlayPushedAt !== undefined ? { overlayPushedAt: args.overlayPushedAt } : {}),
@@ -259,6 +265,7 @@ export const upsert = mutation({
       ...(args.websocketPassword !== undefined ? { websocketPassword: args.websocketPassword } : {}),
       ...(args.activeScene !== undefined ? { activeScene: args.activeScene } : {}),
       ...(args.audioChannelsJson !== undefined ? { audioChannelsJson: args.audioChannelsJson } : {}),
+      ...(args.programSourcesJson !== undefined ? { programSourcesJson: args.programSourcesJson } : {}),
       ...(args.scoreboardJson !== undefined ? { scoreboardJson: args.scoreboardJson } : {}),
       ...(args.tournamentSettingsJson !== undefined
         ? { tournamentSettingsJson: args.tournamentSettingsJson }
@@ -271,6 +278,9 @@ export const upsert = mutation({
         : {}),
       ...(args.sfxBrowserSourceName !== undefined
         ? { sfxBrowserSourceName: args.sfxBrowserSourceName }
+        : {}),
+      ...(args.videoPlayerSceneName !== undefined
+        ? { videoPlayerSceneName: args.videoPlayerSceneName }
         : {}),
       ...(args.lastSfx !== undefined ? { lastSfx: args.lastSfx } : {}),
       ...(args.overlayPushedAt !== undefined ? { overlayPushedAt: args.overlayPushedAt } : {}),

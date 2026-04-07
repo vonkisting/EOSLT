@@ -7,6 +7,7 @@ export {
 } from "@/lib/stream-obs-client-actions-controls";
 export {
   obsClientAudioInputs,
+  obsClientEnsureGraphicsScene,
   obsClientRefreshBrowserSource,
   obsClientSetBrowserSourceUrl,
   obsClientSetImageSourceFile,

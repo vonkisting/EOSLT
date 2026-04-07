@@ -1,7 +1,6 @@
 "use client";
 
 import type { StreamLogoRowUi } from "@/components/stream/streamObsLogoTypes";
-import { labelTitleCase } from "@/lib/labelTitleCase";
 
 type ObsConnectionLogoRowProps = {
   logo: StreamLogoRowUi;
@@ -30,22 +29,15 @@ export function ObsConnectionLogoRow({
   wireError,
 }: ObsConnectionLogoRowProps) {
   return (
-    <li className="rounded-lg border border-white/10 bg-black/25 px-3 py-3">
+    <div className="flex flex-col gap-2" title={logo.fileName}>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:gap-3">
-        <div className="min-w-0 flex-1 space-y-1">
-          <p className="truncate text-xs text-slate-400" title={logo.fileName}>
-            {logo.fileName}
-          </p>
-          <label className="block text-xs font-medium text-slate-400">
-            {labelTitleCase("OBS image source name")}
-            <input
-              type="text"
-              value={inputName}
-              onChange={(e) => onInputNameChange(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-white/15 bg-black/40 px-3 py-2 text-sm text-slate-100 outline-none focus:border-blue-400/50 focus:ring-1 focus:ring-blue-400/40"
-            />
-          </label>
-        </div>
+        <input
+          type="text"
+          value={inputName}
+          onChange={(e) => onInputNameChange(e.target.value)}
+          aria-label="OBS image source name"
+          className="min-w-0 w-full rounded-lg border border-white/15 bg-black/40 px-3 py-2 text-sm text-slate-100 outline-none focus:border-blue-400/50 focus:ring-1 focus:ring-blue-400/40 sm:flex-1"
+        />
         <div className="flex shrink-0 flex-wrap gap-2">
           <button
             type="button"
@@ -72,10 +64,10 @@ export function ObsConnectionLogoRow({
         </div>
       </div>
       {wireError ? (
-        <p className="mt-2 text-xs text-red-300" role="alert">
+        <p className="text-xs text-red-300" role="alert">
           {wireError}
         </p>
       ) : null}
-    </li>
+    </div>
   );
 }

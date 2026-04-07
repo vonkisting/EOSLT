@@ -3,6 +3,7 @@ export const STREAM_OBS_CARD_IDS = {
   connection: "obs-connection",
   sceneSelection: "scene-selection",
   soundEffects: "sound-effects",
+  graphicsEffects: "graphics-effects",
   camerasSources: "cameras-sources",
   audio: "audio",
   scoreboard: "scoreboard",
