@@ -1254,11 +1254,22 @@ export function DashboardContent() {
   /** Persist collapsible open/closed state to the signed-in user’s Convex row (not the shared tournament doc). */
   const persistUiCollapsed = useCallback(
     (patch: Record<string, boolean>) => {
-      if (!email || !selectedLeagueName?.trim() || !selectedSeason?.trim()) return;
+      if (!email) return;
+      const shared =
+        savedSettings && typeof savedSettings === "object"
+          ? (savedSettings as Record<string, unknown>)
+          : null;
+      const leagueName =
+        selectedLeagueName?.trim() ||
+        (typeof shared?.leagueName === "string" ? shared.leagueName.trim() : "");
+      const season =
+        selectedSeason?.trim() ||
+        (typeof shared?.season === "string" ? shared.season.trim() : "");
+      if (!leagueName || !season) return;
       void patchUserDashboardSettings({
         email,
-        leagueName: selectedLeagueName,
-        season: selectedSeason,
+        leagueName,
+        season,
         tournamentStarted,
         tournamentPaused,
         ...patch,
@@ -1270,6 +1281,7 @@ export function DashboardContent() {
       selectedSeason,
       tournamentStarted,
       tournamentPaused,
+      savedSettings,
       patchUserDashboardSettings,
     ]
   );
