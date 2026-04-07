@@ -13,7 +13,9 @@ const uiCollapsedKeys = [
   "uiUsersCardOpen", "uiLeagueCardOpen", "uiPlayersCardOpen",
   "uiWeek1SectionOpen", "uiWeek2SectionOpen", "uiFinalsSectionOpen",
   "uiWeek1Slot0Open", "uiWeek1Slot1Open", "uiWeek1Slot2Open", "uiWeek1Slot3Open",
-  "uiWeek1Slot4Open", "uiWeek1Slot5Open", "uiWeek1Slot6Open", "uiWeek1Slot7Open",
+  "uiWeek1Slot4Open", "uiWeek1Slot5Open",   "uiWeek1Slot6Open", "uiWeek1Slot7Open",
+  /** Side "Tournament Setup" panel: true when collapsed (default open when unset). */
+  "uiTournamentSetupCollapsed",
 ] as const;
 
 const publicDashboardEmails = [

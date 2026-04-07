@@ -14,6 +14,7 @@ export default async function LiveScoringPage({
     match?: string;
     stage?: string;
     readonly?: string;
+    dashboard?: string;
   }>;
 }) {
   const params = await searchParams;
@@ -22,6 +23,7 @@ export default async function LiveScoringPage({
   const stage =
     params.stage === "week2" || params.stage === "finals" ? params.stage : "week1";
   const readOnly = params.readonly === "1";
+  const dashboardOperator = params.dashboard === "1";
   const cardIndex = Number.isNaN(cardNum)
     ? -1
     : Math.max(0, Math.min(stage === "week1" ? 7 : stage === "week2" ? 3 : 0, cardNum));
@@ -35,6 +37,7 @@ export default async function LiveScoringPage({
       matchIndex={matchIndex}
       stage={stage}
       readOnly={readOnly}
+      dashboardOperator={dashboardOperator}
     />
   );
 }

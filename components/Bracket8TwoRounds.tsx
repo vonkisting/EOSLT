@@ -38,6 +38,7 @@ export function MatchWithDropdowns({
   status,
   placeholderText = "Select Player...",
   onMatchClick,
+  onNameContextMenu,
 }: {
   winner: "top" | "bottom";
   topSlotIndex: number;
@@ -59,6 +60,8 @@ export function MatchWithDropdowns({
   status?: string | null;
   placeholderText?: string;
   onMatchClick?: () => void;
+  /** Dashboard: right-click player name to open live scorecard. */
+  onNameContextMenu?: () => void;
 }) {
   const winnerClass = winner === "top" ? "winner-top" : "winner-bottom";
   const topValue = slotSelections[topSlotIndex] ?? "";
@@ -82,16 +85,56 @@ export function MatchWithDropdowns({
               type="button"
               className={`name bracket-slot-select text-left ${topValue ? "slot-filled" : ""}`}
               onClick={onMatchClick}
+              onContextMenu={
+                onNameContextMenu
+                  ? (e) => {
+                      e.preventDefault();
+                      onNameContextMenu();
+                    }
+                  : undefined
+              }
               disabled={!topValue}
               aria-label={topValue ? `View scorecard for ${topValue}` : "No player selected"}
             >
               {topValue || placeholderText}
             </button>
+          ) : disabled && onNameContextMenu ? (
+            <div
+              className="min-w-0 flex-1"
+              onContextMenu={(e) => {
+                e.preventDefault();
+                onNameContextMenu();
+              }}
+            >
+              <select
+                className={`name bracket-slot-select ${topValue ? "slot-filled" : ""}`}
+                value={topValue}
+                onChange={(e) => setSlotSelection(topSlotIndex, e.target.value)}
+                disabled={disabled}
+                style={{ pointerEvents: "none" }}
+                aria-label="Top player"
+              >
+                <option value="">{placeholderText}</option>
+                {topOptions.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </div>
           ) : (
             <select
               className={`name bracket-slot-select ${topValue ? "slot-filled" : ""}`}
               value={topValue}
               onChange={(e) => setSlotSelection(topSlotIndex, e.target.value)}
+              onContextMenu={
+                onNameContextMenu
+                  ? (e) => {
+                      e.preventDefault();
+                      onNameContextMenu();
+                    }
+                  : undefined
+              }
               disabled={disabled}
               aria-label="Top player"
             >
@@ -125,16 +168,56 @@ export function MatchWithDropdowns({
               type="button"
               className={`name bracket-slot-select text-left ${bottomValue ? "slot-filled" : ""}`}
               onClick={onMatchClick}
+              onContextMenu={
+                onNameContextMenu
+                  ? (e) => {
+                      e.preventDefault();
+                      onNameContextMenu();
+                    }
+                  : undefined
+              }
               disabled={!bottomValue}
               aria-label={bottomValue ? `View scorecard for ${bottomValue}` : "No player selected"}
             >
               {bottomValue || placeholderText}
             </button>
+          ) : disabled && onNameContextMenu ? (
+            <div
+              className="min-w-0 flex-1"
+              onContextMenu={(e) => {
+                e.preventDefault();
+                onNameContextMenu();
+              }}
+            >
+              <select
+                className={`name bracket-slot-select ${bottomValue ? "slot-filled" : ""}`}
+                value={bottomValue}
+                onChange={(e) => setSlotSelection(bottomSlotIndex, e.target.value)}
+                disabled={disabled}
+                style={{ pointerEvents: "none" }}
+                aria-label="Bottom player"
+              >
+                <option value="">{placeholderText}</option>
+                {bottomOptions.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </div>
           ) : (
             <select
               className={`name bracket-slot-select ${bottomValue ? "slot-filled" : ""}`}
               value={bottomValue}
               onChange={(e) => setSlotSelection(bottomSlotIndex, e.target.value)}
+              onContextMenu={
+                onNameContextMenu
+                  ? (e) => {
+                      e.preventDefault();
+                      onNameContextMenu();
+                    }
+                  : undefined
+              }
               disabled={disabled}
               aria-label="Bottom player"
             >
@@ -224,6 +307,7 @@ export function Bracket8TwoRounds({
   matchStatusByIndex,
   placeholderText,
   onMatchClickByIndex,
+  onMatchNameContextMenu,
 }: {
   players: string[];
   playerRaceToMap?: Record<string, number | null>;
@@ -241,6 +325,8 @@ export function Bracket8TwoRounds({
   matchStatusByIndex?: (string | null)[];
   placeholderText?: string;
   onMatchClickByIndex?: (matchIndex: number) => void;
+  /** Dashboard: right-click a player name to open the live scorecard for that matchup. */
+  onMatchNameContextMenu?: (matchIndex: number) => void;
 }) {
   const pool = useMemo(() => {
     const filtered = players.filter((n) => n != null && n !== "");
@@ -345,6 +431,9 @@ export function Bracket8TwoRounds({
                 hasBye={disabled && matchupHasBye(0, 1)}
                 placeholderText={placeholderText}
                 onMatchClick={onMatchClickByIndex ? () => onMatchClickByIndex(0) : undefined}
+                onNameContextMenu={
+                  onMatchNameContextMenu ? () => onMatchNameContextMenu(0) : undefined
+                }
                 onTopScoreChange={onScoreChange ? (v) => handleScoreChange(0, "top", v) : undefined}
                 onBottomScoreChange={onScoreChange ? (v) => handleScoreChange(0, "bottom", v) : undefined}
               />
@@ -364,6 +453,9 @@ export function Bracket8TwoRounds({
                 hasBye={disabled && matchupHasBye(2, 3)}
                 placeholderText={placeholderText}
                 onMatchClick={onMatchClickByIndex ? () => onMatchClickByIndex(1) : undefined}
+                onNameContextMenu={
+                  onMatchNameContextMenu ? () => onMatchNameContextMenu(1) : undefined
+                }
                 onTopScoreChange={onScoreChange ? (v) => handleScoreChange(1, "top", v) : undefined}
                 onBottomScoreChange={onScoreChange ? (v) => handleScoreChange(1, "bottom", v) : undefined}
               />
@@ -383,6 +475,9 @@ export function Bracket8TwoRounds({
                 hasBye={disabled && matchupHasBye(4, 5)}
                 placeholderText={placeholderText}
                 onMatchClick={onMatchClickByIndex ? () => onMatchClickByIndex(2) : undefined}
+                onNameContextMenu={
+                  onMatchNameContextMenu ? () => onMatchNameContextMenu(2) : undefined
+                }
                 onTopScoreChange={onScoreChange ? (v) => handleScoreChange(2, "top", v) : undefined}
                 onBottomScoreChange={onScoreChange ? (v) => handleScoreChange(2, "bottom", v) : undefined}
               />
@@ -402,6 +497,9 @@ export function Bracket8TwoRounds({
                 hasBye={disabled && matchupHasBye(6, 7)}
                 placeholderText={placeholderText}
                 onMatchClick={onMatchClickByIndex ? () => onMatchClickByIndex(3) : undefined}
+                onNameContextMenu={
+                  onMatchNameContextMenu ? () => onMatchNameContextMenu(3) : undefined
+                }
                 onTopScoreChange={onScoreChange ? (v) => handleScoreChange(3, "top", v) : undefined}
                 onBottomScoreChange={onScoreChange ? (v) => handleScoreChange(3, "bottom", v) : undefined}
               />
@@ -423,6 +521,9 @@ export function Bracket8TwoRounds({
                 hasBye={disabled && matchupHasBye(8, 9)}
                 placeholderText={placeholderText}
                 onMatchClick={onMatchClickByIndex ? () => onMatchClickByIndex(4) : undefined}
+                onNameContextMenu={
+                  onMatchNameContextMenu ? () => onMatchNameContextMenu(4) : undefined
+                }
                 onTopScoreChange={onScoreChange ? (v) => handleScoreChange(4, "top", v) : undefined}
                 onBottomScoreChange={onScoreChange ? (v) => handleScoreChange(4, "bottom", v) : undefined}
               />
@@ -442,6 +543,9 @@ export function Bracket8TwoRounds({
                 hasBye={disabled && matchupHasBye(10, 11)}
                 placeholderText={placeholderText}
                 onMatchClick={onMatchClickByIndex ? () => onMatchClickByIndex(5) : undefined}
+                onNameContextMenu={
+                  onMatchNameContextMenu ? () => onMatchNameContextMenu(5) : undefined
+                }
                 onTopScoreChange={onScoreChange ? (v) => handleScoreChange(5, "top", v) : undefined}
                 onBottomScoreChange={onScoreChange ? (v) => handleScoreChange(5, "bottom", v) : undefined}
               />

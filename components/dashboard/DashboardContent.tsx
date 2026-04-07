@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { useSession } from "next-auth/react";
 import { useMutation, useQuery } from "convex/react";
@@ -12,6 +13,7 @@ import { isBye } from "@/components/Bracket8TwoRounds";
 import { Modal } from "@/components/ui/Modal";
 import { formatLocationDate, formatLocationTime } from "@/lib/formatDateTime";
 import { selectOptionsFullPool } from "@/lib/dropdownOptions";
+import { deriveMatchStatusForRaceCellStyle } from "@/lib/bracketMatchRaceStyle";
 import { canAccessDashboard } from "@/lib/dashboard-access";
 import {
   parseWeek2BracketMatchStatusesJson,
@@ -327,6 +329,7 @@ function tryRandomizeWeek1Slots(
 export function DashboardContent() {
   const { data: session } = useSession();
   const email = session?.user?.email?.toLowerCase().trim();
+  const router = useRouter();
   const savedSettings = useQuery(api.dashboardSettings.getShared, {});
   const setDashboardSettings = useMutation(api.dashboardSettings.setShared);
   const hasAppliedInitialSettings = useRef(false);
@@ -540,8 +543,10 @@ export function DashboardContent() {
       if (!savedSettings || typeof savedSettings !== "object") return Array(6).fill(null);
       const s = savedSettings as Record<string, unknown>;
       return Array.from({ length: 6 }, (_, i) => {
-        const val = (s[`bracketMatchStatus${cardIndex * 6 + i}`] as string) ?? "";
-        return val.trim() || null;
+        const globalIdx = cardIndex * 6 + i;
+        const rawStatus = ((s[`bracketMatchStatus${globalIdx}`] as string) ?? "").trim() || null;
+        const liveJson = s[`liveScoreGames${globalIdx}`] as string | undefined;
+        return deriveMatchStatusForRaceCellStyle(rawStatus, liveJson);
       });
     },
     [savedSettings]
@@ -722,6 +727,7 @@ export function DashboardContent() {
     if (ui.uiWeek1SectionOpen === true) setWeek1SectionOpen(true);
     if (ui.uiWeek2SectionOpen === true) setWeek2SectionOpen(true);
     if (ui.uiFinalsSectionOpen === true) setFinalsSectionOpen(true);
+    if (ui.uiTournamentSetupCollapsed === true) setSidePanelOpen(false);
     setWeek1SlotCardsOpen((prev) =>
       prev.map((_, i) => (ui[`uiWeek1Slot${i}Open`] === true) || prev[i])
     );
@@ -789,6 +795,65 @@ export function DashboardContent() {
     const top = matchIndex < 4 ? matchIndex * 2 : 8 + (matchIndex - 4) * 2;
     return [top, top + 1];
   }, []);
+
+  /** Right-click a Week 1 player name: open live scorecard (editable for operators; uses ?dashboard=1). */
+  const onWeek1MatchNameContextMenu = useCallback(
+    (cardIndex: number, matchIndex: number) => {
+      if (!email || !savedSettings || typeof savedSettings !== "object") return;
+      const s = savedSettings as Record<string, unknown>;
+      const base = cardIndex * 12;
+      const [topSlot, bottomSlot] = slotIndicesForMatch(matchIndex);
+      const topVal = ((s[`bracketSlot${base + topSlot}`] as string) ?? "").trim();
+      const bottomVal = ((s[`bracketSlot${base + bottomSlot}`] as string) ?? "").trim();
+      const statusKey = `bracketMatchStatus${cardIndex * 6 + matchIndex}`;
+      const stRaw = ((s[statusKey] as string) ?? "").trim();
+      const st = stRaw || null;
+
+      const qs = new URLSearchParams({
+        card: String(cardIndex),
+        match: String(matchIndex),
+        dashboard: "1",
+      });
+
+      if (st === "Paused" || st === "Paused...") {
+        router.push(`/live-scoring?${qs.toString()}`);
+        return;
+      }
+
+      if (st === "Completed") {
+        qs.set("readonly", "1");
+        router.push(`/live-scoring?${qs.toString()}`);
+        return;
+      }
+
+      if (!topVal || !bottomVal) {
+        qs.set("readonly", "1");
+        router.push(`/live-scoring?${qs.toString()}`);
+        return;
+      }
+
+      void setDashboardSettings({
+        email,
+        leagueName: selectedLeagueName,
+        season: selectedSeason,
+        tournamentStarted,
+        tournamentPaused,
+        [statusKey]: "In Progress...",
+      } as Parameters<typeof setDashboardSettings>[0]);
+      router.push(`/live-scoring?${qs.toString()}`);
+    },
+    [
+      email,
+      savedSettings,
+      slotIndicesForMatch,
+      router,
+      setDashboardSettings,
+      selectedLeagueName,
+      selectedSeason,
+      tournamentStarted,
+      tournamentPaused,
+    ]
+  );
 
   /** Save the 12 bracket player-name slots for one Week 1 card only; also sets matchup status to "Match Ready" when both players selected and status was empty. */
   const saveBracketSlots = useCallback(
@@ -1418,7 +1483,10 @@ export function DashboardContent() {
             <span className="pl-[5px] text-[1.4rem] font-medium text-blue-400">Tournament Setup</span>
             <button
               type="button"
-              onClick={() => setSidePanelOpen(false)}
+              onClick={() => {
+                setSidePanelOpen(false);
+                persistUiCollapsed({ uiTournamentSetupCollapsed: true });
+              }}
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-blue-100/80 transition-colors hover:bg-white/10 hover:text-blue-100"
               aria-label="Collapse setup card"
             >
@@ -2543,7 +2611,10 @@ export function DashboardContent() {
       {!sidePanelOpen && (
         <button
           type="button"
-          onClick={() => setSidePanelOpen(true)}
+          onClick={() => {
+            setSidePanelOpen(true);
+            persistUiCollapsed({ uiTournamentSetupCollapsed: false });
+          }}
           className="fixed z-40 flex w-10 items-center justify-center rounded-xl border border-white/20 bg-gradient-to-br from-slate-900 to-slate-950 text-blue-100/90 shadow-2xl transition-colors hover:from-slate-800 hover:to-slate-900 hover:text-blue-100"
           style={{
             left: pageInsets.left,
@@ -2656,6 +2727,9 @@ export function DashboardContent() {
                   allFirstRoundSelections={allFirstRoundSelections}
                   disabled={tournamentPaused}
                   matchStatusByIndex={getMatchStatusByIndex(index)}
+                  onMatchNameContextMenu={(matchIndex) =>
+                    onWeek1MatchNameContextMenu(index, matchIndex)
+                  }
                 />
               </div>
             )}

@@ -139,11 +139,14 @@ export function LiveScoringCard({
   matchIndex,
   stage = "week1",
   readOnly = false,
+  dashboardOperator = false,
 }: {
   cardIndex: number;
   matchIndex: number;
   stage?: BracketStage;
   readOnly?: boolean;
+  /** Opened from /dashboard with ?dashboard=1 — allow editing when tournament is paused or not started. */
+  dashboardOperator?: boolean;
 }) {
   const validCard =
     stage === "week1"
@@ -168,8 +171,8 @@ export function LiveScoringCard({
 
   useEffect(() => {
     if (settings === undefined) return;
-    if (!readOnly && !tournamentInProgress) router.replace("/");
-  }, [settings, tournamentInProgress, router, readOnly]);
+    if (!readOnly && !tournamentInProgress && !dashboardOperator) router.replace("/");
+  }, [settings, tournamentInProgress, router, readOnly, dashboardOperator]);
 
   const [player1Scores, setPlayer1Scores] = useState<string[]>(() => [...EMPTY_ROW]);
   const [player2Scores, setPlayer2Scores] = useState<string[]>(() => [...EMPTY_ROW]);
@@ -557,12 +560,13 @@ export function LiveScoringCard({
   const [submitSuccessModalOpen, setSubmitSuccessModalOpen] = useState(false);
   useEffect(() => {
     if (!submitSuccessModalOpen) return;
+    const dest = dashboardOperator ? "/dashboard" : "/";
     const t = setTimeout(() => {
       setSubmitSuccessModalOpen(false);
-      router.replace("/");
+      router.replace(dest);
     }, 3000);
     return () => clearTimeout(t);
-  }, [submitSuccessModalOpen, router]);
+  }, [submitSuccessModalOpen, router, dashboardOperator]);
 
   return (
     <div className="mx-auto max-w-2xl pb-8 mt-[5px]">
@@ -732,7 +736,7 @@ export function LiveScoringCard({
                     Both players can&apos;t have winning totals. Adjust the scores to represent who won first.
                   </p>
                 )}
-                <div className="flex justify-center gap-3">
+                <div className="flex flex-wrap justify-center gap-3">
                   {!readOnly && totalsReached && !bothHaveWinningTotals && (
                     <button
                       type="button"
@@ -747,11 +751,28 @@ export function LiveScoringCard({
                       Submit Scores
                     </button>
                   )}
+                  {!readOnly && dashboardOperator && stage === "week1" && (
                     <button
+                      type="button"
+                      onClick={() => {
+                        updateMatchStatus("Completed");
+                        setSubmitSuccessModalOpen(true);
+                      }}
+                      className="rounded-lg bg-gradient-to-r from-emerald-700 to-emerald-500 px-5 py-2.5 font-semibold text-white shadow transition-opacity hover:from-emerald-600 hover:to-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-slate-800"
+                      aria-label="Submit scores and mark matchup completed"
+                    >
+                      Submit scores
+                    </button>
+                  )}
+                  <button
                     type="button"
-                    onClick={() => router.push("/")}
+                    onClick={() => router.push(dashboardOperator ? "/dashboard" : "/")}
                     className="rounded-lg bg-gradient-to-r from-red-700 to-red-500 px-5 py-2.5 font-semibold text-white shadow transition-opacity hover:from-red-600 hover:to-red-400 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-2 focus:ring-offset-slate-800"
-                    aria-label="Exit live scoring and return home"
+                    aria-label={
+                      dashboardOperator
+                        ? "Exit live scoring and return to dashboard"
+                        : "Exit live scoring and return home"
+                    }
                   >
                     {readOnly ? "Back to Home" : "Exit"}
                   </button>
@@ -803,7 +824,7 @@ export function LiveScoringCard({
         open={submitSuccessModalOpen}
         onClose={() => {
           setSubmitSuccessModalOpen(false);
-          router.replace("/");
+          router.replace(dashboardOperator ? "/dashboard" : "/");
         }}
         title="Success"
       >
@@ -811,7 +832,7 @@ export function LiveScoringCard({
           Success, match scores successfully submitted.
         </p>
         <p className="mt-2 text-sm text-slate-400">
-          Redirecting to home…
+          {dashboardOperator ? "Redirecting to dashboard…" : "Redirecting to home…"}
         </p>
       </Modal> : null}
       </div>

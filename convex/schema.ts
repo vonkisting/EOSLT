@@ -359,6 +359,7 @@ export default defineSchema({
     uiWeek1Slot5Open: v.optional(v.boolean()),
     uiWeek1Slot6Open: v.optional(v.boolean()),
     uiWeek1Slot7Open: v.optional(v.boolean()),
+    uiTournamentSetupCollapsed: v.optional(v.boolean()),
   }).index("by_email", ["email"]),
   /** Venue names for location dropdowns (synced from PoolHub, exclusions applied). */
   venues: defineTable({

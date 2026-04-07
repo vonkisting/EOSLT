@@ -9,6 +9,7 @@ import { api } from "@/convex/_generated/api";
 import { Bracket8TwoRounds } from "@/components/Bracket8TwoRounds";
 import { Bracket4 } from "@/components/Bracket4";
 import { formatLocationDate, formatLocationTime } from "@/lib/formatDateTime";
+import { deriveMatchStatusForRaceCellStyle } from "@/lib/bracketMatchRaceStyle";
 import {
   parseWeek2BracketMatchStatusesJson,
   parseWeek2BracketScoresJson,
@@ -447,14 +448,16 @@ export function HomeBracketCards() {
     [getMyMatchInCard, settings]
   );
 
-  /** Per-matchup status for this card (6 matchups) for bracket row styling. */
+  /** Per-matchup status for this card (6 matchups) for bracket row styling; includes partial live scorecards. */
   const getMatchStatusByIndex = useCallback(
     (cardIndex: number): (string | null)[] => {
       if (!settings || typeof settings !== "object") return Array(6).fill(null);
       const s = settings as Record<string, unknown>;
       return Array.from({ length: 6 }, (_, i) => {
-        const val = (s[`bracketMatchStatus${cardIndex * 6 + i}`] as string) ?? "";
-        return val.trim() || null;
+        const globalIdx = cardIndex * 6 + i;
+        const rawStatus = ((s[`bracketMatchStatus${globalIdx}`] as string) ?? "").trim() || null;
+        const liveJson = s[`liveScoreGames${globalIdx}`] as string | undefined;
+        return deriveMatchStatusForRaceCellStyle(rawStatus, liveJson);
       });
     },
     [settings]
