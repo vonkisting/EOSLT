@@ -727,11 +727,17 @@ export function DashboardContent() {
     if (ui.uiWeek1SectionOpen === true) setWeek1SectionOpen(true);
     if (ui.uiWeek2SectionOpen === true) setWeek2SectionOpen(true);
     if (ui.uiFinalsSectionOpen === true) setFinalsSectionOpen(true);
-    if (ui.uiTournamentSetupCollapsed === true) setSidePanelOpen(false);
     setWeek1SlotCardsOpen((prev) =>
       prev.map((_, i) => (ui[`uiWeek1Slot${i}Open`] === true) || prev[i])
     );
   }, [savedSettings, leagueNames]);
+
+  /** Restore Tournament Setup side panel open/collapsed from Convex even when league/season hydration is skipped. */
+  useEffect(() => {
+    if (savedSettings == null || typeof savedSettings !== "object") return;
+    const ui = savedSettings as Record<string, unknown>;
+    if (ui.uiTournamentSetupCollapsed === true) setSidePanelOpen(false);
+  }, [savedSettings]);
 
   useEffect(() => {
     if (pendingSeasonFromSettings.current == null || !seasonNames.length) return;
@@ -2724,7 +2730,7 @@ export function DashboardContent() {
                   onScoreChange={(matchIndex, side, value) => saveScoreChange(index, matchIndex, side, value)}
                   cardIndex={index}
                   allFirstRoundSelections={allFirstRoundSelections}
-                  disabled={tournamentPaused}
+                  disabled={false}
                   matchStatusByIndex={getMatchStatusByIndex(index)}
                   onMatchNameContextMenu={(matchIndex) =>
                     onWeek1MatchNameContextMenu(index, matchIndex)
@@ -2803,7 +2809,7 @@ export function DashboardContent() {
                   onScoreChange={(matchIndex, side, value) =>
                     saveWeek2ScoreChange(index, matchIndex, side, value)
                   }
-                  disabled={tournamentPaused}
+                  disabled={false}
                   matchStatusByIndex={getWeek2MatchStatusByIndex(index)}
                 />
               </div>
@@ -2865,7 +2871,7 @@ export function DashboardContent() {
                 onBracketSlotsChange={saveFinalsBracketSlots}
                 initialScores={finalsBracketScoresArray}
                 onScoreChange={saveFinalsScoreChange}
-                disabled={tournamentPaused}
+                disabled={false}
                 matchStatusByIndex={getFinalsMatchStatusByIndex()}
               />
               {finalsChampion != null && (

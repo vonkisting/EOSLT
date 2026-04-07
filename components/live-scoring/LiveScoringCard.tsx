@@ -7,6 +7,10 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Modal } from "@/components/ui/Modal";
 import {
+  resolveWinnerNameForAdvancement,
+  week1TargetSlotForWinner,
+} from "@/lib/bracketMatchAdvance";
+import {
   parseWeek2BracketScoresJson,
   parseWeek2BracketSlotsJson,
   week2SlotPairIndices,
@@ -325,33 +329,6 @@ export function LiveScoringCard({
     };
   }, [email, settings, validCard, validMatch, cardIndex, matchIndex, player1Scores, player2Scores, setDashboardSettings, readOnly, stage]);
 
-  const updateMatchStatus = useCallback(
-    (status: string) => {
-      if (
-        readOnly ||
-        !email ||
-        !settings ||
-        typeof settings !== "object" ||
-        !validCard ||
-        !validMatch ||
-        stage !== "week1"
-      ) {
-        return;
-      }
-      const s = settings as Record<string, unknown>;
-      const statusKey = `bracketMatchStatus${cardIndex * 6 + matchIndex}`;
-      setDashboardSettings({
-        email,
-        leagueName: String(s.leagueName ?? ""),
-        season: String(s.season ?? ""),
-        tournamentStarted: s.tournamentStarted === true,
-        tournamentPaused: s.tournamentPaused === true,
-        [statusKey]: status,
-      } as Parameters<typeof setDashboardSettings>[0]);
-    },
-    [email, settings, validCard, validMatch, cardIndex, matchIndex, setDashboardSettings, readOnly, stage]
-  );
-
   const { player1Name, player2Name, storedTopScore, storedBottomScore } = useMemo(() => {
     const s = settings as Record<string, unknown> | undefined;
     if (s == null || !validCard || !validMatch) {
@@ -509,6 +486,65 @@ export function LiveScoringCard({
   const singleWinnerName = useMemo(
     () => (p1Won && !p2Won ? player1Name : p2Won && !p1Won ? player2Name : null),
     [p1Won, p2Won, player1Name, player2Name]
+  );
+
+  const updateMatchStatus = useCallback(
+    (status: string) => {
+      if (
+        readOnly ||
+        !email ||
+        !settings ||
+        typeof settings !== "object" ||
+        !validCard ||
+        !validMatch ||
+        stage !== "week1"
+      ) {
+        return;
+      }
+      const s = settings as Record<string, unknown>;
+      const statusKey = `bracketMatchStatus${cardIndex * 6 + matchIndex}`;
+      const payload: Record<string, unknown> = {
+        email,
+        leagueName: String(s.leagueName ?? ""),
+        season: String(s.season ?? ""),
+        tournamentStarted: s.tournamentStarted === true,
+        tournamentPaused: s.tournamentPaused === true,
+        [statusKey]: status,
+      };
+      if (status === "Completed") {
+        const targetSlot = week1TargetSlotForWinner(matchIndex);
+        if (targetSlot != null) {
+          const winner = resolveWinnerNameForAdvancement(
+            singleWinnerName,
+            player1Name,
+            player2Name,
+            displayTotal1,
+            displayTotal2
+          );
+          if (winner) {
+            const base = cardIndex * 12;
+            payload[`bracketSlot${base + targetSlot}`] = winner;
+          }
+        }
+      }
+      setDashboardSettings(payload as Parameters<typeof setDashboardSettings>[0]);
+    },
+    [
+      email,
+      settings,
+      validCard,
+      validMatch,
+      cardIndex,
+      matchIndex,
+      setDashboardSettings,
+      readOnly,
+      stage,
+      singleWinnerName,
+      player1Name,
+      player2Name,
+      displayTotal1,
+      displayTotal2,
+    ]
   );
 
   /** Only show winning-ball confirmation when the game that put the winner's total >= raceTo has both players' scores. */
