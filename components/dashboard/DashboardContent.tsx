@@ -735,13 +735,20 @@ export function DashboardContent() {
     }
   }, [savedSettings, leagueNames]);
 
-  /** Restore collapsible sections from the signed-in user’s dashboard row (not the shared tournament doc). */
+  /**
+   * Restore collapsible UI from the signed-in user’s Convex row (same pattern for every slot card:
+   * if Convex has an explicit boolean, use it; otherwise keep previous React state so shared-doc
+   * updates do not collapse Week 2 / Finals mid-session).
+   */
   useEffect(() => {
     if (!email || myUserSettings === undefined) return;
-    if (myUserSettings === null) return;
-    const ui = myUserSettings as Record<string, unknown>;
+    const ui =
+      myUserSettings !== null && typeof myUserSettings === "object"
+        ? (myUserSettings as Record<string, unknown>)
+        : null;
+
     const applyBool = (key: string, set: Dispatch<SetStateAction<boolean>>) => {
-      const v = ui[key];
+      const v = ui?.[key];
       if (v === true || v === false) set(v);
     };
     applyBool("uiUsersCardOpen", setUsersCardOpen);
@@ -752,19 +759,23 @@ export function DashboardContent() {
     applyBool("uiFinalsSectionOpen", setFinalsSectionOpen);
     setWeek1SlotCardsOpen((prev) =>
       prev.map((p, i) => {
-        const v = ui[`uiWeek1Slot${i}Open`];
+        const v = ui?.[`uiWeek1Slot${i}Open`];
         if (v === true || v === false) return v;
         return p;
       })
     );
     setWeek2SlotCardsOpen((prev) =>
       prev.map((p, i) => {
-        const v = ui[`uiWeek2Slot${i}Open`];
+        const v = ui?.[`uiWeek2Slot${i}Open`];
         if (v === true || v === false) return v;
         return p;
       })
     );
-    applyBool("uiFinalsCardOpen", setFinalsCardOpen);
+    setFinalsCardOpen((prev) => {
+      const v = ui?.uiFinalsCardOpen;
+      if (v === true || v === false) return v;
+      return prev;
+    });
   }, [email, myUserSettings]);
 
   useEffect(() => {
