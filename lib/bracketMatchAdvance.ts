@@ -8,6 +8,26 @@ export function week1TargetSlotForWinner(matchIndex: number): number | null {
 }
 
 /**
+ * Week 1 semifinal winners (match 4 = first semi on the Week 1 card, match 5 = second semi) feed into
+ * Week 2 four-person brackets: two consecutive Week 1 cards → one Week 2 card.
+ * - Week 1 cards 0 & 1 → Week 2 card 0 (matchup 0 = slots 0–1, matchup 1 = slots 2–3)
+ * - Week 1 cards 2 & 3 → Week 2 card 1, etc.
+ * Match 4 winner → top slot of that pair; match 5 winner → bottom slot.
+ */
+export function week2SlotIndexForWeek1SemiWinner(
+  week1CardIndex: number,
+  week1MatchIndex: number
+): number | null {
+  if (week1MatchIndex !== 4 && week1MatchIndex !== 5) return null;
+  if (week1CardIndex < 0 || week1CardIndex > 7) return null;
+  const w2Card = Math.floor(week1CardIndex / 2);
+  const matchupOnW2Card = week1CardIndex % 2;
+  const base = w2Card * 6;
+  const offsetWithinPair = week1MatchIndex === 4 ? 0 : 1;
+  return base + matchupOnW2Card * 2 + offsetWithinPair;
+}
+
+/**
  * Resolves the winner for Convex bracket slot updates when a match is marked completed.
  * Prefers the single-winner from race-to rules when set; otherwise uses higher ball total.
  */

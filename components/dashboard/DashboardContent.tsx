@@ -367,7 +367,7 @@ export function DashboardContent() {
     () => Array(4).fill(false)
   );
   const [finalsCardOpen, setFinalsCardOpen] = useState(false);
-  const [sidePanelOpen, setSidePanelOpen] = useState(true);
+  const [sidePanelOpen, setSidePanelOpen] = useState(false);
   const [week1SectionOpen, setWeek1SectionOpen] = useState(false);
   const [week2SectionOpen, setWeek2SectionOpen] = useState(false);
   const [finalsSectionOpen, setFinalsSectionOpen] = useState(false);
@@ -731,13 +731,6 @@ export function DashboardContent() {
       prev.map((_, i) => (ui[`uiWeek1Slot${i}Open`] === true) || prev[i])
     );
   }, [savedSettings, leagueNames]);
-
-  /** Restore Tournament Setup side panel open/collapsed from Convex even when league/season hydration is skipped. */
-  useEffect(() => {
-    if (savedSettings == null || typeof savedSettings !== "object") return;
-    const ui = savedSettings as Record<string, unknown>;
-    if (ui.uiTournamentSetupCollapsed === true) setSidePanelOpen(false);
-  }, [savedSettings]);
 
   useEffect(() => {
     if (pendingSeasonFromSettings.current == null || !seasonNames.length) return;
@@ -1488,10 +1481,7 @@ export function DashboardContent() {
             <span className="pl-[5px] text-[1.4rem] font-medium text-blue-400">Tournament Setup</span>
             <button
               type="button"
-              onClick={() => {
-                setSidePanelOpen(false);
-                persistUiCollapsed({ uiTournamentSetupCollapsed: true });
-              }}
+              onClick={() => setSidePanelOpen(false)}
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-blue-100/80 transition-colors hover:bg-white/10 hover:text-blue-100"
               aria-label="Collapse setup card"
             >
@@ -2616,10 +2606,7 @@ export function DashboardContent() {
       {!sidePanelOpen && (
         <button
           type="button"
-          onClick={() => {
-            setSidePanelOpen(true);
-            persistUiCollapsed({ uiTournamentSetupCollapsed: false });
-          }}
+          onClick={() => setSidePanelOpen(true)}
           className="fixed z-40 flex w-10 items-center justify-center rounded-xl border border-white/20 bg-gradient-to-br from-slate-900 to-slate-950 text-blue-100/90 shadow-2xl transition-colors hover:from-slate-800 hover:to-slate-900 hover:text-blue-100"
           style={{
             left: pageInsets.left,

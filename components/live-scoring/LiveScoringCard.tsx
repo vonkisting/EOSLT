@@ -9,6 +9,7 @@ import { Modal } from "@/components/ui/Modal";
 import {
   resolveWinnerNameForAdvancement,
   week1TargetSlotForWinner,
+  week2SlotIndexForWeek1SemiWinner,
 } from "@/lib/bracketMatchAdvance";
 import {
   parseWeek2BracketScoresJson,
@@ -512,18 +513,25 @@ export function LiveScoringCard({
         [statusKey]: status,
       };
       if (status === "Completed") {
+        const winner = resolveWinnerNameForAdvancement(
+          singleWinnerName,
+          player1Name,
+          player2Name,
+          displayTotal1,
+          displayTotal2
+        );
         const targetSlot = week1TargetSlotForWinner(matchIndex);
-        if (targetSlot != null) {
-          const winner = resolveWinnerNameForAdvancement(
-            singleWinnerName,
-            player1Name,
-            player2Name,
-            displayTotal1,
-            displayTotal2
-          );
-          if (winner) {
-            const base = cardIndex * 12;
-            payload[`bracketSlot${base + targetSlot}`] = winner;
+        if (targetSlot != null && winner) {
+          const base = cardIndex * 12;
+          payload[`bracketSlot${base + targetSlot}`] = winner;
+        }
+        const w2Idx = week2SlotIndexForWeek1SemiWinner(cardIndex, matchIndex);
+        if (w2Idx != null && winner) {
+          const slots = parseWeek2BracketSlotsJson(s.week2BracketSlots);
+          const nextSlots = [...slots];
+          if (w2Idx < nextSlots.length) {
+            nextSlots[w2Idx] = winner;
+            payload.week2BracketSlots = JSON.stringify(nextSlots);
           }
         }
       }
