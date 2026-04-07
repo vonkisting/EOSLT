@@ -460,6 +460,72 @@ export function HomeBracketCards() {
     [settings]
   );
 
+  /**
+   * Week 1 bracket name click: read-only for spectators or completed matches; linked players who
+   * could use “Live Score My Match” get the same navigation and status update as that button.
+   */
+  const handleWeek1BracketMatchClick = useCallback(
+    (cardIndex: number, matchIndex: number) => {
+      if (!settings || typeof settings !== "object") {
+        openReadOnlyScorecard("week1", cardIndex, matchIndex);
+        return;
+      }
+      const s = settings as Record<string, unknown>;
+      const base = cardIndex * 12;
+      const [topSlot, bottomSlot] = slotIndicesForMatch(matchIndex);
+      const topVal = ((s[`bracketSlot${base + topSlot}`] as string) ?? "").trim();
+      const bottomVal = ((s[`bracketSlot${base + bottomSlot}`] as string) ?? "").trim();
+      const topNorm = topVal.toLowerCase();
+      const bottomNorm = bottomVal.toLowerCase();
+      if (!linkedName || (topNorm !== linkedName && bottomNorm !== linkedName)) {
+        openReadOnlyScorecard("week1", cardIndex, matchIndex);
+        return;
+      }
+
+      const stRaw = ((s[`bracketMatchStatus${cardIndex * 6 + matchIndex}`] as string) ?? "").trim();
+      const st = stRaw || null;
+
+      if (st === "Paused" || st === "Paused...") {
+        router.push(`/live-scoring?card=${cardIndex}&match=${matchIndex}`);
+        return;
+      }
+
+      if (tournamentInProgress && st !== "Completed") {
+        const inProgress = st === "In Progress...";
+        if ((!topVal || !bottomVal) && !inProgress) {
+          openReadOnlyScorecard("week1", cardIndex, matchIndex);
+          return;
+        }
+        if (!email) {
+          openReadOnlyScorecard("week1", cardIndex, matchIndex);
+          return;
+        }
+        const statusKey = `bracketMatchStatus${cardIndex * 6 + matchIndex}`;
+        void setDashboardSettings({
+          email,
+          leagueName: String(s.leagueName ?? ""),
+          season: String(s.season ?? ""),
+          tournamentStarted: s.tournamentStarted === true,
+          tournamentPaused: s.tournamentPaused === true,
+          [statusKey]: "In Progress...",
+        } as Parameters<typeof setDashboardSettings>[0]);
+        router.push(`/live-scoring?card=${cardIndex}&match=${matchIndex}`);
+        return;
+      }
+
+      openReadOnlyScorecard("week1", cardIndex, matchIndex);
+    },
+    [
+      settings,
+      linkedName,
+      tournamentInProgress,
+      email,
+      setDashboardSettings,
+      router,
+      openReadOnlyScorecard,
+    ]
+  );
+
   const week2BracketSlotsArray = useMemo(() => {
     const raw =
       settings && typeof settings === "object"
@@ -705,7 +771,7 @@ export function HomeBracketCards() {
                 placeholderText="TBD..."
                 matchStatusByIndex={getMatchStatusByIndex(index)}
                 onMatchClickByIndex={(matchIndex) =>
-                  openReadOnlyScorecard("week1", index, matchIndex)
+                  handleWeek1BracketMatchClick(index, matchIndex)
                 }
               />
             </div>
