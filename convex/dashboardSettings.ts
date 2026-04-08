@@ -85,7 +85,7 @@ function mapDocToSettings(doc: Doc<"dashboardSettings">) {
       out[key] = typeof val === "string" ? val : null;
     }
   }
-  for (let i = 0; i < 48; i++) {
+  for (let i = 0; i < 63; i++) {
     const key = `liveScoreGames${i}`;
     const val = d[key];
     out[key] = typeof val === "string" ? val : null;
@@ -100,6 +100,14 @@ function mapDocToSettings(doc: Doc<"dashboardSettings">) {
   out.finalsBracketSlots = typeof finalsRaw === "string" ? finalsRaw : null;
   const finalsScoresRaw = d.finalsBracketScores;
   out.finalsBracketScores = typeof finalsScoresRaw === "string" ? finalsScoresRaw : null;
+  const finalsStatusesRaw = d.finalsBracketMatchStatuses;
+  out.finalsBracketMatchStatuses =
+    typeof finalsStatusesRaw === "string" ? finalsStatusesRaw : null;
+  const bracketCardsUiRaw = d.dashboardBracketCardsUiJson;
+  out.dashboardBracketCardsUiJson =
+    typeof bracketCardsUiRaw === "string" && bracketCardsUiRaw.trim() !== ""
+      ? bracketCardsUiRaw
+      : null;
   out.week1BracketsRandomized = d.week1BracketsRandomized === true;
   out.showBracketsOnHomeScreen = d.showBracketsOnHomeScreen === true;
   for (const key of uiCollapsedKeys) {
@@ -114,7 +122,7 @@ function mapDocToSettings(doc: Doc<"dashboardSettings">) {
     leagueGuid: string | null;
     tournamentStarted: boolean;
     tournamentPaused: boolean;
-  } & Record<(typeof locationKeys)[number], string | null> & { locationStartMeta: string | null } & Record<`bracketSlot${number}`, string | null> & Record<`bracketMatchStatus${number}`, string | null> & Record<`bracketScoreTop${number}` | `bracketScoreBottom${number}`, string | null> & Record<`liveScoreGames${number}`, string | null> & { week2BracketSlots: string | null; week2BracketScores: string | null; week2BracketMatchStatuses: string | null; finalsBracketSlots: string | null; finalsBracketScores: string | null; week1BracketsRandomized: boolean; showBracketsOnHomeScreen: boolean   } & Record<(typeof uiCollapsedKeys)[number], boolean | null>;
+  } & Record<(typeof locationKeys)[number], string | null> & { locationStartMeta: string | null } & Record<`bracketSlot${number}`, string | null> & Record<`bracketMatchStatus${number}`, string | null> & Record<`bracketScoreTop${number}` | `bracketScoreBottom${number}`, string | null> & Record<`liveScoreGames${number}`, string | null> & { week2BracketSlots: string | null; week2BracketScores: string | null; week2BracketMatchStatuses: string | null; finalsBracketSlots: string | null; finalsBracketScores: string | null; finalsBracketMatchStatuses: string | null; week1BracketsRandomized: boolean; showBracketsOnHomeScreen: boolean   } & Record<(typeof uiCollapsedKeys)[number], boolean | null>;
 }
 
 /**
@@ -195,7 +203,7 @@ const bracketScoreArgs = Object.fromEntries(
 ) as Record<string, ReturnType<typeof v.optional>>;
 
 const liveScoreGamesKeys = Array.from(
-  { length: 48 },
+  { length: 63 },
   (_, i) => `liveScoreGames${i}` as const
 );
 const liveScoreGamesArgs = Object.fromEntries(
@@ -255,8 +263,17 @@ function buildPatch(args: Record<string, unknown>) {
   }
   if (args.finalsBracketSlots !== undefined) patch.finalsBracketSlots = args.finalsBracketSlots as string ?? undefined;
   if (args.finalsBracketScores !== undefined) patch.finalsBracketScores = args.finalsBracketScores as string ?? undefined;
+  if (args.finalsBracketMatchStatuses !== undefined) {
+    patch.finalsBracketMatchStatuses = args.finalsBracketMatchStatuses as string ?? undefined;
+  }
   if (args.week1BracketsRandomized !== undefined) patch.week1BracketsRandomized = args.week1BracketsRandomized as boolean;
   if (args.showBracketsOnHomeScreen !== undefined) patch.showBracketsOnHomeScreen = args.showBracketsOnHomeScreen as boolean;
+  if (args.dashboardBracketCardsUiJson !== undefined) {
+    patch.dashboardBracketCardsUiJson =
+      (args.dashboardBracketCardsUiJson as string)?.trim() !== ""
+        ? (args.dashboardBracketCardsUiJson as string)
+        : undefined;
+  }
   for (const key of uiCollapsedKeys) {
     const val = args[key];
     if (val !== undefined) patch[key] = val as boolean;
@@ -303,8 +320,10 @@ export const set = mutation({
     week2BracketMatchStatuses: v.optional(v.string()),
     finalsBracketSlots: v.optional(v.string()),
     finalsBracketScores: v.optional(v.string()),
+    finalsBracketMatchStatuses: v.optional(v.string()),
     week1BracketsRandomized: v.optional(v.boolean()),
     showBracketsOnHomeScreen: v.optional(v.boolean()),
+    dashboardBracketCardsUiJson: v.optional(v.string()),
     ...uiCollapsedArgs,
   },
   handler: async (ctx, args) => {
@@ -332,8 +351,10 @@ export const setShared = mutation({
     week2BracketMatchStatuses: v.optional(v.string()),
     finalsBracketSlots: v.optional(v.string()),
     finalsBracketScores: v.optional(v.string()),
+    finalsBracketMatchStatuses: v.optional(v.string()),
     week1BracketsRandomized: v.optional(v.boolean()),
     showBracketsOnHomeScreen: v.optional(v.boolean()),
+    dashboardBracketCardsUiJson: v.optional(v.string()),
     ...uiCollapsedArgs,
   },
   handler: async (ctx, args) => {

@@ -24,6 +24,7 @@ import { formatLocationDate, formatLocationTime } from "@/lib/formatDateTime";
 import { selectOptionsFullPool } from "@/lib/dropdownOptions";
 import { deriveMatchStatusForRaceCellStyle } from "@/lib/bracketMatchRaceStyle";
 import { canAccessDashboard } from "@/lib/dashboard-access";
+import { parseFinalsBracketMatchStatusesJson } from "@/lib/finalsBracketMatchStatuses";
 import {
   parseWeek2BracketMatchStatusesJson,
   parseWeek2BracketScoresJson,
@@ -380,6 +381,10 @@ export function DashboardContent() {
     () => Array(4).fill(false)
   );
   const [finalsCardOpen, setFinalsCardOpen] = useState(false);
+  const week2SlotCardsOpenRef = useRef<boolean[]>([false, false, false, false]);
+  const finalsCardOpenRef = useRef(false);
+  week2SlotCardsOpenRef.current = week2SlotCardsOpen;
+  finalsCardOpenRef.current = finalsCardOpen;
   const [sidePanelOpen, setSidePanelOpen] = useState(false);
   const [week1SectionOpen, setWeek1SectionOpen] = useState(false);
   const [week2SectionOpen, setWeek2SectionOpen] = useState(false);
@@ -536,6 +541,14 @@ export function DashboardContent() {
     }
   }, [savedSettings]);
 
+  const finalsBracketMatchStatusesArray = useMemo(() => {
+    const raw =
+      savedSettings && typeof savedSettings === "object"
+        ? (savedSettings as Record<string, unknown>).finalsBracketMatchStatuses
+        : undefined;
+    return parseFinalsBracketMatchStatusesJson(raw);
+  }, [savedSettings]);
+
   /** Champion of the Finals bracket: winner of the final match (slots 4 vs 5 by score), or null if no winner yet. */
   const finalsChampion = useMemo(() => {
     const slots = finalsBracketSlotsArray;
@@ -567,23 +580,30 @@ export function DashboardContent() {
 
   const getWeek2MatchStatusByIndex = useCallback(
     (cardIndex: number): (string | null)[] => {
+      if (!savedSettings || typeof savedSettings !== "object") return Array(3).fill(null);
+      const s = savedSettings as Record<string, unknown>;
       return Array.from({ length: 3 }, (_, i) => {
         const val = week2BracketMatchStatusesArray[cardIndex * 3 + i] ?? "";
-        return val.trim() || null;
+        const rawStatus = val.trim() || null;
+        const gk = 48 + cardIndex * 3 + i;
+        const liveJson = s[`liveScoreGames${gk}`] as string | undefined;
+        return deriveMatchStatusForRaceCellStyle(rawStatus, liveJson);
       });
     },
-    [week2BracketMatchStatusesArray]
+    [savedSettings, week2BracketMatchStatusesArray]
   );
 
   const getFinalsMatchStatusByIndex = useCallback((): (string | null)[] => {
     if (!savedSettings || typeof savedSettings !== "object") return Array(3).fill(null);
     const s = savedSettings as Record<string, unknown>;
-    const base = 72;
     return Array.from({ length: 3 }, (_, i) => {
-      const val = (s[`bracketMatchStatus${base + i}`] as string) ?? "";
-      return val.trim() || null;
+      const val = finalsBracketMatchStatusesArray[i] ?? "";
+      const rawStatus = val.trim() || null;
+      const gk = 60 + i;
+      const liveJson = s[`liveScoreGames${gk}`] as string | undefined;
+      return deriveMatchStatusForRaceCellStyle(rawStatus, liveJson);
     });
-  }, [savedSettings]);
+  }, [savedSettings, finalsBracketMatchStatusesArray]);
 
   const tournamentStarted =
     (savedSettings && typeof savedSettings === "object" && (savedSettings as Record<string, unknown>).tournamentStarted === true) ?? false;
@@ -764,18 +784,41 @@ export function DashboardContent() {
         return p;
       })
     );
-    setWeek2SlotCardsOpen((prev) =>
-      prev.map((p, i) => {
-        const v = ui?.[`uiWeek2Slot${i}Open`];
+
+    let jsonHandledW2 = false;
+    let jsonHandledF = false;
+    const rawCards = ui?.dashboardBracketCardsUiJson;
+    if (typeof rawCards === "string" && rawCards.trim() !== "") {
+      try {
+        const parsed = JSON.parse(rawCards) as { week2?: unknown; finals?: unknown };
+        if (Array.isArray(parsed.week2) && parsed.week2.length === 4) {
+          setWeek2SlotCardsOpen(parsed.week2.map((x) => x === true));
+          jsonHandledW2 = true;
+        }
+        if (typeof parsed.finals === "boolean") {
+          setFinalsCardOpen(parsed.finals);
+          jsonHandledF = true;
+        }
+      } catch {
+        /* fall through to legacy fields */
+      }
+    }
+    if (!jsonHandledW2) {
+      setWeek2SlotCardsOpen((prev) =>
+        prev.map((p, i) => {
+          const v = ui?.[`uiWeek2Slot${i}Open`];
+          if (v === true || v === false) return v;
+          return p;
+        })
+      );
+    }
+    if (!jsonHandledF) {
+      setFinalsCardOpen((prev) => {
+        const v = ui?.uiFinalsCardOpen;
         if (v === true || v === false) return v;
-        return p;
-      })
-    );
-    setFinalsCardOpen((prev) => {
-      const v = ui?.uiFinalsCardOpen;
-      if (v === true || v === false) return v;
-      return prev;
-    });
+        return prev;
+      });
+    }
   }, [email, myUserSettings]);
 
   useEffect(() => {
@@ -1008,10 +1051,20 @@ export function DashboardContent() {
     ]
   );
 
-  /** Save the 6 Finals bracket slots. Persists to finalsBracketSlots JSON. */
+  /** Save the 6 Finals bracket slots. Persists to finalsBracketSlots JSON + per-matchup statuses. */
   const saveFinalsBracketSlots = useCallback(
     (slots: string[]) => {
       if (!email || !selectedLeagueName?.trim() || !selectedSeason?.trim() || slots.length !== 6) return;
+      const nextStatuses = [...finalsBracketMatchStatusesArray];
+      for (let m = 0; m < 3; m++) {
+        const [top, bottom] = week2SlotPairIndices(m);
+        const topVal = (slots[top] ?? "").trim();
+        const bottomVal = (slots[bottom] ?? "").trim();
+        if (topVal && bottomVal) {
+          const cur = (nextStatuses[m] ?? "").trim();
+          if (!cur) nextStatuses[m] = "Match Ready";
+        }
+      }
       setDashboardSettings({
         email,
         leagueName: selectedLeagueName,
@@ -1019,9 +1072,18 @@ export function DashboardContent() {
         tournamentStarted,
         tournamentPaused,
         finalsBracketSlots: JSON.stringify(slots),
+        finalsBracketMatchStatuses: JSON.stringify(nextStatuses),
       } as Parameters<typeof setDashboardSettings>[0]);
     },
-    [email, selectedLeagueName, selectedSeason, tournamentStarted, tournamentPaused, setDashboardSettings]
+    [
+      email,
+      selectedLeagueName,
+      selectedSeason,
+      tournamentStarted,
+      tournamentPaused,
+      finalsBracketMatchStatusesArray,
+      setDashboardSettings,
+    ]
   );
 
   /** Save one Finals bracket score (matchIndex 0–2, side "top"|"bottom"). Persists to finalsBracketScores JSON. */
@@ -1253,14 +1315,14 @@ export function DashboardContent() {
   }, [week1BracketsRandomized, randomizeWeek1Brackets]);
 
   const togglePauseTournament = useCallback(() => {
-    if (!email) return;
+    if (!email || !tournamentStarted) return;
     setDashboardSettings({
       email,
       leagueName: selectedLeagueName,
       season: selectedSeason,
       tournamentPaused: !tournamentPaused,
     } as Parameters<typeof setDashboardSettings>[0]);
-  }, [email, selectedLeagueName, selectedSeason, tournamentPaused, setDashboardSettings]);
+  }, [email, selectedLeagueName, selectedSeason, tournamentStarted, tournamentPaused, setDashboardSettings]);
 
   /** Persist collapsible open/closed state to the signed-in user’s Convex row (not the shared tournament doc). */
   const persistUiCollapsed = useCallback(
@@ -1284,6 +1346,41 @@ export function DashboardContent() {
         tournamentStarted,
         tournamentPaused,
         ...patch,
+      } as Parameters<typeof patchUserDashboardSettings>[0]);
+    },
+    [
+      email,
+      selectedLeagueName,
+      selectedSeason,
+      tournamentStarted,
+      tournamentPaused,
+      savedSettings,
+      patchUserDashboardSettings,
+    ]
+  );
+
+  /** Week 2 + Finals bracket card open state: one JSON field on the user row (reliable vs many booleans). */
+  const persistBracketCardsCollapse = useCallback(
+    (week2: boolean[], finals: boolean) => {
+      if (!email) return;
+      const shared =
+        savedSettings && typeof savedSettings === "object"
+          ? (savedSettings as Record<string, unknown>)
+          : null;
+      const leagueName =
+        selectedLeagueName?.trim() ||
+        (typeof shared?.leagueName === "string" ? shared.leagueName.trim() : "");
+      const season =
+        selectedSeason?.trim() ||
+        (typeof shared?.season === "string" ? shared.season.trim() : "");
+      if (!leagueName || !season) return;
+      void patchUserDashboardSettings({
+        email,
+        leagueName,
+        season,
+        tournamentStarted,
+        tournamentPaused,
+        dashboardBracketCardsUiJson: JSON.stringify({ week2, finals }),
       } as Parameters<typeof patchUserDashboardSettings>[0]);
     },
     [
@@ -1904,16 +2001,20 @@ export function DashboardContent() {
                   {startTournamentHintMessage}
                 </p>
               )}
-              {tournamentStarted && (
-                <button
-                  type="button"
-                  onClick={togglePauseTournament}
-                  className="cursor-pointer rounded-lg border border-green-400/50 bg-gradient-to-r from-green-800 to-green-600 px-4 py-2.5 text-sm font-medium text-green-100 shadow-sm transition-colors hover:from-green-700 hover:to-green-500 hover:border-green-300/60 disabled:opacity-55 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-slate-700/80 disabled:border-slate-600"
-                  aria-label={tournamentPaused ? "Resume Tournament" : "Pause Tournament"}
-                >
-                  {tournamentPaused ? "Resume Tournament" : "Pause Tournament"}
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={togglePauseTournament}
+                disabled={!tournamentStarted}
+                className="cursor-pointer rounded-lg border border-green-400/50 bg-gradient-to-r from-green-800 to-green-600 px-4 py-2.5 text-sm font-medium text-green-100 shadow-sm transition-colors hover:from-green-700 hover:to-green-500 hover:border-green-300/60 disabled:opacity-55 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-slate-700/80 disabled:border-slate-600"
+                aria-label={tournamentPaused ? "Resume Tournament" : "Pause Tournament"}
+                title={
+                  !tournamentStarted
+                    ? "Start the tournament first to pause or resume."
+                    : undefined
+                }
+              >
+                {tournamentPaused ? "Resume Tournament" : "Pause Tournament"}
+              </button>
               <button
                 type="button"
                 disabled={!tournamentStarted || tournamentPaused}
@@ -2819,8 +2920,8 @@ export function DashboardContent() {
                 onClick={() => {
                   setWeek2SlotCardsOpen((prev) => {
                     const next = [...prev];
-                    next[index] = !next[index];
-                    persistUiCollapsed({ [`uiWeek2Slot${index}Open`]: next[index] });
+                    next[index] = !prev[index];
+                    persistBracketCardsCollapse(next, finalsCardOpenRef.current);
                     return next;
                   });
                 }}
@@ -2893,7 +2994,7 @@ export function DashboardContent() {
               onClick={() =>
                 setFinalsCardOpen((o) => {
                   const next = !o;
-                  persistUiCollapsed({ uiFinalsCardOpen: next });
+                  persistBracketCardsCollapse(week2SlotCardsOpenRef.current, next);
                   return next;
                 })
               }

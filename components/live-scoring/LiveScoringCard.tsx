@@ -7,11 +7,18 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Modal } from "@/components/ui/Modal";
 import {
+  bracket4TargetSlotForWinner,
   resolveWinnerNameForAdvancement,
   week1TargetSlotForWinner,
   week2SlotIndexForWeek1SemiWinner,
 } from "@/lib/bracketMatchAdvance";
 import {
+  parseFinalsBracketMatchStatusesJson,
+  parseFinalsBracketScoresJson,
+} from "@/lib/finalsBracketMatchStatuses";
+import { liveScoreGamesGlobalKey } from "@/lib/liveScoringGlobalKey";
+import {
+  parseWeek2BracketMatchStatusesJson,
   parseWeek2BracketScoresJson,
   parseWeek2BracketSlotsJson,
   week2SlotPairIndices,
@@ -42,10 +49,6 @@ function slotIndicesForMatch(matchIndex: number): [number, number] {
 const GAME_COUNT = 11;
 const EMPTY_ROW = Array.from({ length: GAME_COUNT }, () => "");
 type BracketStage = "week1" | "week2" | "finals";
-
-function isBracketStage(value: string | null | undefined): value is BracketStage {
-  return value === "week1" || value === "week2" || value === "finals";
-}
 
 /**
  * Sum each row only when both players have a value in that game cell.
@@ -214,10 +217,10 @@ export function LiveScoringCard({
   }, [cardIndex, matchIndex, stage]);
 
   useEffect(() => {
-    if (!validCard || !validMatch || !settings || typeof settings !== "object" || stage !== "week1") return;
-    const key = cardIndex * 6 + matchIndex;
+    if (!validCard || !validMatch || !settings || typeof settings !== "object") return;
     const s = settings as Record<string, unknown>;
-    const raw = s[`liveScoreGames${key}`];
+    const globalKey = liveScoreGamesGlobalKey(stage, cardIndex, matchIndex);
+    const raw = s[`liveScoreGames${globalKey}`];
     if (typeof raw === "string") {
       if (raw === lastSyncedRawRef.current) return;
       if (raw === lastWrittenRawRef.current) {
@@ -259,14 +262,34 @@ export function LiveScoringCard({
     }
     setPlayer1Scores([...EMPTY_ROW]);
     setPlayer2Scores([...EMPTY_ROW]);
-    setDashboardSettings({
+
+    const patch: Record<string, unknown> = {
       email: email as string,
       leagueName: String(s.leagueName ?? ""),
       season: String(s.season ?? ""),
-      [`liveScoreGames${key}`]: emptyGames,
-      [`bracketScoreTop${key}`]: "0",
-      [`bracketScoreBottom${key}`]: "0",
-    } as Parameters<typeof setDashboardSettings>[0]);
+      [`liveScoreGames${globalKey}`]: emptyGames,
+    };
+
+    if (stage === "week1") {
+      patch[`bracketScoreTop${globalKey}`] = "0";
+      patch[`bracketScoreBottom${globalKey}`] = "0";
+    } else if (stage === "week2") {
+      const scores = parseWeek2BracketScoresJson(s.week2BracketScores);
+      const next = [...scores];
+      const base = cardIndex * 6;
+      const si = base + matchIndex * 2;
+      next[si] = "0";
+      next[si + 1] = "0";
+      patch.week2BracketScores = JSON.stringify(next);
+    } else {
+      const scores = parseFinalsBracketScoresJson(s.finalsBracketScores);
+      const next = [...scores];
+      next[matchIndex * 2] = "0";
+      next[matchIndex * 2 + 1] = "0";
+      patch.finalsBracketScores = JSON.stringify(next);
+    }
+
+    setDashboardSettings(patch as Parameters<typeof setDashboardSettings>[0]);
   }, [settings, cardIndex, matchIndex, validCard, validMatch, email, setDashboardSettings, stage, readOnly, dashboardOperator]);
 
   const updateScore = useCallback(
@@ -292,7 +315,6 @@ export function LiveScoringCard({
   useEffect(() => {
     if (
       readOnly ||
-      stage !== "week1" ||
       !email ||
       !settings ||
       typeof settings !== "object" ||
@@ -305,7 +327,7 @@ export function LiveScoringCard({
       skipNextSaveRef.current = false;
       return;
     }
-    const key = cardIndex * 6 + matchIndex;
+    const globalKey = liveScoreGamesGlobalKey(stage, cardIndex, matchIndex);
     const s = settings as Record<string, unknown>;
     const { total1, total2 } = sumScoresWhenBothPresent(player1Scores, player2Scores);
     const bothEmpty =
@@ -320,14 +342,31 @@ export function LiveScoringCard({
     saveTimeoutRef.current = setTimeout(() => {
       saveTimeoutRef.current = null;
       lastWrittenRawRef.current = payload;
-      setDashboardSettings({
+      const patch: Record<string, unknown> = {
         email: email as string,
         leagueName: String(s.leagueName ?? ""),
         season: String(s.season ?? ""),
-        [`liveScoreGames${key}`]: payload,
-        [`bracketScoreTop${key}`]: String(totals.total1),
-        [`bracketScoreBottom${key}`]: String(totals.total2),
-      } as Parameters<typeof setDashboardSettings>[0]);
+        [`liveScoreGames${globalKey}`]: payload,
+      };
+      if (stage === "week1") {
+        patch[`bracketScoreTop${globalKey}`] = String(totals.total1);
+        patch[`bracketScoreBottom${globalKey}`] = String(totals.total2);
+      } else if (stage === "week2") {
+        const scores = parseWeek2BracketScoresJson(s.week2BracketScores);
+        const next = [...scores];
+        const base = cardIndex * 6;
+        const si = base + matchIndex * 2;
+        next[si] = String(totals.total1);
+        next[si + 1] = String(totals.total2);
+        patch.week2BracketScores = JSON.stringify(next);
+      } else {
+        const scores = parseFinalsBracketScoresJson(s.finalsBracketScores);
+        const next = [...scores];
+        next[matchIndex * 2] = String(totals.total1);
+        next[matchIndex * 2 + 1] = String(totals.total2);
+        patch.finalsBracketScores = JSON.stringify(next);
+      }
+      setDashboardSettings(patch as Parameters<typeof setDashboardSettings>[0]);
     }, 400);
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -445,14 +484,13 @@ export function LiveScoringCard({
   const displayTotal1 = readOnly ? Number.parseInt(storedTopScore, 10) || 0 : total1;
   const displayTotal2 = readOnly ? Number.parseInt(storedBottomScore, 10) || 0 : total2;
 
-  /** Dashboard (week 1): winning-ball flow + submit only after the user changes at least one cell vs loaded snapshot. */
+  /** Dashboard: submit only after the user changes at least one cell vs loaded snapshot. */
   const hasUserEditedScores = useMemo(() => {
     if (!dashboardOperator || readOnly) return true;
-    if (stage !== "week1") return true;
     const b = baselineSnapshotRef.current;
     if (b == null) return false;
     return !scoresEqualToBaseline(player1Scores, player2Scores, b);
-  }, [dashboardOperator, readOnly, player1Scores, player2Scores, stage]);
+  }, [dashboardOperator, readOnly, player1Scores, player2Scores]);
 
   const [legalWinConfirmed, setLegalWinConfirmed] = useState(false);
   const [requireStrictExceedPlayer1, setRequireStrictExceedPlayer1] = useState(false);
@@ -495,50 +533,105 @@ export function LiveScoringCard({
 
   const updateMatchStatus = useCallback(
     (status: string) => {
-      if (
-        readOnly ||
-        !email ||
-        !settings ||
-        typeof settings !== "object" ||
-        !validCard ||
-        !validMatch ||
-        stage !== "week1"
-      ) {
+      if (readOnly || !email || !settings || typeof settings !== "object" || !validCard || !validMatch) {
         return;
       }
       const s = settings as Record<string, unknown>;
-      const statusKey = `bracketMatchStatus${cardIndex * 6 + matchIndex}`;
       const payload: Record<string, unknown> = {
         email,
         leagueName: String(s.leagueName ?? ""),
         season: String(s.season ?? ""),
         tournamentStarted: s.tournamentStarted === true,
         tournamentPaused: s.tournamentPaused === true,
-        [statusKey]: status,
       };
-      if (status === "Completed") {
-        const winner = resolveWinnerNameForAdvancement(
-          singleWinnerName,
-          player1Name,
-          player2Name,
-          displayTotal1,
-          displayTotal2
-        );
-        const targetSlot = week1TargetSlotForWinner(matchIndex);
-        if (targetSlot != null && winner) {
-          const base = cardIndex * 12;
-          payload[`bracketSlot${base + targetSlot}`] = winner;
+
+      if (stage === "week1") {
+        const statusKey = `bracketMatchStatus${cardIndex * 6 + matchIndex}`;
+        payload[statusKey] = status;
+        if (status === "Completed") {
+          const winner = resolveWinnerNameForAdvancement(
+            singleWinnerName,
+            player1Name,
+            player2Name,
+            displayTotal1,
+            displayTotal2
+          );
+          const targetSlot = week1TargetSlotForWinner(matchIndex);
+          if (targetSlot != null && winner) {
+            const base = cardIndex * 12;
+            payload[`bracketSlot${base + targetSlot}`] = winner;
+          }
+          const w2Idx = week2SlotIndexForWeek1SemiWinner(cardIndex, matchIndex);
+          if (w2Idx != null && winner) {
+            const slots = parseWeek2BracketSlotsJson(s.week2BracketSlots);
+            const nextSlots = [...slots];
+            if (w2Idx < nextSlots.length) {
+              nextSlots[w2Idx] = winner;
+              payload.week2BracketSlots = JSON.stringify(nextSlots);
+            }
+          }
         }
-        const w2Idx = week2SlotIndexForWeek1SemiWinner(cardIndex, matchIndex);
-        if (w2Idx != null && winner) {
-          const slots = parseWeek2BracketSlotsJson(s.week2BracketSlots);
-          const nextSlots = [...slots];
-          if (w2Idx < nextSlots.length) {
-            nextSlots[w2Idx] = winner;
-            payload.week2BracketSlots = JSON.stringify(nextSlots);
+      } else if (stage === "week2") {
+        const idx = cardIndex * 3 + matchIndex;
+        const statuses = parseWeek2BracketMatchStatusesJson(s.week2BracketMatchStatuses);
+        const nextStatuses = [...statuses];
+        nextStatuses[idx] = status;
+        payload.week2BracketMatchStatuses = JSON.stringify(nextStatuses);
+        if (status === "Completed") {
+          const winner = resolveWinnerNameForAdvancement(
+            singleWinnerName,
+            player1Name,
+            player2Name,
+            displayTotal1,
+            displayTotal2
+          );
+          const targetSlot = bracket4TargetSlotForWinner(matchIndex);
+          if (targetSlot != null && winner) {
+            const slots = parseWeek2BracketSlotsJson(s.week2BracketSlots);
+            const nextSlots = [...slots];
+            const base = cardIndex * 6;
+            if (base + targetSlot < nextSlots.length) {
+              nextSlots[base + targetSlot] = winner;
+              payload.week2BracketSlots = JSON.stringify(nextSlots);
+            }
+          }
+        }
+      } else {
+        const statuses = parseFinalsBracketMatchStatusesJson(s.finalsBracketMatchStatuses);
+        const nextStatuses = [...statuses];
+        nextStatuses[matchIndex] = status;
+        payload.finalsBracketMatchStatuses = JSON.stringify(nextStatuses);
+        if (status === "Completed") {
+          const winner = resolveWinnerNameForAdvancement(
+            singleWinnerName,
+            player1Name,
+            player2Name,
+            displayTotal1,
+            displayTotal2
+          );
+          const targetSlot = bracket4TargetSlotForWinner(matchIndex);
+          if (targetSlot != null && winner) {
+            const rawSlots = s.finalsBracketSlots;
+            let arr: string[] = ["", "", "", "", "", ""];
+            if (typeof rawSlots === "string" && rawSlots.trim()) {
+              try {
+                const parsed = JSON.parse(rawSlots) as unknown[];
+                if (Array.isArray(parsed) && parsed.length === 6) {
+                  arr = parsed.map((v) => (typeof v === "string" ? v : ""));
+                }
+              } catch {
+                /* ignore */
+              }
+            }
+            const nextSlots = [...arr];
+            if (targetSlot < nextSlots.length) {
+              nextSlots[targetSlot] = winner;
+              payload.finalsBracketSlots = JSON.stringify(nextSlots);
+            }
           }
         }
       }
+
       setDashboardSettings(payload as Parameters<typeof setDashboardSettings>[0]);
     },
     [
@@ -837,7 +930,7 @@ export function LiveScoringCard({
                   </p>
                 )}
                 <div className="flex flex-wrap justify-center gap-3">
-                  {!readOnly && dashboardOperator && stage === "week1" && (
+                  {!readOnly && dashboardOperator && (
                     <button
                       type="button"
                       onClick={() => {

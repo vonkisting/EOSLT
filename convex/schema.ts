@@ -334,6 +334,22 @@ export default defineSchema({
     liveScoreGames45: v.optional(v.string()),
     liveScoreGames46: v.optional(v.string()),
     liveScoreGames47: v.optional(v.string()),
+    /** Week 2 (48–59) + Finals (60–62) per-matchup live rows; same JSON shape as Week 1. */
+    liveScoreGames48: v.optional(v.string()),
+    liveScoreGames49: v.optional(v.string()),
+    liveScoreGames50: v.optional(v.string()),
+    liveScoreGames51: v.optional(v.string()),
+    liveScoreGames52: v.optional(v.string()),
+    liveScoreGames53: v.optional(v.string()),
+    liveScoreGames54: v.optional(v.string()),
+    liveScoreGames55: v.optional(v.string()),
+    liveScoreGames56: v.optional(v.string()),
+    liveScoreGames57: v.optional(v.string()),
+    liveScoreGames58: v.optional(v.string()),
+    liveScoreGames59: v.optional(v.string()),
+    liveScoreGames60: v.optional(v.string()),
+    liveScoreGames61: v.optional(v.string()),
+    liveScoreGames62: v.optional(v.string()),
     /** Week 2 bracket: 4 cards × 6 slots (4-person). JSON: string[24]. Legacy string[48] is migrated in the client. */
     week2BracketSlots: v.optional(v.string()),
     /** Week 2 bracket cell scores (same order as week2BracketSlots). JSON: string[24]. */
@@ -344,6 +360,8 @@ export default defineSchema({
     finalsBracketSlots: v.optional(v.string()),
     /** Finals bracket scores. JSON: string[6] (same order as slots). */
     finalsBracketScores: v.optional(v.string()),
+    /** Finals per-matchup status (3 matches). JSON: string[3]. */
+    finalsBracketMatchStatuses: v.optional(v.string()),
     /** Collapsible UI state: restored on reload so sections stay open/closed. */
     uiUsersCardOpen: v.optional(v.boolean()),
     uiLeagueCardOpen: v.optional(v.boolean()),
@@ -366,6 +384,11 @@ export default defineSchema({
     uiWeek2Slot3Open: v.optional(v.boolean()),
     /** Finals bracket card body open/closed (distinct from uiFinalsSectionOpen). */
     uiFinalsCardOpen: v.optional(v.boolean()),
+    /**
+     * JSON: `{ "week2": boolean[4], "finals": boolean }` for main bracket Week 2 / Finals card bodies.
+     * Single field so collapse survives refresh reliably (avoids per-slot boolean patch issues).
+     */
+    dashboardBracketCardsUiJson: v.optional(v.string()),
     uiTournamentSetupCollapsed: v.optional(v.boolean()),
   }).index("by_email", ["email"]),
   /** Venue names for location dropdowns (synced from PoolHub, exclusions applied). */

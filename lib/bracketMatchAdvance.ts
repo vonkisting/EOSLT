@@ -48,3 +48,12 @@ export function resolveWinnerNameForAdvancement(
   if (displayTotal2 > displayTotal1) return player2Name;
   return null;
 }
+
+/**
+ * 4-person bracket (Week 2 card or Finals): semis feed slots 4–5; final has no further slot on the same bracket.
+ */
+export function bracket4TargetSlotForWinner(matchIndex: number): number | null {
+  if (matchIndex === 0) return 4;
+  if (matchIndex === 1) return 5;
+  return null;
+}
