@@ -989,6 +989,7 @@ export function HomeBracketCards() {
                 </h2>
               </div>
               {hasLinkedPoolhubPlayer &&
+              tournamentInProgress &&
               getMyMatchInCard(index) !== null &&
               (getMyMatchStatusRaw(index) === "Paused" ||
                 getMyMatchStatusRaw(index) === "Paused..." ||
@@ -1088,6 +1089,7 @@ export function HomeBracketCards() {
                     </span>
                   </button>
                   {hasLinkedPoolhubPlayer &&
+                    tournamentInProgress &&
                     getMyMatchInWeek2Card(index) !== null &&
                     (getMyWeek2MatchStatusRaw(index) === "Paused" ||
                       getMyWeek2MatchStatusRaw(index) === "Paused..." ||
@@ -1192,6 +1194,7 @@ export function HomeBracketCards() {
                   </span>
                 </button>
                 {hasLinkedPoolhubPlayer &&
+                  tournamentInProgress &&
                   getMyMatchInFinals() !== null &&
                   (getMyFinalsMatchStatusRaw() === "Paused" ||
                     getMyFinalsMatchStatusRaw() === "Paused..." ||
