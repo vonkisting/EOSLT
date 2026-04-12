@@ -57,3 +57,13 @@ export function bracket4TargetSlotForWinner(matchIndex: number): number | null {
   if (matchIndex === 1) return 5;
   return null;
 }
+
+/**
+ * Week 2 card championship (match index 2 on the 4-person bracket) feeds the Finals bracket
+ * semifinal name slots: top Week 2 card → first finals slot, etc.
+ * Week 2 card 0 → finals slot 0, card 1 → slot 1, card 2 → slot 2, card 3 → slot 3.
+ */
+export function finalsSlotIndexForWeek2FinalWinner(week2CardIndex: number): number | null {
+  if (week2CardIndex >= 0 && week2CardIndex <= 3) return week2CardIndex;
+  return null;
+}

@@ -24,6 +24,7 @@ import { formatLocationDate, formatLocationTime } from "@/lib/formatDateTime";
 import { selectOptionsFullPool } from "@/lib/dropdownOptions";
 import { deriveMatchStatusForRaceCellStyle } from "@/lib/bracketMatchRaceStyle";
 import { canAccessDashboard } from "@/lib/dashboard-access";
+import { bracket4TargetSlotForWinner } from "@/lib/bracketMatchAdvance";
 import { parseFinalsBracketMatchStatusesJson } from "@/lib/finalsBracketMatchStatuses";
 import {
   parseWeek2BracketMatchStatusesJson,
@@ -856,13 +857,11 @@ export function DashboardContent() {
         email,
         leagueName: selectedLeagueName,
         season: selectedSeason,
-        tournamentStarted,
-        tournamentPaused,
         ...locations,
         locationStartMeta: metaJson,
       } as Parameters<typeof setDashboardSettings>[0]);
     },
-    [email, selectedLeagueName, selectedSeason, tournamentStarted, tournamentPaused, locations, setDashboardSettings]
+    [email, selectedLeagueName, selectedSeason, locations, setDashboardSettings]
   );
 
   const saveLocations = useCallback(() => {
@@ -871,12 +870,10 @@ export function DashboardContent() {
       email,
       leagueName: selectedLeagueName,
       season: selectedSeason,
-      tournamentStarted,
-      tournamentPaused,
       ...locations,
       locationStartMeta: locationStartMetaJson,
     } as Parameters<typeof setDashboardSettings>[0]);
-  }, [email, selectedLeagueName, selectedSeason, tournamentStarted, tournamentPaused, locations, locationStartMetaJson, setDashboardSettings]);
+  }, [email, selectedLeagueName, selectedSeason, locations, locationStartMetaJson, setDashboardSettings]);
 
   /** Slot indices for a matchup: matchIndex 0->0,1; 1->2,3; ...; 5->10,11. */
   const slotIndicesForMatch = useCallback((matchIndex: number): [number, number] => {
@@ -933,6 +930,122 @@ export function DashboardContent() {
       email,
       savedSettings,
       slotIndicesForMatch,
+      router,
+      setDashboardSettings,
+      selectedLeagueName,
+      selectedSeason,
+      tournamentStarted,
+      tournamentPaused,
+    ]
+  );
+
+  /** Right-click a Week 2 player name: open live scorecard (same rules as Week 1; `stage=week2`). */
+  const onWeek2MatchNameContextMenu = useCallback(
+    (cardIndex: number, matchIndex: number) => {
+      if (!email || !savedSettings || typeof savedSettings !== "object") return;
+      const base = cardIndex * 6;
+      const [topSlot, bottomSlot] = week2SlotPairIndices(matchIndex);
+      const topVal = (week2BracketSlotsArray[base + topSlot] ?? "").trim();
+      const bottomVal = (week2BracketSlotsArray[base + bottomSlot] ?? "").trim();
+      const statusIdx = cardIndex * 3 + matchIndex;
+      const stRaw = (week2BracketMatchStatusesArray[statusIdx] ?? "").trim();
+      const st = stRaw || null;
+
+      const qs = new URLSearchParams({
+        stage: "week2",
+        card: String(cardIndex),
+        match: String(matchIndex),
+        dashboard: "1",
+      });
+
+      if (st === "Paused" || st === "Paused...") {
+        router.push(`/live-scoring?${qs.toString()}`);
+        return;
+      }
+      if (st === "Completed") {
+        router.push(`/live-scoring?${qs.toString()}`);
+        return;
+      }
+      if (!topVal || !bottomVal) {
+        qs.set("readonly", "1");
+        router.push(`/live-scoring?${qs.toString()}`);
+        return;
+      }
+
+      const nextStatuses = [...week2BracketMatchStatusesArray];
+      nextStatuses[statusIdx] = "In Progress...";
+      void setDashboardSettings({
+        email,
+        leagueName: selectedLeagueName,
+        season: selectedSeason,
+        tournamentStarted,
+        tournamentPaused,
+        week2BracketMatchStatuses: JSON.stringify(nextStatuses),
+      } as Parameters<typeof setDashboardSettings>[0]);
+      router.push(`/live-scoring?${qs.toString()}`);
+    },
+    [
+      email,
+      savedSettings,
+      week2BracketSlotsArray,
+      week2BracketMatchStatusesArray,
+      router,
+      setDashboardSettings,
+      selectedLeagueName,
+      selectedSeason,
+      tournamentStarted,
+      tournamentPaused,
+    ]
+  );
+
+  /** Right-click a Finals player name: open live scorecard (`stage=finals`, `card=0`). */
+  const onFinalsMatchNameContextMenu = useCallback(
+    (matchIndex: number) => {
+      if (!email || !savedSettings || typeof savedSettings !== "object") return;
+      const [topSlot, bottomSlot] = week2SlotPairIndices(matchIndex);
+      const topVal = (finalsBracketSlotsArray[topSlot] ?? "").trim();
+      const bottomVal = (finalsBracketSlotsArray[bottomSlot] ?? "").trim();
+      const stRaw = (finalsBracketMatchStatusesArray[matchIndex] ?? "").trim();
+      const st = stRaw || null;
+
+      const qs = new URLSearchParams({
+        stage: "finals",
+        card: "0",
+        match: String(matchIndex),
+        dashboard: "1",
+      });
+
+      if (st === "Paused" || st === "Paused...") {
+        router.push(`/live-scoring?${qs.toString()}`);
+        return;
+      }
+      if (st === "Completed") {
+        router.push(`/live-scoring?${qs.toString()}`);
+        return;
+      }
+      if (!topVal || !bottomVal) {
+        qs.set("readonly", "1");
+        router.push(`/live-scoring?${qs.toString()}`);
+        return;
+      }
+
+      const nextStatuses = [...finalsBracketMatchStatusesArray];
+      nextStatuses[matchIndex] = "In Progress...";
+      void setDashboardSettings({
+        email,
+        leagueName: selectedLeagueName,
+        season: selectedSeason,
+        tournamentStarted,
+        tournamentPaused,
+        finalsBracketMatchStatuses: JSON.stringify(nextStatuses),
+      } as Parameters<typeof setDashboardSettings>[0]);
+      router.push(`/live-scoring?${qs.toString()}`);
+    },
+    [
+      email,
+      savedSettings,
+      finalsBracketSlotsArray,
+      finalsBracketMatchStatusesArray,
       router,
       setDashboardSettings,
       selectedLeagueName,
@@ -1093,16 +1206,54 @@ export function DashboardContent() {
       const scoreIndex = matchIndex * 2 + (side === "top" ? 0 : 1);
       const next = [...finalsBracketScoresArray];
       next[scoreIndex] = value;
-      setDashboardSettings({
+      const patch = {
         email,
         leagueName: selectedLeagueName,
         season: selectedSeason,
         tournamentStarted,
         tournamentPaused,
         finalsBracketScores: JSON.stringify(next),
-      } as Parameters<typeof setDashboardSettings>[0]);
+      } as Parameters<typeof setDashboardSettings>[0];
+
+      /** Semifinals (match 0–1): push winner into championship matchup slots 4–5 (same as live scoring submit). */
+      if (matchIndex === 0 || matchIndex === 1) {
+        const targetSlot = bracket4TargetSlotForWinner(matchIndex);
+        if (targetSlot != null) {
+          const [siT, siB] = week2SlotPairIndices(matchIndex);
+          const p1 = (finalsBracketSlotsArray[siT] ?? "").trim();
+          const p2 = (finalsBracketSlotsArray[siB] ?? "").trim();
+          const raw1 = (next[matchIndex * 2] ?? "").trim();
+          const raw2 = (next[matchIndex * 2 + 1] ?? "").trim();
+          let slotUpdate: string | undefined;
+          if (p1 && p2 && !isBye(p1) && !isBye(p2) && raw1 !== "" && raw2 !== "") {
+            const n1 = parseInt(raw1, 10);
+            const n2 = parseInt(raw2, 10);
+            if (!Number.isNaN(n1) && !Number.isNaN(n2)) {
+              if (n1 > n2) slotUpdate = p1;
+              else if (n2 > n1) slotUpdate = p2;
+              else slotUpdate = "";
+            }
+          }
+          if (slotUpdate !== undefined) {
+            const nextSlots = [...finalsBracketSlotsArray];
+            nextSlots[targetSlot] = slotUpdate;
+            patch.finalsBracketSlots = JSON.stringify(nextSlots);
+          }
+        }
+      }
+
+      setDashboardSettings(patch);
     },
-    [email, selectedLeagueName, selectedSeason, tournamentStarted, tournamentPaused, finalsBracketScoresArray, setDashboardSettings]
+    [
+      email,
+      selectedLeagueName,
+      selectedSeason,
+      tournamentStarted,
+      tournamentPaused,
+      finalsBracketScoresArray,
+      finalsBracketSlotsArray,
+      setDashboardSettings,
+    ]
   );
 
   /** Save one score for one matchup (cardIndex 0–7, matchIndex 0–5, side "top"|"bottom"). */
@@ -1274,6 +1425,7 @@ export function DashboardContent() {
       leagueName: selectedLeagueName,
       season: selectedSeason,
       tournamentStarted: true,
+      tournamentPaused: false,
     } as Parameters<typeof setDashboardSettings>[0]);
   }, [email, selectedLeagueName, selectedSeason, setDashboardSettings]);
 
@@ -1394,7 +1546,8 @@ export function DashboardContent() {
     ]
   );
 
-  // Debounced save when any location or start date/time input changes (skip until we've applied initial settings from Convex so we don't overwrite with empty state)
+  // Debounced save when any location or start date/time input changes (skip until we've applied initial settings from Convex so we don't overwrite with empty state).
+  // Do not send tournamentStarted/tournamentPaused here: they are derived from Convex and a pending timer could fire after "Start Tournament" before the query updates, wiping true back to false.
   useEffect(() => {
     if (!email || !settingsQueryHasReturned.current || !hasAppliedInitialSettings.current) return;
     if (!selectedLeagueName || !selectedSeason) return;
@@ -1403,14 +1556,12 @@ export function DashboardContent() {
         email,
         leagueName: selectedLeagueName,
         season: selectedSeason,
-        tournamentStarted,
-        tournamentPaused,
         ...locations,
         locationStartMeta: locationStartMetaJson,
       } as Parameters<typeof setDashboardSettings>[0]);
     }, 400);
     return () => clearTimeout(t);
-  }, [email, selectedLeagueName, selectedSeason, tournamentStarted, tournamentPaused, locations, locationStartMetaJson, setDashboardSettings]);
+  }, [email, selectedLeagueName, selectedSeason, locations, locationStartMetaJson, setDashboardSettings]);
 
   const loadPlayers = useCallback((leagueName: string, season: string) => {
     if (!leagueName || !season) {
@@ -1444,8 +1595,6 @@ export function DashboardContent() {
             leagueName,
             season,
             leagueGuid: guid,
-            tournamentStarted,
-            tournamentPaused,
           } as Parameters<typeof setDashboardSettings>[0]);
         }
         setLoadingPlayers(false);
@@ -1464,7 +1613,7 @@ export function DashboardContent() {
         );
         setLoadingPlayers(false);
       });
-  }, [email, tournamentStarted, tournamentPaused, setDashboardSettings]);
+  }, [email, setDashboardSettings]);
 
   useEffect(() => {
     if (!selectedLeagueName) {
@@ -2802,10 +2951,13 @@ export function DashboardContent() {
             pageInsets.left + (sidePanelOpen ? sidePanelMeasuredWidth : SIDE_PANEL_TAB_WIDTH),
         }}
       >
-        <div className="min-w-0 overflow-x-auto">
+        <div className="min-w-0 overflow-x-auto pb-10">
           <div className="flex min-w-max flex-wrap gap-6 items-start">
       {/* Column 2: Week 1 location slot cards (8 cards) – all cards match width of widest (expanded) card */}
       <div className="flex w-max min-w-0 flex-col gap-6">
+        <h2 className="w-full shrink-0 text-center text-3xl font-bold tracking-tight text-cyan-400 sm:text-4xl">
+          Week 1
+        </h2>
         {WEEK_1_KEYS.map((key, index) => (
           <div
             key={key}
@@ -2906,6 +3058,9 @@ export function DashboardContent() {
 
       {/* Column 3: Week 2 location slot cards (4 cards, 4-person brackets like Finals) */}
       <div className="flex w-max min-w-0 flex-col gap-6">
+        <h2 className="w-full shrink-0 text-center text-3xl font-bold tracking-tight text-cyan-400 sm:text-4xl">
+          Week 2
+        </h2>
         {WEEK_2_KEYS.map((key, index) => (
           <div
             key={key}
@@ -2975,6 +3130,9 @@ export function DashboardContent() {
                   }
                   disabled={false}
                   matchStatusByIndex={getWeek2MatchStatusByIndex(index)}
+                  onMatchNameContextMenu={(matchIndex) =>
+                    onWeek2MatchNameContextMenu(index, matchIndex)
+                  }
                 />
               </div>
             )}
@@ -2984,6 +3142,9 @@ export function DashboardContent() {
 
       {/* Column 4: Finals (1 card, 4-person bracket) – same structure and styling as Week 2 cards */}
       <div className="flex w-max min-w-0 flex-col gap-6">
+        <h2 className="w-full shrink-0 text-center text-3xl font-bold tracking-tight text-cyan-400 sm:text-4xl">
+          Finals
+        </h2>
         <div className="w-max min-w-0 overflow-hidden rounded-xl border border-white/40 bg-black text-foreground">
           <div
             className={`flex min-h-14 w-full flex-shrink-0 flex-col gap-1 px-5 py-4 ${finalsCardOpen ? "rounded-t-xl" : "rounded-xl"} bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900`}
@@ -3044,6 +3205,7 @@ export function DashboardContent() {
                 onScoreChange={saveFinalsScoreChange}
                 disabled={false}
                 matchStatusByIndex={getFinalsMatchStatusByIndex()}
+                onMatchNameContextMenu={onFinalsMatchNameContextMenu}
               />
               {finalsChampion != null && (
                 <>

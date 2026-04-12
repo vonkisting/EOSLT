@@ -8,7 +8,8 @@ import { selectOptionsFullPool } from "@/lib/dropdownOptions";
 const EMPTY_SLOTS = Array(6).fill("") as string[];
 const DEFAULT_SCORES = Array(6).fill("0") as string[];
 
-function applyByeAdvancesToBracket4(slots: string[]): string[] {
+/** Exported for home bracket: same effective slots 4–5 as the live Bracket4 UI after bye propagation. */
+export function applyByeAdvancesToBracket4(slots: string[]): string[] {
   const next = [...slots];
   const top0 = next[0]?.trim() ?? "";
   const bottom0 = next[1]?.trim() ?? "";
@@ -43,6 +44,8 @@ export function Bracket4({
   matchStatusByIndex,
   placeholderText,
   onMatchClickByIndex,
+  /** Dashboard: right-click a player name to open the live scorecard for that matchup. */
+  onMatchNameContextMenu,
 }: {
   players: string[];
   playerRaceToMap?: Record<string, number | null>;
@@ -56,6 +59,7 @@ export function Bracket4({
   matchStatusByIndex?: (string | null)[];
   placeholderText?: string;
   onMatchClickByIndex?: (matchIndex: number) => void;
+  onMatchNameContextMenu?: (matchIndex: number) => void;
 }) {
   const pool = useMemo(() => {
     const filtered = players.filter((n) => n != null && n !== "");
@@ -164,6 +168,9 @@ export function Bracket4({
                 hasBye={disabled && matchupHasBye(0, 1)}
                 placeholderText={placeholderText}
                 onMatchClick={onMatchClickByIndex ? () => onMatchClickByIndex(0) : undefined}
+                onNameContextMenu={
+                  onMatchNameContextMenu ? () => onMatchNameContextMenu(0) : undefined
+                }
                 onTopScoreChange={onScoreChange ? (v) => handleScoreChange(0, "top", v) : undefined}
                 onBottomScoreChange={onScoreChange ? (v) => handleScoreChange(0, "bottom", v) : undefined}
               />
@@ -183,6 +190,9 @@ export function Bracket4({
                 hasBye={disabled && matchupHasBye(2, 3)}
                 placeholderText={placeholderText}
                 onMatchClick={onMatchClickByIndex ? () => onMatchClickByIndex(1) : undefined}
+                onNameContextMenu={
+                  onMatchNameContextMenu ? () => onMatchNameContextMenu(1) : undefined
+                }
                 onTopScoreChange={onScoreChange ? (v) => handleScoreChange(1, "top", v) : undefined}
                 onBottomScoreChange={onScoreChange ? (v) => handleScoreChange(1, "bottom", v) : undefined}
               />
@@ -204,6 +214,9 @@ export function Bracket4({
                 hasBye={disabled && matchupHasBye(4, 5)}
                 placeholderText={placeholderText}
                 onMatchClick={onMatchClickByIndex ? () => onMatchClickByIndex(2) : undefined}
+                onNameContextMenu={
+                  onMatchNameContextMenu ? () => onMatchNameContextMenu(2) : undefined
+                }
                 onTopScoreChange={onScoreChange ? (v) => handleScoreChange(2, "top", v) : undefined}
                 onBottomScoreChange={onScoreChange ? (v) => handleScoreChange(2, "bottom", v) : undefined}
               />

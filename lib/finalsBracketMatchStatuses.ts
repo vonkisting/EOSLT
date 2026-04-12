@@ -1,3 +1,19 @@
+/** Finals bracket player-name slots: JSON string[6] (two semis then final). */
+export function parseFinalsBracketSlotsJson(raw: unknown): string[] {
+  if (raw == null || typeof raw !== "string" || !raw.trim()) {
+    return Array(6).fill("") as string[];
+  }
+  try {
+    const arr = JSON.parse(raw) as unknown;
+    if (!Array.isArray(arr) || arr.length !== 6) {
+      return Array(6).fill("") as string[];
+    }
+    return arr.map((v) => (typeof v === "string" ? v : ""));
+  } catch {
+    return Array(6).fill("") as string[];
+  }
+}
+
 /** Finals bracket scores: JSON string[6] (same order as slots). */
 export function parseFinalsBracketScoresJson(raw: unknown): string[] {
   if (raw == null || typeof raw !== "string" || !raw.trim()) {

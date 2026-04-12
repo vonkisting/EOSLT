@@ -7,9 +7,13 @@ import { useSession } from "next-auth/react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Bracket8TwoRounds } from "@/components/Bracket8TwoRounds";
-import { Bracket4 } from "@/components/Bracket4";
+import { Bracket4, applyByeAdvancesToBracket4 } from "@/components/Bracket4";
 import { formatLocationDate, formatLocationTime } from "@/lib/formatDateTime";
 import { deriveMatchStatusForRaceCellStyle } from "@/lib/bracketMatchRaceStyle";
+import {
+  bracketMatchStatusIsCompleted,
+  bracketParticipantNamesMatch,
+} from "@/lib/bracketNameMatch";
 import { liveScoreGamesGlobalKey } from "@/lib/liveScoringGlobalKey";
 import { parseFinalsBracketMatchStatusesJson } from "@/lib/finalsBracketMatchStatuses";
 import {
@@ -81,7 +85,10 @@ export function HomeBracketCards() {
   const { data: session, status } = useSession();
   const email = session?.user?.email?.toLowerCase().trim();
   const settings = useQuery(api.dashboardSettings.getPublic, {});
-  const setDashboardSettings = useMutation(api.dashboardSettings.set);
+  /** Per-user row: collapse prefs only (not shared tournament data). */
+  const patchMyDashboardRow = useMutation(api.dashboardSettings.set);
+  /** Canonical tournament doc — same source as getPublic (bracket + match statuses). */
+  const patchSharedTournament = useMutation(api.dashboardSettings.setShared);
   /** Per-user row (collapse prefs); tournament data still comes from getPublic. */
   const myUserSettings = useQuery(api.dashboardSettings.get, email ? { email } : "skip");
   const convexUser = useQuery(
@@ -91,7 +98,9 @@ export function HomeBracketCards() {
 
   const [leagueGuid, setLeagueGuid] = useState<string | null>(null);
 
-  const linkedName = (convexUser?.poolhubPlayerName ?? "").trim().toLowerCase();
+  /** Raw PoolHub player name from Convex (trimmed). Compare to bracket slots with `bracketParticipantNamesMatch`. */
+  const linkedPoolhubRaw = convexUser?.poolhubPlayerName?.trim() ?? "";
+  const hasLinkedPoolhubPlayer = linkedPoolhubRaw.length > 0;
   const [playerRows, setPlayerRows] = useState<
     { playerName: string; raceTo: number | null }[]
   >([]);
@@ -182,18 +191,16 @@ export function HomeBracketCards() {
       const leagueName = String(s.leagueName ?? "").trim();
       const season = String(s.season ?? "").trim();
       if (!leagueName || !season || myUserSettings === undefined) return;
-      void setDashboardSettings({
+      void patchMyDashboardRow({
         email,
         leagueName,
         season,
-        tournamentStarted: s.tournamentStarted === true,
-        tournamentPaused: s.tournamentPaused === true,
         uiWeek2Slot0Open: week2CardsOpen[0],
         uiWeek2Slot1Open: week2CardsOpen[1],
         uiWeek2Slot2Open: week2CardsOpen[2],
         uiWeek2Slot3Open: week2CardsOpen[3],
         uiFinalsCardOpen: finalsCardOpen,
-      } as Parameters<typeof setDashboardSettings>[0]);
+      } as Parameters<typeof patchMyDashboardRow>[0]);
       return;
     }
     window.localStorage.setItem(
@@ -207,7 +214,7 @@ export function HomeBracketCards() {
     week2CardsOpen,
     finalsCardOpen,
     settings,
-    setDashboardSettings,
+    patchMyDashboardRow,
   ]);
 
   const hasLeagueAndSeason =
@@ -445,20 +452,23 @@ export function HomeBracketCards() {
    */
   const getMyMatchInCard = useCallback(
     (cardIndex: number): number | null => {
-      if (!settings || typeof settings !== "object" || !linkedName) return null;
+      if (!settings || typeof settings !== "object" || !hasLinkedPoolhubPlayer) return null;
       const s = settings as Record<string, unknown>;
       const base = cardIndex * 12;
       for (let m = 5; m >= 0; m--) {
         const [top, bottom] = slotIndicesForMatch(m);
         const topVal = (s[`bracketSlot${base + top}`] as string) ?? "";
         const bottomVal = (s[`bracketSlot${base + bottom}`] as string) ?? "";
-        const topNorm = topVal.trim().toLowerCase();
-        const bottomNorm = bottomVal.trim().toLowerCase();
-        if (topNorm === linkedName || bottomNorm === linkedName) return m;
+        if (
+          bracketParticipantNamesMatch(topVal, linkedPoolhubRaw) ||
+          bracketParticipantNamesMatch(bottomVal, linkedPoolhubRaw)
+        ) {
+          return m;
+        }
       }
       return null;
     },
-    [settings, linkedName]
+    [settings, hasLinkedPoolhubPlayer, linkedPoolhubRaw]
   );
 
   /** Raw status for the user's matchup on this card, or null. */
@@ -504,9 +514,11 @@ export function HomeBracketCards() {
       const [topSlot, bottomSlot] = slotIndicesForMatch(matchIndex);
       const topVal = ((s[`bracketSlot${base + topSlot}`] as string) ?? "").trim();
       const bottomVal = ((s[`bracketSlot${base + bottomSlot}`] as string) ?? "").trim();
-      const topNorm = topVal.toLowerCase();
-      const bottomNorm = bottomVal.toLowerCase();
-      if (!linkedName || (topNorm !== linkedName && bottomNorm !== linkedName)) {
+      if (
+        !hasLinkedPoolhubPlayer ||
+        (!bracketParticipantNamesMatch(topVal, linkedPoolhubRaw) &&
+          !bracketParticipantNamesMatch(bottomVal, linkedPoolhubRaw))
+      ) {
         openReadOnlyScorecard("week1", cardIndex, matchIndex);
         return;
       }
@@ -519,7 +531,7 @@ export function HomeBracketCards() {
         return;
       }
 
-      if (tournamentInProgress && st !== "Completed") {
+      if (tournamentInProgress && !bracketMatchStatusIsCompleted(st)) {
         const inProgress = st === "In Progress...";
         if ((!topVal || !bottomVal) && !inProgress) {
           openReadOnlyScorecard("week1", cardIndex, matchIndex);
@@ -530,14 +542,13 @@ export function HomeBracketCards() {
           return;
         }
         const statusKey = `bracketMatchStatus${cardIndex * 6 + matchIndex}`;
-        void setDashboardSettings({
-          email,
+        void patchSharedTournament({
           leagueName: String(s.leagueName ?? ""),
           season: String(s.season ?? ""),
           tournamentStarted: s.tournamentStarted === true,
           tournamentPaused: s.tournamentPaused === true,
           [statusKey]: "In Progress...",
-        } as Parameters<typeof setDashboardSettings>[0]);
+        } as Parameters<typeof patchSharedTournament>[0]);
         router.push(`/live-scoring?card=${cardIndex}&match=${matchIndex}`);
         return;
       }
@@ -546,10 +557,11 @@ export function HomeBracketCards() {
     },
     [
       settings,
-      linkedName,
+      hasLinkedPoolhubPlayer,
+      linkedPoolhubRaw,
       tournamentInProgress,
       email,
-      setDashboardSettings,
+      patchSharedTournament,
       router,
       openReadOnlyScorecard,
     ]
@@ -593,6 +605,17 @@ export function HomeBracketCards() {
       return Array(6).fill("") as string[];
     }
   }, [settings]);
+
+  /** Same 6 slots as Bracket4 after bye labels + bye propagation (championship row may differ from raw JSON). */
+  const finalsEffectiveSlotsForLink = useMemo(() => {
+    let byeNum = 0;
+    const mapped = finalsBracketSlotsArray.map((val) =>
+      val === BYE_LABEL ? `-- Bye ${++byeNum} --` : val
+    );
+    return applyByeAdvancesToBracket4(mapped);
+  }, [finalsBracketSlotsArray]);
+
+  const finalsChampionshipMatchIndex = 2;
 
   const finalsBracketScoresArray = useMemo(() => {
     const raw =
@@ -650,17 +673,22 @@ export function HomeBracketCards() {
    */
   const getMyMatchInWeek2Card = useCallback(
     (cardIndex: number): number | null => {
-      if (!linkedName) return null;
+      if (!hasLinkedPoolhubPlayer) return null;
       const base = cardIndex * 6;
       for (let m = 2; m >= 0; m--) {
         const [top, bottom] = week2SlotPairIndices(m);
-        const topVal = (week2BracketSlotsArray[base + top] ?? "").trim().toLowerCase();
-        const bottomVal = (week2BracketSlotsArray[base + bottom] ?? "").trim().toLowerCase();
-        if (topVal === linkedName || bottomVal === linkedName) return m;
+        const topVal = week2BracketSlotsArray[base + top] ?? "";
+        const bottomVal = week2BracketSlotsArray[base + bottom] ?? "";
+        if (
+          bracketParticipantNamesMatch(topVal, linkedPoolhubRaw) ||
+          bracketParticipantNamesMatch(bottomVal, linkedPoolhubRaw)
+        ) {
+          return m;
+        }
       }
       return null;
     },
-    [linkedName, week2BracketSlotsArray]
+    [hasLinkedPoolhubPlayer, linkedPoolhubRaw, week2BracketSlotsArray]
   );
 
   const getMyWeek2MatchStatusRaw = useCallback(
@@ -673,16 +701,37 @@ export function HomeBracketCards() {
     [getMyMatchInWeek2Card, week2BracketMatchStatusesArray]
   );
 
+  /**
+   * Finals match index (0–2): semis use raw slots; championship uses effective slots 4–5
+   * (bye propagation matches Bracket4). Scans 2→0 so the final wins when names still appear in semis.
+   */
   const getMyMatchInFinals = useCallback((): number | null => {
-    if (!linkedName) return null;
-    for (let m = 2; m >= 0; m--) {
+    if (!hasLinkedPoolhubPlayer) return null;
+    for (let m = finalsChampionshipMatchIndex; m >= 0; m--) {
       const [top, bottom] = week2SlotPairIndices(m);
-      const topVal = (finalsBracketSlotsArray[top] ?? "").trim().toLowerCase();
-      const bottomVal = (finalsBracketSlotsArray[bottom] ?? "").trim().toLowerCase();
-      if (topVal === linkedName || bottomVal === linkedName) return m;
+      const topVal =
+        m === finalsChampionshipMatchIndex
+          ? (finalsEffectiveSlotsForLink[top] ?? "")
+          : (finalsBracketSlotsArray[top] ?? "");
+      const bottomVal =
+        m === finalsChampionshipMatchIndex
+          ? (finalsEffectiveSlotsForLink[bottom] ?? "")
+          : (finalsBracketSlotsArray[bottom] ?? "");
+      if (
+        bracketParticipantNamesMatch(topVal, linkedPoolhubRaw) ||
+        bracketParticipantNamesMatch(bottomVal, linkedPoolhubRaw)
+      ) {
+        return m;
+      }
     }
     return null;
-  }, [linkedName, finalsBracketSlotsArray]);
+  }, [
+    hasLinkedPoolhubPlayer,
+    linkedPoolhubRaw,
+    finalsBracketSlotsArray,
+    finalsEffectiveSlotsForLink,
+    finalsChampionshipMatchIndex,
+  ]);
 
   const getMyFinalsMatchStatusRaw = useCallback((): string | null => {
     const matchIndex = getMyMatchInFinals();
@@ -702,9 +751,11 @@ export function HomeBracketCards() {
       const [topSlot, bottomSlot] = week2SlotPairIndices(matchIndex);
       const topVal = (week2BracketSlotsArray[base + topSlot] ?? "").trim();
       const bottomVal = (week2BracketSlotsArray[base + bottomSlot] ?? "").trim();
-      const topNorm = topVal.toLowerCase();
-      const bottomNorm = bottomVal.toLowerCase();
-      if (!linkedName || (topNorm !== linkedName && bottomNorm !== linkedName)) {
+      if (
+        !hasLinkedPoolhubPlayer ||
+        (!bracketParticipantNamesMatch(topVal, linkedPoolhubRaw) &&
+          !bracketParticipantNamesMatch(bottomVal, linkedPoolhubRaw))
+      ) {
         openReadOnlyScorecard("week2", cardIndex, matchIndex);
         return;
       }
@@ -718,7 +769,7 @@ export function HomeBracketCards() {
         return;
       }
 
-      if (tournamentInProgress && st !== "Completed") {
+      if (tournamentInProgress && !bracketMatchStatusIsCompleted(st)) {
         const inProgress = st === "In Progress...";
         if ((!topVal || !bottomVal) && !inProgress) {
           openReadOnlyScorecard("week2", cardIndex, matchIndex);
@@ -730,14 +781,13 @@ export function HomeBracketCards() {
         }
         const nextStatuses = [...week2BracketMatchStatusesArray];
         nextStatuses[idx] = "In Progress...";
-        void setDashboardSettings({
-          email,
+        void patchSharedTournament({
           leagueName: String(s.leagueName ?? ""),
           season: String(s.season ?? ""),
           tournamentStarted: s.tournamentStarted === true,
           tournamentPaused: s.tournamentPaused === true,
           week2BracketMatchStatuses: JSON.stringify(nextStatuses),
-        } as Parameters<typeof setDashboardSettings>[0]);
+        } as Parameters<typeof patchSharedTournament>[0]);
         router.push(`/live-scoring?stage=week2&card=${cardIndex}&match=${matchIndex}`);
         return;
       }
@@ -746,10 +796,11 @@ export function HomeBracketCards() {
     },
     [
       settings,
-      linkedName,
+      hasLinkedPoolhubPlayer,
+      linkedPoolhubRaw,
       tournamentInProgress,
       email,
-      setDashboardSettings,
+      patchSharedTournament,
       router,
       openReadOnlyScorecard,
       week2BracketSlotsArray,
@@ -767,9 +818,16 @@ export function HomeBracketCards() {
       const [topSlot, bottomSlot] = week2SlotPairIndices(matchIndex);
       const topVal = (finalsBracketSlotsArray[topSlot] ?? "").trim();
       const bottomVal = (finalsBracketSlotsArray[bottomSlot] ?? "").trim();
-      const topNorm = topVal.toLowerCase();
-      const bottomNorm = bottomVal.toLowerCase();
-      if (!linkedName || (topNorm !== linkedName && bottomNorm !== linkedName)) {
+      const effTop = (finalsEffectiveSlotsForLink[topSlot] ?? "").trim();
+      const effBottom = (finalsEffectiveSlotsForLink[bottomSlot] ?? "").trim();
+      const linkedInRawPair =
+        bracketParticipantNamesMatch(topVal, linkedPoolhubRaw) ||
+        bracketParticipantNamesMatch(bottomVal, linkedPoolhubRaw);
+      const linkedInChampionshipEffective =
+        matchIndex === finalsChampionshipMatchIndex &&
+        (bracketParticipantNamesMatch(finalsEffectiveSlotsForLink[4] ?? "", linkedPoolhubRaw) ||
+          bracketParticipantNamesMatch(finalsEffectiveSlotsForLink[5] ?? "", linkedPoolhubRaw));
+      if (!hasLinkedPoolhubPlayer || (!linkedInRawPair && !linkedInChampionshipEffective)) {
         openReadOnlyScorecard("finals", 0, matchIndex);
         return;
       }
@@ -782,9 +840,11 @@ export function HomeBracketCards() {
         return;
       }
 
-      if (tournamentInProgress && st !== "Completed") {
+      if (tournamentInProgress && !bracketMatchStatusIsCompleted(st)) {
         const inProgress = st === "In Progress...";
-        if ((!topVal || !bottomVal) && !inProgress) {
+        const pairTop = matchIndex === finalsChampionshipMatchIndex ? effTop : topVal;
+        const pairBottom = matchIndex === finalsChampionshipMatchIndex ? effBottom : bottomVal;
+        if ((!pairTop || !pairBottom) && !inProgress) {
           openReadOnlyScorecard("finals", 0, matchIndex);
           return;
         }
@@ -794,14 +854,13 @@ export function HomeBracketCards() {
         }
         const nextStatuses = [...finalsBracketMatchStatusesArray];
         nextStatuses[matchIndex] = "In Progress...";
-        void setDashboardSettings({
-          email,
+        void patchSharedTournament({
           leagueName: String(s.leagueName ?? ""),
           season: String(s.season ?? ""),
           tournamentStarted: s.tournamentStarted === true,
           tournamentPaused: s.tournamentPaused === true,
           finalsBracketMatchStatuses: JSON.stringify(nextStatuses),
-        } as Parameters<typeof setDashboardSettings>[0]);
+        } as Parameters<typeof patchSharedTournament>[0]);
         router.push(`/live-scoring?stage=finals&card=0&match=${matchIndex}`);
         return;
       }
@@ -810,13 +869,15 @@ export function HomeBracketCards() {
     },
     [
       settings,
-      linkedName,
+      hasLinkedPoolhubPlayer,
+      linkedPoolhubRaw,
       tournamentInProgress,
       email,
-      setDashboardSettings,
+      patchSharedTournament,
       router,
       openReadOnlyScorecard,
       finalsBracketSlotsArray,
+      finalsEffectiveSlotsForLink,
       finalsBracketMatchStatusesArray,
     ]
   );
@@ -849,7 +910,7 @@ export function HomeBracketCards() {
         <p className="text-2xl font-semibold text-yellow-400 sm:text-3xl">
           Tournament hasn&apos;t been setup yet. Brackets will be posted once the drawing is complete and ready.
         </p>
-        {(email && !linkedName) || !email ? (
+        {(email && convexUser !== undefined && !hasLinkedPoolhubPlayer) || !email ? (
           <div className="text-lg text-blue-200/90 sm:text-xl space-y-3">
             {email ? (
               <p>To link your account to your PoolHub player, go to the Profile tab.</p>
@@ -913,6 +974,9 @@ export function HomeBracketCards() {
       <div className="w-full overflow-x-auto">
         <div className="mx-auto flex min-w-full w-max items-start justify-center gap-6 pb-16">
           <div className="flex w-max min-w-0 flex-col gap-6">
+            <h2 className="w-full shrink-0 text-center text-3xl font-bold tracking-tight text-cyan-400 sm:text-4xl">
+              Week 1
+            </h2>
             {WEEK_1_LOCATION_KEYS.map((key, index) => (
           <div
             key={key}
@@ -924,14 +988,14 @@ export function HomeBracketCards() {
                   {getLocationName(key)}
                 </h2>
               </div>
-              {linkedName &&
+              {hasLinkedPoolhubPlayer &&
               getMyMatchInCard(index) !== null &&
               (getMyMatchStatusRaw(index) === "Paused" ||
                 getMyMatchStatusRaw(index) === "Paused..." ||
-                (tournamentInProgress && getMyMatchStatusRaw(index) !== "Completed")) && (
+                !bracketMatchStatusIsCompleted(getMyMatchStatusRaw(index))) && (
                 <div className="w-full pb-2">
                   <div className="flex w-full">
-                    {getMyMatchStatusRaw(index) !== "Completed" &&
+                    {!bracketMatchStatusIsCompleted(getMyMatchStatusRaw(index)) &&
                       (getMyMatchStatusRaw(index) === "Paused" || getMyMatchStatusRaw(index) === "Paused..." ? (
                         <button
                           type="button"
@@ -944,29 +1008,19 @@ export function HomeBracketCards() {
                         >
                           Resume Match
                         </button>
-                      ) : tournamentInProgress ? (
+                      ) : (
                         <button
                           type="button"
                           onClick={() => {
                             const matchIndex = getMyMatchInCard(index);
-                            if (matchIndex === null || !email || !settings || typeof settings !== "object") return;
-                            const s = settings as Record<string, unknown>;
-                            const statusKey = `bracketMatchStatus${index * 6 + matchIndex}`;
-                            setDashboardSettings({
-                              email,
-                              leagueName: String(s.leagueName ?? ""),
-                              season: String(s.season ?? ""),
-                              tournamentStarted: s.tournamentStarted === true,
-                              tournamentPaused: s.tournamentPaused === true,
-                              [statusKey]: "In Progress...",
-                            } as Parameters<typeof setDashboardSettings>[0]);
-                            router.push(`/live-scoring?card=${index}&match=${matchIndex}`);
+                            if (matchIndex === null) return;
+                            handleWeek1BracketMatchClick(index, matchIndex);
                           }}
                           className="w-full rounded-lg bg-gradient-to-r from-purple-600 to-violet-600 px-3 py-2 text-sm font-semibold text-white shadow transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-2 focus:ring-offset-slate-900"
                         >
                           Live Score My Match
                         </button>
-                      ) : null)}
+                      ))}
                   </div>
                 </div>
               )}
@@ -1000,6 +1054,9 @@ export function HomeBracketCards() {
             ))}
           </div>
           <div className="flex w-max min-w-0 flex-col gap-6">
+            <h2 className="w-full shrink-0 text-center text-3xl font-bold tracking-tight text-cyan-400 sm:text-4xl">
+              Week 2
+            </h2>
             {WEEK_2_LOCATION_KEYS.map((key, index) => (
               <div
                 key={key}
@@ -1030,15 +1087,14 @@ export function HomeBracketCards() {
                       {week2CardsOpen[index] ? "▼" : "▶"}
                     </span>
                   </button>
-                  {linkedName &&
+                  {hasLinkedPoolhubPlayer &&
                     getMyMatchInWeek2Card(index) !== null &&
                     (getMyWeek2MatchStatusRaw(index) === "Paused" ||
                       getMyWeek2MatchStatusRaw(index) === "Paused..." ||
-                      (tournamentInProgress &&
-                        getMyWeek2MatchStatusRaw(index) !== "Completed")) && (
+                      !bracketMatchStatusIsCompleted(getMyWeek2MatchStatusRaw(index))) && (
                       <div className="w-full pb-2">
                         <div className="flex w-full">
-                          {getMyWeek2MatchStatusRaw(index) !== "Completed" &&
+                          {!bracketMatchStatusIsCompleted(getMyWeek2MatchStatusRaw(index)) &&
                             (getMyWeek2MatchStatusRaw(index) === "Paused" ||
                             getMyWeek2MatchStatusRaw(index) === "Paused..." ? (
                               <button
@@ -1054,34 +1110,19 @@ export function HomeBracketCards() {
                               >
                                 Resume Match
                               </button>
-                            ) : tournamentInProgress ? (
+                            ) : (
                               <button
                                 type="button"
                                 onClick={() => {
                                   const matchIndex = getMyMatchInWeek2Card(index);
-                                  if (matchIndex === null || !email || !settings || typeof settings !== "object")
-                                    return;
-                                  const s = settings as Record<string, unknown>;
-                                  const idx = index * 3 + matchIndex;
-                                  const nextStatuses = [...week2BracketMatchStatusesArray];
-                                  nextStatuses[idx] = "In Progress...";
-                                  void setDashboardSettings({
-                                    email,
-                                    leagueName: String(s.leagueName ?? ""),
-                                    season: String(s.season ?? ""),
-                                    tournamentStarted: s.tournamentStarted === true,
-                                    tournamentPaused: s.tournamentPaused === true,
-                                    week2BracketMatchStatuses: JSON.stringify(nextStatuses),
-                                  } as Parameters<typeof setDashboardSettings>[0]);
-                                  router.push(
-                                    `/live-scoring?stage=week2&card=${index}&match=${matchIndex}`
-                                  );
+                                  if (matchIndex === null) return;
+                                  handleWeek2BracketMatchClick(index, matchIndex);
                                 }}
                                 className="w-full rounded-lg bg-gradient-to-r from-purple-600 to-violet-600 px-3 py-2 text-sm font-semibold text-white shadow transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-2 focus:ring-offset-slate-900"
                               >
                                 Live Score My Match
                               </button>
-                            ) : null)}
+                            ))}
                         </div>
                       </div>
                     )}
@@ -1127,6 +1168,9 @@ export function HomeBracketCards() {
             ))}
           </div>
           <div className="flex w-max min-w-0 flex-col gap-6">
+            <h2 className="w-full shrink-0 text-center text-3xl font-bold tracking-tight text-cyan-400 sm:text-4xl">
+              Finals
+            </h2>
             <div className="w-full min-w-0 max-w-[600px] overflow-hidden rounded-xl border border-white/40 bg-black text-foreground sm:min-w-[555px]">
               <div
                 className={`flex min-h-14 w-full flex-shrink-0 flex-col gap-1 bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 px-5 py-4 ${finalsCardOpen ? "rounded-t-xl" : "rounded-xl"}`}
@@ -1147,14 +1191,14 @@ export function HomeBracketCards() {
                     {finalsCardOpen ? "▼" : "▶"}
                   </span>
                 </button>
-                {linkedName &&
+                {hasLinkedPoolhubPlayer &&
                   getMyMatchInFinals() !== null &&
                   (getMyFinalsMatchStatusRaw() === "Paused" ||
                     getMyFinalsMatchStatusRaw() === "Paused..." ||
-                    (tournamentInProgress && getMyFinalsMatchStatusRaw() !== "Completed")) && (
+                    !bracketMatchStatusIsCompleted(getMyFinalsMatchStatusRaw())) && (
                     <div className="w-full pb-2">
                       <div className="flex w-full">
-                        {getMyFinalsMatchStatusRaw() !== "Completed" &&
+                        {!bracketMatchStatusIsCompleted(getMyFinalsMatchStatusRaw()) &&
                           (getMyFinalsMatchStatusRaw() === "Paused" ||
                           getMyFinalsMatchStatusRaw() === "Paused..." ? (
                             <button
@@ -1170,33 +1214,19 @@ export function HomeBracketCards() {
                             >
                               Resume Match
                             </button>
-                          ) : tournamentInProgress ? (
+                          ) : (
                             <button
                               type="button"
                               onClick={() => {
                                 const matchIndex = getMyMatchInFinals();
-                                if (matchIndex === null || !email || !settings || typeof settings !== "object")
-                                  return;
-                                const s = settings as Record<string, unknown>;
-                                const nextStatuses = [...finalsBracketMatchStatusesArray];
-                                nextStatuses[matchIndex] = "In Progress...";
-                                void setDashboardSettings({
-                                  email,
-                                  leagueName: String(s.leagueName ?? ""),
-                                  season: String(s.season ?? ""),
-                                  tournamentStarted: s.tournamentStarted === true,
-                                  tournamentPaused: s.tournamentPaused === true,
-                                  finalsBracketMatchStatuses: JSON.stringify(nextStatuses),
-                                } as Parameters<typeof setDashboardSettings>[0]);
-                                router.push(
-                                  `/live-scoring?stage=finals&card=0&match=${matchIndex}`
-                                );
+                                if (matchIndex === null) return;
+                                handleFinalsBracketMatchClick(matchIndex);
                               }}
                               className="w-full rounded-lg bg-gradient-to-r from-purple-600 to-violet-600 px-3 py-2 text-sm font-semibold text-white shadow transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-2 focus:ring-offset-slate-900"
                             >
                               Live Score My Match
                             </button>
-                          ) : null)}
+                          ))}
                       </div>
                     </div>
                   )}

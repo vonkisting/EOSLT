@@ -8,6 +8,7 @@ import { api } from "@/convex/_generated/api";
 import { Modal } from "@/components/ui/Modal";
 import {
   bracket4TargetSlotForWinner,
+  finalsSlotIndexForWeek2FinalWinner,
   resolveWinnerNameForAdvancement,
   week1TargetSlotForWinner,
   week2SlotIndexForWeek1SemiWinner,
@@ -15,14 +16,24 @@ import {
 import {
   parseFinalsBracketMatchStatusesJson,
   parseFinalsBracketScoresJson,
+  parseFinalsBracketSlotsJson,
 } from "@/lib/finalsBracketMatchStatuses";
 import { liveScoreGamesGlobalKey } from "@/lib/liveScoringGlobalKey";
+import {
+  buildMatchupResetPatch,
+  emptyLiveScoreGamesJson,
+} from "@/lib/liveScoringMatchupReset";
 import {
   parseWeek2BracketMatchStatusesJson,
   parseWeek2BracketScoresJson,
   parseWeek2BracketSlotsJson,
   week2SlotPairIndices,
 } from "@/lib/week2BracketSlots";
+import {
+  bracketMatchStatusIsCompleted,
+  bracketParticipantNamesMatch,
+} from "@/lib/bracketNameMatch";
+import { canAccessDashboard } from "@/lib/dashboard-access";
 
 type StatsRow = Record<string, string | number | null | undefined>;
 function getStatValue(row: StatsRow, ...keys: string[]): string | number | null | undefined {
@@ -185,6 +196,8 @@ export function LiveScoringCard({
 
   const router = useRouter();
   const email = useSession().data?.user?.email?.toLowerCase().trim();
+  const isDashboardAdmin = canAccessDashboard(email);
+  const convexUser = useQuery(api.users.getByEmail, email ? { email } : "skip");
   const settings = useQuery(api.dashboardSettings.getShared, {});
   const setDashboardSettings = useMutation(api.dashboardSettings.setShared);
 
@@ -193,11 +206,6 @@ export function LiveScoringCard({
   const tournamentPaused =
     settings && typeof settings === "object" && (settings as Record<string, unknown>).tournamentPaused === true;
   const tournamentInProgress = tournamentStarted && !tournamentPaused;
-
-  useEffect(() => {
-    if (settings === undefined) return;
-    if (!readOnly && !tournamentInProgress && !dashboardOperator) router.replace("/");
-  }, [settings, tournamentInProgress, router, readOnly, dashboardOperator]);
 
   const [player1Scores, setPlayer1Scores] = useState<string[]>(() => [...EMPTY_ROW]);
   const [player2Scores, setPlayer2Scores] = useState<string[]>(() => [...EMPTY_ROW]);
@@ -215,163 +223,6 @@ export function LiveScoringCard({
     lastWrittenRawRef.current = null;
     baselineSnapshotRef.current = null;
   }, [cardIndex, matchIndex, stage]);
-
-  useEffect(() => {
-    if (!validCard || !validMatch || !settings || typeof settings !== "object") return;
-    const s = settings as Record<string, unknown>;
-    const globalKey = liveScoreGamesGlobalKey(stage, cardIndex, matchIndex);
-    const raw = s[`liveScoreGames${globalKey}`];
-    if (typeof raw === "string") {
-      if (raw === lastSyncedRawRef.current) return;
-      if (raw === lastWrittenRawRef.current) {
-        lastSyncedRawRef.current = raw;
-        return;
-      }
-      lastSyncedRawRef.current = raw;
-      lastWrittenRawRef.current = null;
-      skipNextSaveRef.current = true;
-      try {
-        const parsed = JSON.parse(raw) as { p1?: unknown[]; p2?: unknown[] };
-        if (
-          Array.isArray(parsed.p1) &&
-          Array.isArray(parsed.p2) &&
-          parsed.p1.length === GAME_COUNT &&
-          parsed.p2.length === GAME_COUNT
-        ) {
-          const p1 = parsed.p1.map((c) => (c != null && c !== "" ? String(c).trim() : ""));
-          const p2 = parsed.p2.map((c) => (c != null && c !== "" ? String(c).trim() : ""));
-          if (dashboardOperator) {
-            baselineSnapshotRef.current = { p1: [...p1], p2: [...p2] };
-          }
-          setPlayer1Scores(p1);
-          setPlayer2Scores(p2);
-        }
-      } catch {
-        lastSyncedRawRef.current = null;
-      }
-      return;
-    }
-    if (!email || readOnly) return;
-    const emptyGames = JSON.stringify({
-      p1: Array.from({ length: GAME_COUNT }, () => ""),
-      p2: Array.from({ length: GAME_COUNT }, () => ""),
-    });
-    lastSyncedRawRef.current = emptyGames;
-    if (dashboardOperator) {
-      baselineSnapshotRef.current = { p1: [...EMPTY_ROW], p2: [...EMPTY_ROW] };
-    }
-    setPlayer1Scores([...EMPTY_ROW]);
-    setPlayer2Scores([...EMPTY_ROW]);
-
-    const patch: Record<string, unknown> = {
-      email: email as string,
-      leagueName: String(s.leagueName ?? ""),
-      season: String(s.season ?? ""),
-      [`liveScoreGames${globalKey}`]: emptyGames,
-    };
-
-    if (stage === "week1") {
-      patch[`bracketScoreTop${globalKey}`] = "0";
-      patch[`bracketScoreBottom${globalKey}`] = "0";
-    } else if (stage === "week2") {
-      const scores = parseWeek2BracketScoresJson(s.week2BracketScores);
-      const next = [...scores];
-      const base = cardIndex * 6;
-      const si = base + matchIndex * 2;
-      next[si] = "0";
-      next[si + 1] = "0";
-      patch.week2BracketScores = JSON.stringify(next);
-    } else {
-      const scores = parseFinalsBracketScoresJson(s.finalsBracketScores);
-      const next = [...scores];
-      next[matchIndex * 2] = "0";
-      next[matchIndex * 2 + 1] = "0";
-      patch.finalsBracketScores = JSON.stringify(next);
-    }
-
-    setDashboardSettings(patch as Parameters<typeof setDashboardSettings>[0]);
-  }, [settings, cardIndex, matchIndex, validCard, validMatch, email, setDashboardSettings, stage, readOnly, dashboardOperator]);
-
-  const updateScore = useCallback(
-    (playerIndex: 0 | 1, gameIndex: number, value: string) => {
-      if (playerIndex === 0) {
-        setPlayer1Scores((prev) => {
-          const next = [...prev];
-          next[gameIndex] = value;
-          return next;
-        });
-      } else {
-        setPlayer2Scores((prev) => {
-          const next = [...prev];
-          next[gameIndex] = value;
-          return next;
-        });
-      }
-    },
-    []
-  );
-
-  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    if (
-      readOnly ||
-      !email ||
-      !settings ||
-      typeof settings !== "object" ||
-      !validCard ||
-      !validMatch
-    ) {
-      return;
-    }
-    if (skipNextSaveRef.current) {
-      skipNextSaveRef.current = false;
-      return;
-    }
-    const globalKey = liveScoreGamesGlobalKey(stage, cardIndex, matchIndex);
-    const s = settings as Record<string, unknown>;
-    const { total1, total2 } = sumScoresWhenBothPresent(player1Scores, player2Scores);
-    const bothEmpty =
-      player1Scores.every((c) => !(c ?? "").trim()) &&
-      player2Scores.every((c) => !(c ?? "").trim());
-    if (bothEmpty) return;
-
-    const payload = JSON.stringify({ p1: player1Scores, p2: player2Scores });
-    const totals = { total1, total2 };
-
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    saveTimeoutRef.current = setTimeout(() => {
-      saveTimeoutRef.current = null;
-      lastWrittenRawRef.current = payload;
-      const patch: Record<string, unknown> = {
-        email: email as string,
-        leagueName: String(s.leagueName ?? ""),
-        season: String(s.season ?? ""),
-        [`liveScoreGames${globalKey}`]: payload,
-      };
-      if (stage === "week1") {
-        patch[`bracketScoreTop${globalKey}`] = String(totals.total1);
-        patch[`bracketScoreBottom${globalKey}`] = String(totals.total2);
-      } else if (stage === "week2") {
-        const scores = parseWeek2BracketScoresJson(s.week2BracketScores);
-        const next = [...scores];
-        const base = cardIndex * 6;
-        const si = base + matchIndex * 2;
-        next[si] = String(totals.total1);
-        next[si + 1] = String(totals.total2);
-        patch.week2BracketScores = JSON.stringify(next);
-      } else {
-        const scores = parseFinalsBracketScoresJson(s.finalsBracketScores);
-        const next = [...scores];
-        next[matchIndex * 2] = String(totals.total1);
-        next[matchIndex * 2 + 1] = String(totals.total2);
-        patch.finalsBracketScores = JSON.stringify(next);
-      }
-      setDashboardSettings(patch as Parameters<typeof setDashboardSettings>[0]);
-    }, 400);
-    return () => {
-      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    };
-  }, [email, settings, validCard, validMatch, cardIndex, matchIndex, player1Scores, player2Scores, setDashboardSettings, readOnly, stage]);
 
   const { player1Name, player2Name, storedTopScore, storedBottomScore } = useMemo(() => {
     const s = settings as Record<string, unknown> | undefined;
@@ -436,6 +287,217 @@ export function LiveScoringCard({
     };
   }, [settings, cardIndex, matchIndex, validCard, validMatch, stage]);
 
+  const linkedPoolhubRaw = convexUser?.poolhubPlayerName?.trim() ?? "";
+  const linkedPlayerInThisMatchup = useMemo(() => {
+    if (!linkedPoolhubRaw) return false;
+    if (player1Name === "—" && player2Name === "—") return false;
+    return (
+      bracketParticipantNamesMatch(player1Name, linkedPoolhubRaw) ||
+      bracketParticipantNamesMatch(player2Name, linkedPoolhubRaw)
+    );
+  }, [linkedPoolhubRaw, player1Name, player2Name]);
+
+  /** Spectator read-only from URL, unless this user is a linked player in this matchup. */
+  const effectiveReadOnly = readOnly && !linkedPlayerInThisMatchup;
+  /** Dashboard operator tools only when not scoring as a linked player in this matchup. */
+  const effectiveDashboardOperator = dashboardOperator && !linkedPlayerInThisMatchup;
+
+  /** Stored bracket status for this matchup (shared settings). */
+  const sharedMatchupStatusCompleted = useMemo(() => {
+    if (!settings || typeof settings !== "object" || !validCard || !validMatch) return false;
+    const s = settings as Record<string, unknown>;
+    if (stage === "week1") {
+      const raw = (s[`bracketMatchStatus${cardIndex * 6 + matchIndex}`] as string) ?? "";
+      return bracketMatchStatusIsCompleted(raw);
+    }
+    if (stage === "week2") {
+      const arr = parseWeek2BracketMatchStatusesJson(s.week2BracketMatchStatuses);
+      const idx = cardIndex * 3 + matchIndex;
+      return bracketMatchStatusIsCompleted(arr[idx] ?? "");
+    }
+    const arr = parseFinalsBracketMatchStatusesJson(s.finalsBracketMatchStatuses);
+    return bracketMatchStatusIsCompleted(arr[matchIndex] ?? "");
+  }, [settings, stage, cardIndex, matchIndex, validCard, validMatch]);
+
+  useEffect(() => {
+    if (settings === undefined) return;
+    if (effectiveReadOnly) return;
+    if (tournamentInProgress || effectiveDashboardOperator || linkedPlayerInThisMatchup) return;
+    router.replace("/");
+  }, [
+    settings,
+    tournamentInProgress,
+    router,
+    effectiveReadOnly,
+    effectiveDashboardOperator,
+    linkedPlayerInThisMatchup,
+  ]);
+
+  useEffect(() => {
+    if (!validCard || !validMatch || !settings || typeof settings !== "object") return;
+    const s = settings as Record<string, unknown>;
+    const globalKey = liveScoreGamesGlobalKey(stage, cardIndex, matchIndex);
+    const raw = s[`liveScoreGames${globalKey}`];
+    if (typeof raw === "string") {
+      if (raw === lastSyncedRawRef.current) return;
+      if (raw === lastWrittenRawRef.current) {
+        lastSyncedRawRef.current = raw;
+        return;
+      }
+      lastSyncedRawRef.current = raw;
+      lastWrittenRawRef.current = null;
+      skipNextSaveRef.current = true;
+      try {
+        const parsed = JSON.parse(raw) as { p1?: unknown[]; p2?: unknown[] };
+        if (
+          Array.isArray(parsed.p1) &&
+          Array.isArray(parsed.p2) &&
+          parsed.p1.length === GAME_COUNT &&
+          parsed.p2.length === GAME_COUNT
+        ) {
+          const p1 = parsed.p1.map((c) => (c != null && c !== "" ? String(c).trim() : ""));
+          const p2 = parsed.p2.map((c) => (c != null && c !== "" ? String(c).trim() : ""));
+          if (effectiveDashboardOperator) {
+            baselineSnapshotRef.current = { p1: [...p1], p2: [...p2] };
+          }
+          setPlayer1Scores(p1);
+          setPlayer2Scores(p2);
+        }
+      } catch {
+        lastSyncedRawRef.current = null;
+      }
+      return;
+    }
+    if (!email || effectiveReadOnly) return;
+    const emptyGames = emptyLiveScoreGamesJson();
+    lastSyncedRawRef.current = emptyGames;
+    if (effectiveDashboardOperator) {
+      baselineSnapshotRef.current = { p1: [...EMPTY_ROW], p2: [...EMPTY_ROW] };
+    }
+    setPlayer1Scores([...EMPTY_ROW]);
+    setPlayer2Scores([...EMPTY_ROW]);
+
+    const patch: Record<string, unknown> = {
+      email: email as string,
+      leagueName: String(s.leagueName ?? ""),
+      season: String(s.season ?? ""),
+      [`liveScoreGames${globalKey}`]: emptyGames,
+    };
+
+    if (stage === "week1") {
+      patch[`bracketScoreTop${globalKey}`] = "0";
+      patch[`bracketScoreBottom${globalKey}`] = "0";
+    } else if (stage === "week2") {
+      const scores = parseWeek2BracketScoresJson(s.week2BracketScores);
+      const next = [...scores];
+      const base = cardIndex * 6;
+      const si = base + matchIndex * 2;
+      next[si] = "0";
+      next[si + 1] = "0";
+      patch.week2BracketScores = JSON.stringify(next);
+    } else {
+      const scores = parseFinalsBracketScoresJson(s.finalsBracketScores);
+      const next = [...scores];
+      next[matchIndex * 2] = "0";
+      next[matchIndex * 2 + 1] = "0";
+      patch.finalsBracketScores = JSON.stringify(next);
+    }
+
+    setDashboardSettings(patch as Parameters<typeof setDashboardSettings>[0]);
+  }, [
+    settings,
+    cardIndex,
+    matchIndex,
+    validCard,
+    validMatch,
+    email,
+    setDashboardSettings,
+    stage,
+    effectiveReadOnly,
+    effectiveDashboardOperator,
+  ]);
+
+  const updateScore = useCallback(
+    (playerIndex: 0 | 1, gameIndex: number, value: string) => {
+      if (playerIndex === 0) {
+        setPlayer1Scores((prev) => {
+          const next = [...prev];
+          next[gameIndex] = value;
+          return next;
+        });
+      } else {
+        setPlayer2Scores((prev) => {
+          const next = [...prev];
+          next[gameIndex] = value;
+          return next;
+        });
+      }
+    },
+    []
+  );
+
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (
+      effectiveReadOnly ||
+      !email ||
+      !settings ||
+      typeof settings !== "object" ||
+      !validCard ||
+      !validMatch
+    ) {
+      return;
+    }
+    if (skipNextSaveRef.current) {
+      skipNextSaveRef.current = false;
+      return;
+    }
+    const globalKey = liveScoreGamesGlobalKey(stage, cardIndex, matchIndex);
+    const s = settings as Record<string, unknown>;
+    const { total1, total2 } = sumScoresWhenBothPresent(player1Scores, player2Scores);
+    const bothEmpty =
+      player1Scores.every((c) => !(c ?? "").trim()) &&
+      player2Scores.every((c) => !(c ?? "").trim());
+    if (bothEmpty) return;
+
+    const payload = JSON.stringify({ p1: player1Scores, p2: player2Scores });
+    const totals = { total1, total2 };
+
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => {
+      saveTimeoutRef.current = null;
+      lastWrittenRawRef.current = payload;
+      const patch: Record<string, unknown> = {
+        email: email as string,
+        leagueName: String(s.leagueName ?? ""),
+        season: String(s.season ?? ""),
+        [`liveScoreGames${globalKey}`]: payload,
+      };
+      if (stage === "week1") {
+        patch[`bracketScoreTop${globalKey}`] = String(totals.total1);
+        patch[`bracketScoreBottom${globalKey}`] = String(totals.total2);
+      } else if (stage === "week2") {
+        const scores = parseWeek2BracketScoresJson(s.week2BracketScores);
+        const next = [...scores];
+        const base = cardIndex * 6;
+        const si = base + matchIndex * 2;
+        next[si] = String(totals.total1);
+        next[si + 1] = String(totals.total2);
+        patch.week2BracketScores = JSON.stringify(next);
+      } else {
+        const scores = parseFinalsBracketScoresJson(s.finalsBracketScores);
+        const next = [...scores];
+        next[matchIndex * 2] = String(totals.total1);
+        next[matchIndex * 2 + 1] = String(totals.total2);
+        patch.finalsBracketScores = JSON.stringify(next);
+      }
+      setDashboardSettings(patch as Parameters<typeof setDashboardSettings>[0]);
+    }, 400);
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
+  }, [email, settings, validCard, validMatch, cardIndex, matchIndex, player1Scores, player2Scores, setDashboardSettings, effectiveReadOnly, stage]);
+
   const [raceToMap, setRaceToMap] = useState<Record<string, number | null>>({});
   const leagueGuid = (settings as Record<string, unknown> | undefined)?.leagueGuid as string | undefined;
   useEffect(() => {
@@ -481,35 +543,30 @@ export function LiveScoringCard({
     () => sumScoresWhenBothPresent(player1Scores, player2Scores),
     [player1Scores, player2Scores]
   );
-  const displayTotal1 = readOnly ? Number.parseInt(storedTopScore, 10) || 0 : total1;
-  const displayTotal2 = readOnly ? Number.parseInt(storedBottomScore, 10) || 0 : total2;
+  const displayTotal1 = effectiveReadOnly ? Number.parseInt(storedTopScore, 10) || 0 : total1;
+  const displayTotal2 = effectiveReadOnly ? Number.parseInt(storedBottomScore, 10) || 0 : total2;
 
   /** Dashboard: submit only after the user changes at least one cell vs loaded snapshot. */
   const hasUserEditedScores = useMemo(() => {
-    if (!dashboardOperator || readOnly) return true;
+    if (!effectiveDashboardOperator || effectiveReadOnly) return true;
     const b = baselineSnapshotRef.current;
     if (b == null) return false;
     return !scoresEqualToBaseline(player1Scores, player2Scores, b);
-  }, [dashboardOperator, readOnly, player1Scores, player2Scores]);
+  }, [effectiveDashboardOperator, effectiveReadOnly, player1Scores, player2Scores]);
 
   const [legalWinConfirmed, setLegalWinConfirmed] = useState(false);
   const [requireStrictExceedPlayer1, setRequireStrictExceedPlayer1] = useState(false);
   const [requireStrictExceedPlayer2, setRequireStrictExceedPlayer2] = useState(false);
   const [legalWinModalOpen, setLegalWinModalOpen] = useState(false);
 
-  useEffect(() => {
-    if (readOnly) return;
-    setLegalWinConfirmed(false);
-  }, [total1, total2, readOnly]);
+  /** Completed matches skip the winning-ball modal; same effect as legal confirmation for submit/rows. */
+  const legalWinSatisfied = legalWinConfirmed || sharedMatchupStatusCompleted;
 
   useEffect(() => {
-    if (readOnly || !dashboardOperator) return;
-    if (hasUserEditedScores) return;
+    if (effectiveReadOnly) return;
+    if (sharedMatchupStatusCompleted) return;
     setLegalWinConfirmed(false);
-    setLegalWinModalOpen(false);
-    setRequireStrictExceedPlayer1(false);
-    setRequireStrictExceedPlayer2(false);
-  }, [hasUserEditedScores, readOnly, dashboardOperator]);
+  }, [total1, total2, effectiveReadOnly, sharedMatchupStatusCompleted]);
 
   const p1Won = useMemo(
     () =>
@@ -531,9 +588,27 @@ export function LiveScoringCard({
     [p1Won, p2Won, player1Name, player2Name]
   );
 
+  useEffect(() => {
+    if (effectiveReadOnly || !effectiveDashboardOperator) return;
+    if (sharedMatchupStatusCompleted) return;
+    if (hasUserEditedScores) return;
+    if (totalsReached && !bothHaveWinningTotals) return;
+    setLegalWinConfirmed(false);
+    setLegalWinModalOpen(false);
+    setRequireStrictExceedPlayer1(false);
+    setRequireStrictExceedPlayer2(false);
+  }, [
+    hasUserEditedScores,
+    effectiveReadOnly,
+    effectiveDashboardOperator,
+    totalsReached,
+    bothHaveWinningTotals,
+    sharedMatchupStatusCompleted,
+  ]);
+
   const updateMatchStatus = useCallback(
     (status: string) => {
-      if (readOnly || !email || !settings || typeof settings !== "object" || !validCard || !validMatch) {
+      if (effectiveReadOnly || !email || !settings || typeof settings !== "object" || !validCard || !validMatch) {
         return;
       }
       const s = settings as Record<string, unknown>;
@@ -595,6 +670,14 @@ export function LiveScoringCard({
               payload.week2BracketSlots = JSON.stringify(nextSlots);
             }
           }
+          if (matchIndex === 2 && winner) {
+            const finalsIdx = finalsSlotIndexForWeek2FinalWinner(cardIndex);
+            if (finalsIdx != null) {
+              const nextFinals = [...parseFinalsBracketSlotsJson(s.finalsBracketSlots)];
+              nextFinals[finalsIdx] = winner;
+              payload.finalsBracketSlots = JSON.stringify(nextFinals);
+            }
+          }
         }
       } else {
         const statuses = parseFinalsBracketMatchStatusesJson(s.finalsBracketMatchStatuses);
@@ -611,19 +694,7 @@ export function LiveScoringCard({
           );
           const targetSlot = bracket4TargetSlotForWinner(matchIndex);
           if (targetSlot != null && winner) {
-            const rawSlots = s.finalsBracketSlots;
-            let arr: string[] = ["", "", "", "", "", ""];
-            if (typeof rawSlots === "string" && rawSlots.trim()) {
-              try {
-                const parsed = JSON.parse(rawSlots) as unknown[];
-                if (Array.isArray(parsed) && parsed.length === 6) {
-                  arr = parsed.map((v) => (typeof v === "string" ? v : ""));
-                }
-              } catch {
-                /* ignore */
-              }
-            }
-            const nextSlots = [...arr];
+            const nextSlots = [...parseFinalsBracketSlotsJson(s.finalsBracketSlots)];
             if (targetSlot < nextSlots.length) {
               nextSlots[targetSlot] = winner;
               payload.finalsBracketSlots = JSON.stringify(nextSlots);
@@ -642,7 +713,7 @@ export function LiveScoringCard({
       cardIndex,
       matchIndex,
       setDashboardSettings,
-      readOnly,
+      effectiveReadOnly,
       stage,
       singleWinnerName,
       player1Name,
@@ -667,7 +738,15 @@ export function LiveScoringCard({
   const winningBallDelayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (readOnly || dashboardOperator) return;
+    if (effectiveReadOnly) return;
+    if (sharedMatchupStatusCompleted) {
+      if (winningBallDelayRef.current != null) {
+        clearTimeout(winningBallDelayRef.current);
+        winningBallDelayRef.current = null;
+      }
+      setLegalWinModalOpen(false);
+      return;
+    }
     if (!winningGameHasBothScores) {
       if (winningBallDelayRef.current != null) {
         clearTimeout(winningBallDelayRef.current);
@@ -691,8 +770,8 @@ export function LiveScoringCard({
     singleWinnerName,
     legalWinConfirmed,
     winningGameHasBothScores,
-    readOnly,
-    dashboardOperator,
+    effectiveReadOnly,
+    sharedMatchupStatusCompleted,
   ]);
 
   const handleScoreChange = useCallback(
@@ -707,13 +786,13 @@ export function LiveScoringCard({
         updateScore(playerIndex, gameIndex, "");
         return;
       }
-      if (readOnly || totalsReached) {
+      if (effectiveReadOnly || totalsReached) {
         updateScore(playerIndex, gameIndex, digitsOnly);
         return;
       }
       updateScore(playerIndex, gameIndex, digitsOnly);
     },
-    [totalsReached, updateScore, readOnly]
+    [totalsReached, updateScore, effectiveReadOnly]
   );
 
   const handleScoreBlur = useCallback(
@@ -739,25 +818,84 @@ export function LiveScoringCard({
   }, [p1Won, p2Won]);
 
   /** Allow submit when one player has won (under strict rule if set), not both, and user confirmed legal win. */
-  const canSubmitScores = useMemo(
-    () =>
+  const canSubmitScores = useMemo(() => {
+    const operatorMaySubmit =
+      !effectiveDashboardOperator ||
+      hasUserEditedScores ||
+      (totalsReached && !bothHaveWinningTotals);
+    return (
       totalsReached &&
       !bothHaveWinningTotals &&
-      legalWinConfirmed &&
-      (!dashboardOperator || hasUserEditedScores),
-    [totalsReached, bothHaveWinningTotals, legalWinConfirmed, dashboardOperator, hasUserEditedScores]
-  );
+      legalWinSatisfied &&
+      operatorMaySubmit
+    );
+  }, [
+    totalsReached,
+    bothHaveWinningTotals,
+    legalWinSatisfied,
+    effectiveDashboardOperator,
+    hasUserEditedScores,
+  ]);
 
   const [submitSuccessModalOpen, setSubmitSuccessModalOpen] = useState(false);
+  const [resetMatchupModalOpen, setResetMatchupModalOpen] = useState(false);
+
+  const confirmResetMatchup = useCallback(() => {
+    if (
+      !isDashboardAdmin ||
+      !email ||
+      !settings ||
+      typeof settings !== "object" ||
+      !validCard ||
+      !validMatch
+    ) {
+      return;
+    }
+    const s = settings as Record<string, unknown>;
+    const emptyGames = emptyLiveScoreGamesJson();
+    const resetPatch = buildMatchupResetPatch(stage, cardIndex, matchIndex, s);
+    lastSyncedRawRef.current = emptyGames;
+    lastWrittenRawRef.current = emptyGames;
+    skipNextSaveRef.current = true;
+    if (isDashboardAdmin) {
+      baselineSnapshotRef.current = { p1: [...EMPTY_ROW], p2: [...EMPTY_ROW] };
+    }
+    setPlayer1Scores([...EMPTY_ROW]);
+    setPlayer2Scores([...EMPTY_ROW]);
+    setLegalWinConfirmed(false);
+    setLegalWinModalOpen(false);
+    setRequireStrictExceedPlayer1(false);
+    setRequireStrictExceedPlayer2(false);
+    setResetMatchupModalOpen(false);
+    setDashboardSettings({
+      email,
+      leagueName: String(s.leagueName ?? ""),
+      season: String(s.season ?? ""),
+      tournamentStarted: s.tournamentStarted === true,
+      tournamentPaused: s.tournamentPaused === true,
+      ...resetPatch,
+    } as Parameters<typeof setDashboardSettings>[0]);
+  }, [
+    isDashboardAdmin,
+    email,
+    settings,
+    validCard,
+    validMatch,
+    stage,
+    cardIndex,
+    matchIndex,
+    setDashboardSettings,
+  ]);
+
   useEffect(() => {
     if (!submitSuccessModalOpen) return;
-    const dest = dashboardOperator ? "/dashboard" : "/";
+    const dest = effectiveDashboardOperator ? "/dashboard" : "/";
     const t = setTimeout(() => {
       setSubmitSuccessModalOpen(false);
       router.replace(dest);
     }, 3000);
     return () => clearTimeout(t);
-  }, [submitSuccessModalOpen, router, dashboardOperator]);
+  }, [submitSuccessModalOpen, router, effectiveDashboardOperator]);
 
   return (
     <div className="mx-auto max-w-2xl pb-8 mt-[5px]">
@@ -839,7 +977,7 @@ export function LiveScoringCard({
                       const hasAnyValue =
                         (player1Scores[i] ?? "").trim() !== "" || (player2Scores[i] ?? "").trim() !== "";
                       /** Hide trailing empty rows only after legal win is confirmed (Yes). If they answer No, keep blanks for extra games. */
-                      if (totalsReached && legalWinConfirmed && !hasAnyValue) return null;
+                      if (totalsReached && legalWinSatisfied && !hasAnyValue) return null;
                       return (
                         <Fragment key={i}>
                           <tr>
@@ -847,7 +985,7 @@ export function LiveScoringCard({
                               Game {i + 1}
                             </td>
                             <td className="border border-slate-300 p-0">
-                              {readOnly ? (
+                              {effectiveReadOnly ? (
                                 <div className="w-full min-w-[2.5rem] bg-white px-2 py-1.5 text-center text-black">
                                   {player1Scores[i] || "—"}
                                 </div>
@@ -860,7 +998,7 @@ export function LiveScoringCard({
                                   onBlur={() => handleScoreBlur(i)}
                                   disabled={
                                     totalsReached &&
-                                    legalWinConfirmed &&
+                                    legalWinSatisfied &&
                                     (player1Scores[i] ?? "").trim() === ""
                                   }
                                   className="w-full min-w-[2.5rem] border-0 bg-white px-2 py-1.5 text-center text-[16px] text-black outline-none focus:ring-1 focus:ring-inset focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 sm:text-base"
@@ -869,7 +1007,7 @@ export function LiveScoringCard({
                               )}
                             </td>
                             <td className="border border-slate-300 p-0">
-                              {readOnly ? (
+                              {effectiveReadOnly ? (
                                 <div className="w-full min-w-[2.5rem] bg-white px-2 py-1.5 text-center text-black">
                                   {player2Scores[i] || "—"}
                                 </div>
@@ -882,7 +1020,7 @@ export function LiveScoringCard({
                                   onBlur={() => handleScoreBlur(i)}
                                   disabled={
                                     totalsReached &&
-                                    legalWinConfirmed &&
+                                    legalWinSatisfied &&
                                     (player2Scores[i] ?? "").trim() === ""
                                   }
                                   className="w-full min-w-[2.5rem] border-0 bg-white px-2 py-1.5 text-center text-[16px] text-black outline-none focus:ring-1 focus:ring-inset focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 sm:text-base"
@@ -892,7 +1030,7 @@ export function LiveScoringCard({
                             </td>
                           </tr>
                           {(() => {
-                            if (readOnly || (totalsReached && legalWinConfirmed)) return null;
+                            if (effectiveReadOnly || (totalsReached && legalWinSatisfied)) return null;
                             const msg = getGameRowErrorMessage(player1Scores, player2Scores, i, {
                               hasPlayerReachedRaceTo: totalsReached,
                             });
@@ -924,25 +1062,49 @@ export function LiveScoringCard({
                 </table>
               </div>
               <div className="mt-3 flex flex-col gap-3">
-                {!readOnly && bothHaveWinningTotals && (
+                {!effectiveReadOnly && bothHaveWinningTotals && (
                   <p className="w-full rounded-lg border border-amber-500/60 bg-amber-950/40 px-4 py-3 text-center text-sm font-medium text-amber-200" role="alert">
                     Both players can&apos;t have winning totals. Adjust the scores to represent who won first.
                   </p>
                 )}
                 <div className="flex flex-wrap justify-center gap-3">
-                  {!readOnly && dashboardOperator && (
+                  {isDashboardAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => setResetMatchupModalOpen(true)}
+                      className="rounded-lg border border-amber-500/70 bg-amber-950/40 px-5 py-2.5 font-semibold text-amber-100 shadow transition-colors hover:bg-amber-900/50 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 focus:ring-offset-slate-800"
+                    >
+                      Reset Matchup
+                    </button>
+                  )}
+                  {effectiveReadOnly && isDashboardAdmin && (
                     <button
                       type="button"
                       onClick={() => {
+                        router.push(
+                          `/live-scoring?stage=${stage}&card=${cardIndex}&match=${matchIndex}&dashboard=1`
+                        );
+                      }}
+                      className="rounded-lg bg-gradient-to-r from-emerald-700 to-emerald-500 px-5 py-2.5 font-semibold text-white shadow transition-opacity hover:from-emerald-600 hover:to-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-slate-800"
+                    >
+                      Live Score Match
+                    </button>
+                  )}
+                  {!effectiveReadOnly && effectiveDashboardOperator && totalsReached && !bothHaveWinningTotals && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!canSubmitScores) return;
                         updateMatchStatus("Completed");
                         setSubmitSuccessModalOpen(true);
                       }}
-                      className="rounded-lg bg-gradient-to-r from-blue-700 to-blue-500 px-5 py-2.5 font-semibold text-white shadow transition-opacity hover:from-blue-600 hover:to-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-800"
+                      disabled={!canSubmitScores}
+                      className="rounded-lg bg-gradient-to-r from-blue-700 to-blue-500 px-5 py-2.5 font-semibold text-white shadow transition-opacity hover:from-blue-600 hover:to-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-800 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:from-blue-700 disabled:hover:to-blue-500"
                     >
                       Submit Scores
                     </button>
                   )}
-                  {!readOnly && !dashboardOperator && totalsReached && !bothHaveWinningTotals && (
+                  {!effectiveReadOnly && !effectiveDashboardOperator && totalsReached && !bothHaveWinningTotals && (
                     <button
                       type="button"
                       onClick={() => {
@@ -958,15 +1120,15 @@ export function LiveScoringCard({
                   )}
                   <button
                     type="button"
-                    onClick={() => router.push(dashboardOperator ? "/dashboard" : "/")}
+                    onClick={() => router.push(effectiveDashboardOperator ? "/dashboard" : "/")}
                     className="rounded-lg bg-gradient-to-r from-red-700 to-red-500 px-5 py-2.5 font-semibold text-white shadow transition-opacity hover:from-red-600 hover:to-red-400 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-2 focus:ring-offset-slate-800"
                     aria-label={
-                      dashboardOperator
+                      effectiveDashboardOperator
                         ? "Exit live scoring and return to dashboard"
                         : "Exit live scoring and return home"
                     }
                   >
-                    {readOnly ? "Back to Home" : "Exit"}
+                    {effectiveReadOnly ? "Back to Home" : "Exit"}
                   </button>
                 </div>
               </div>
@@ -974,7 +1136,39 @@ export function LiveScoringCard({
           )}
         </div>
       </div>
-      {!readOnly ? <Modal
+      {isDashboardAdmin ? (
+        <Modal
+          open={resetMatchupModalOpen}
+          onClose={() => setResetMatchupModalOpen(false)}
+          title="Reset matchup"
+          footer={
+            <div className="flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setResetMatchupModalOpen(false)}
+                className="cursor-pointer rounded-lg border border-white/20 bg-transparent px-4 py-2.5 text-sm font-medium text-slate-200 transition-colors hover:bg-white/10"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => confirmResetMatchup()}
+                className="cursor-pointer rounded-lg border border-amber-500/50 bg-amber-900/80 px-4 py-2.5 text-sm font-medium text-amber-100 shadow-sm transition-colors hover:bg-amber-800/80"
+              >
+                Reset
+              </button>
+            </div>
+          }
+        >
+          <p className="text-slate-200">
+            This clears all game scores and totals for this matchup and sets its status to the default
+            (empty). If a winner had been advanced to the next round on this card, Week 2, or Finals, that
+            advanced name is cleared so the slot shows as empty (Select Player). Other unrelated matchups are
+            not changed.
+          </p>
+        </Modal>
+      ) : null}
+      {!effectiveReadOnly ? <Modal
         open={legalWinModalOpen}
         onClose={() => setLegalWinModalOpen(false)}
         title="Confirm winning ball"
@@ -1012,20 +1206,24 @@ export function LiveScoringCard({
           Was the winning ball made legally by {singleWinnerName ?? "the winner"}?
         </p>
       </Modal> : null}
-      {!readOnly ? <Modal
+      {!effectiveReadOnly ? <Modal
         open={submitSuccessModalOpen}
         onClose={() => {
           setSubmitSuccessModalOpen(false);
-          router.replace(dashboardOperator ? "/dashboard" : "/");
+          router.replace(effectiveDashboardOperator ? "/dashboard" : "/");
         }}
-        title="Success"
+        title="Scorecard Successfully Submitted"
       >
-        <p className="text-slate-200">
-          Success, match scores successfully submitted.
-        </p>
-        <p className="mt-2 text-sm text-slate-400">
-          {dashboardOperator ? "Redirecting to dashboard…" : "Redirecting to home…"}
-        </p>
+        <div className="space-y-4">
+          <div
+            className="h-px w-full bg-white/15"
+            role="separator"
+            aria-hidden="true"
+          />
+          <p className="text-sm text-slate-400">
+            {effectiveDashboardOperator ? "Redirecting to dashboard…" : "Redirecting to home…"}
+          </p>
+        </div>
       </Modal> : null}
       </div>
   );
