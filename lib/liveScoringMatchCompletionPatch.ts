@@ -11,6 +11,12 @@ import {
 } from "@/lib/finalsBracketMatchStatuses";
 import type { LiveScoringStage } from "@/lib/liveScoringGlobalKey";
 import { liveScoreGamesGlobalKey } from "@/lib/liveScoringGlobalKey";
+import {
+  FINALS_MATCH_FORFEIT_COUNT,
+  mergeMatchForfeitSlotIntoArray,
+  WEEK1_MATCH_FORFEIT_COUNT,
+  WEEK2_MATCH_FORFEIT_COUNT,
+} from "@/lib/matchForfeitsJson";
 import { emptyLiveScoreGamesJson } from "@/lib/liveScoringMatchupReset";
 import {
   parseWeek2BracketMatchStatusesJson,
@@ -27,7 +33,8 @@ export function buildMatchCompletionPatch(
   cardIndex: number,
   matchIndex: number,
   settings: Record<string, unknown>,
-  winnerName: string | null
+  winnerName: string | null,
+  options?: { forfeitingPlayerName?: string | null }
 ): Record<string, unknown> {
   const globalKey = liveScoreGamesGlobalKey(stage, cardIndex, matchIndex);
   const patch: Record<string, unknown> = {
@@ -110,6 +117,30 @@ export function buildMatchCompletionPatch(
         }
       }
     }
+  }
+
+  const forfeitStored = options?.forfeitingPlayerName?.trim() ?? "";
+  if (stage === "week1") {
+    patch.week1MatchForfeits = mergeMatchForfeitSlotIntoArray(
+      settings.week1MatchForfeits,
+      WEEK1_MATCH_FORFEIT_COUNT,
+      cardIndex * 6 + matchIndex,
+      forfeitStored
+    );
+  } else if (stage === "week2") {
+    patch.week2MatchForfeits = mergeMatchForfeitSlotIntoArray(
+      settings.week2MatchForfeits,
+      WEEK2_MATCH_FORFEIT_COUNT,
+      cardIndex * 3 + matchIndex,
+      forfeitStored
+    );
+  } else {
+    patch.finalsMatchForfeits = mergeMatchForfeitSlotIntoArray(
+      settings.finalsMatchForfeits,
+      FINALS_MATCH_FORFEIT_COUNT,
+      matchIndex,
+      forfeitStored
+    );
   }
 
   return patch;

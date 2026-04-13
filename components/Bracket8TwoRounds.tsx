@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "@/app/home-bracket.css";
 import { selectOptionsFullPool } from "@/lib/dropdownOptions";
+import { displayNameWithForfeitSuffix } from "@/lib/matchForfeitsJson";
 
 const SECOND_ROUND_FIRST_SLOT = 8;
 
@@ -39,6 +40,7 @@ export function MatchWithDropdowns({
   placeholderText = "Select Player...",
   onMatchClick,
   onNameContextMenu,
+  forfeitingPlayerName,
 }: {
   winner: "top" | "bottom";
   topSlotIndex: number;
@@ -62,10 +64,20 @@ export function MatchWithDropdowns({
   onMatchClick?: () => void;
   /** Dashboard: right-click player name to open live scorecard. */
   onNameContextMenu?: () => void;
+  /** When set and it matches a slot name, that side is labeled with " (Forfeit)". */
+  forfeitingPlayerName?: string | null;
 }) {
   const winnerClass = winner === "top" ? "winner-top" : "winner-bottom";
   const topValue = slotSelections[topSlotIndex] ?? "";
   const bottomValue = slotSelections[bottomSlotIndex] ?? "";
+  const topDisplay =
+    topValue.trim() !== ""
+      ? displayNameWithForfeitSuffix(topValue, forfeitingPlayerName) || topValue
+      : "";
+  const bottomDisplay =
+    bottomValue.trim() !== ""
+      ? displayNameWithForfeitSuffix(bottomValue, forfeitingPlayerName) || bottomValue
+      : "";
   const topRaceTo = topValue && playerRaceToMap?.[topValue];
   const bottomRaceTo = bottomValue && playerRaceToMap?.[bottomValue];
   const formatRace = (v: number | null | undefined | string) =>
@@ -94,9 +106,9 @@ export function MatchWithDropdowns({
                   : undefined
               }
               disabled={!topValue}
-              aria-label={topValue ? `View scorecard for ${topValue}` : "No player selected"}
+              aria-label={topValue ? `View scorecard for ${topDisplay}` : "No player selected"}
             >
-              {topValue || placeholderText}
+              {topDisplay || placeholderText}
             </button>
           ) : disabled && onNameContextMenu ? (
             <div
@@ -117,7 +129,7 @@ export function MatchWithDropdowns({
                 <option value="">{placeholderText}</option>
                 {topOptions.map((name) => (
                   <option key={name} value={name}>
-                    {name}
+                    {displayNameWithForfeitSuffix(name, forfeitingPlayerName) || name}
                   </option>
                 ))}
               </select>
@@ -141,7 +153,7 @@ export function MatchWithDropdowns({
               <option value="">{placeholderText}</option>
               {topOptions.map((name) => (
                 <option key={name} value={name}>
-                  {name}
+                  {displayNameWithForfeitSuffix(name, forfeitingPlayerName) || name}
                 </option>
               ))}
             </select>
@@ -177,9 +189,9 @@ export function MatchWithDropdowns({
                   : undefined
               }
               disabled={!bottomValue}
-              aria-label={bottomValue ? `View scorecard for ${bottomValue}` : "No player selected"}
+              aria-label={bottomValue ? `View scorecard for ${bottomDisplay}` : "No player selected"}
             >
-              {bottomValue || placeholderText}
+              {bottomDisplay || placeholderText}
             </button>
           ) : disabled && onNameContextMenu ? (
             <div
@@ -200,7 +212,7 @@ export function MatchWithDropdowns({
                 <option value="">{placeholderText}</option>
                 {bottomOptions.map((name) => (
                   <option key={name} value={name}>
-                    {name}
+                    {displayNameWithForfeitSuffix(name, forfeitingPlayerName) || name}
                   </option>
                 ))}
               </select>
@@ -224,7 +236,7 @@ export function MatchWithDropdowns({
               <option value="">{placeholderText}</option>
               {bottomOptions.map((name) => (
                 <option key={name} value={name}>
-                  {name}
+                  {displayNameWithForfeitSuffix(name, forfeitingPlayerName) || name}
                 </option>
               ))}
             </select>
@@ -308,6 +320,7 @@ export function Bracket8TwoRounds({
   placeholderText,
   onMatchClickByIndex,
   onMatchNameContextMenu,
+  matchForfeitingPlayerByMatchIndex,
 }: {
   players: string[];
   playerRaceToMap?: Record<string, number | null>;
@@ -327,6 +340,8 @@ export function Bracket8TwoRounds({
   onMatchClickByIndex?: (matchIndex: number) => void;
   /** Dashboard: right-click a player name to open the live scorecard for that matchup. */
   onMatchNameContextMenu?: (matchIndex: number) => void;
+  /** Length 6: forfeiting player name per matchup on this Week 1 card (match index 0–5). */
+  matchForfeitingPlayerByMatchIndex?: (string | null)[] | null;
 }) {
   const pool = useMemo(() => {
     const filtered = players.filter((n) => n != null && n !== "");
@@ -436,6 +451,7 @@ export function Bracket8TwoRounds({
                 }
                 onTopScoreChange={onScoreChange ? (v) => handleScoreChange(0, "top", v) : undefined}
                 onBottomScoreChange={onScoreChange ? (v) => handleScoreChange(0, "bottom", v) : undefined}
+                forfeitingPlayerName={matchForfeitingPlayerByMatchIndex?.[0] ?? null}
               />
               <MatchWithDropdowns
                 winner="bottom"
@@ -458,6 +474,7 @@ export function Bracket8TwoRounds({
                 }
                 onTopScoreChange={onScoreChange ? (v) => handleScoreChange(1, "top", v) : undefined}
                 onBottomScoreChange={onScoreChange ? (v) => handleScoreChange(1, "bottom", v) : undefined}
+                forfeitingPlayerName={matchForfeitingPlayerByMatchIndex?.[1] ?? null}
               />
               <MatchWithDropdowns
                 winner="top"
@@ -480,6 +497,7 @@ export function Bracket8TwoRounds({
                 }
                 onTopScoreChange={onScoreChange ? (v) => handleScoreChange(2, "top", v) : undefined}
                 onBottomScoreChange={onScoreChange ? (v) => handleScoreChange(2, "bottom", v) : undefined}
+                forfeitingPlayerName={matchForfeitingPlayerByMatchIndex?.[2] ?? null}
               />
               <MatchWithDropdowns
                 winner="top"
@@ -502,6 +520,7 @@ export function Bracket8TwoRounds({
                 }
                 onTopScoreChange={onScoreChange ? (v) => handleScoreChange(3, "top", v) : undefined}
                 onBottomScoreChange={onScoreChange ? (v) => handleScoreChange(3, "bottom", v) : undefined}
+                forfeitingPlayerName={matchForfeitingPlayerByMatchIndex?.[3] ?? null}
               />
             </div>
             <div className="column two">
@@ -526,6 +545,7 @@ export function Bracket8TwoRounds({
                 }
                 onTopScoreChange={onScoreChange ? (v) => handleScoreChange(4, "top", v) : undefined}
                 onBottomScoreChange={onScoreChange ? (v) => handleScoreChange(4, "bottom", v) : undefined}
+                forfeitingPlayerName={matchForfeitingPlayerByMatchIndex?.[4] ?? null}
               />
               <MatchWithDropdowns
                 winner="bottom"
@@ -548,6 +568,7 @@ export function Bracket8TwoRounds({
                 }
                 onTopScoreChange={onScoreChange ? (v) => handleScoreChange(5, "top", v) : undefined}
                 onBottomScoreChange={onScoreChange ? (v) => handleScoreChange(5, "bottom", v) : undefined}
+                forfeitingPlayerName={matchForfeitingPlayerByMatchIndex?.[5] ?? null}
               />
             </div>
           </div>

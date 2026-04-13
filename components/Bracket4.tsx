@@ -46,6 +46,7 @@ export function Bracket4({
   onMatchClickByIndex,
   /** Dashboard: right-click a player name to open the live scorecard for that matchup. */
   onMatchNameContextMenu,
+  matchForfeitingPlayerByMatchIndex,
 }: {
   players: string[];
   playerRaceToMap?: Record<string, number | null>;
@@ -60,6 +61,8 @@ export function Bracket4({
   placeholderText?: string;
   onMatchClickByIndex?: (matchIndex: number) => void;
   onMatchNameContextMenu?: (matchIndex: number) => void;
+  /** Length 3: forfeiting player name per matchup (0–1 semis, 2 final). */
+  matchForfeitingPlayerByMatchIndex?: (string | null)[] | null;
 }) {
   const pool = useMemo(() => {
     const filtered = players.filter((n) => n != null && n !== "");
@@ -173,6 +176,7 @@ export function Bracket4({
                 }
                 onTopScoreChange={onScoreChange ? (v) => handleScoreChange(0, "top", v) : undefined}
                 onBottomScoreChange={onScoreChange ? (v) => handleScoreChange(0, "bottom", v) : undefined}
+                forfeitingPlayerName={matchForfeitingPlayerByMatchIndex?.[0] ?? null}
               />
               <MatchWithDropdowns
                 winner="bottom"
@@ -195,6 +199,7 @@ export function Bracket4({
                 }
                 onTopScoreChange={onScoreChange ? (v) => handleScoreChange(1, "top", v) : undefined}
                 onBottomScoreChange={onScoreChange ? (v) => handleScoreChange(1, "bottom", v) : undefined}
+                forfeitingPlayerName={matchForfeitingPlayerByMatchIndex?.[1] ?? null}
               />
             </div>
             <div className="column two">
@@ -219,6 +224,7 @@ export function Bracket4({
                 }
                 onTopScoreChange={onScoreChange ? (v) => handleScoreChange(2, "top", v) : undefined}
                 onBottomScoreChange={onScoreChange ? (v) => handleScoreChange(2, "bottom", v) : undefined}
+                forfeitingPlayerName={matchForfeitingPlayerByMatchIndex?.[2] ?? null}
               />
             </div>
           </div>

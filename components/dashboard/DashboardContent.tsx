@@ -24,6 +24,12 @@ import { formatLocationDate, formatLocationTime } from "@/lib/formatDateTime";
 import { selectOptionsFullPool } from "@/lib/dropdownOptions";
 import { deriveMatchStatusForRaceCellStyle } from "@/lib/bracketMatchRaceStyle";
 import { canAccessDashboard } from "@/lib/dashboard-access";
+import {
+  FINALS_MATCH_FORFEIT_COUNT,
+  parseMatchForfeitsJson,
+  WEEK1_MATCH_FORFEIT_COUNT,
+  WEEK2_MATCH_FORFEIT_COUNT,
+} from "@/lib/matchForfeitsJson";
 import { bracket4TargetSlotForWinner } from "@/lib/bracketMatchAdvance";
 import { parseFinalsBracketMatchStatusesJson } from "@/lib/finalsBracketMatchStatuses";
 import {
@@ -548,6 +554,30 @@ export function DashboardContent() {
         ? (savedSettings as Record<string, unknown>).finalsBracketMatchStatuses
         : undefined;
     return parseFinalsBracketMatchStatusesJson(raw);
+  }, [savedSettings]);
+
+  const week1MatchForfeitsArray = useMemo(() => {
+    const raw =
+      savedSettings && typeof savedSettings === "object"
+        ? (savedSettings as Record<string, unknown>).week1MatchForfeits
+        : undefined;
+    return parseMatchForfeitsJson(raw, WEEK1_MATCH_FORFEIT_COUNT);
+  }, [savedSettings]);
+
+  const week2MatchForfeitsArray = useMemo(() => {
+    const raw =
+      savedSettings && typeof savedSettings === "object"
+        ? (savedSettings as Record<string, unknown>).week2MatchForfeits
+        : undefined;
+    return parseMatchForfeitsJson(raw, WEEK2_MATCH_FORFEIT_COUNT);
+  }, [savedSettings]);
+
+  const finalsMatchForfeitsArray = useMemo(() => {
+    const raw =
+      savedSettings && typeof savedSettings === "object"
+        ? (savedSettings as Record<string, unknown>).finalsMatchForfeits
+        : undefined;
+    return parseMatchForfeitsJson(raw, FINALS_MATCH_FORFEIT_COUNT);
   }, [savedSettings]);
 
   /** Champion of the Finals bracket: winner of the final match (slots 4 vs 5 by score), or null if no winner yet. */
@@ -1454,6 +1484,9 @@ export function DashboardContent() {
       tournamentStarted: false,
       tournamentPaused: false,
       week1BracketsRandomized: false,
+      week1MatchForfeits: JSON.stringify(Array(WEEK1_MATCH_FORFEIT_COUNT).fill("")),
+      week2MatchForfeits: JSON.stringify(Array(WEEK2_MATCH_FORFEIT_COUNT).fill("")),
+      finalsMatchForfeits: JSON.stringify(Array(FINALS_MATCH_FORFEIT_COUNT).fill("")),
       ...statusReset,
       ...scoreReset,
       ...liveScoreReset,
@@ -3051,6 +3084,10 @@ export function DashboardContent() {
                   onMatchNameContextMenu={(matchIndex) =>
                     onWeek1MatchNameContextMenu(index, matchIndex)
                   }
+                  matchForfeitingPlayerByMatchIndex={week1MatchForfeitsArray.slice(
+                    index * 6,
+                    index * 6 + 6
+                  )}
                 />
               </div>
             )}
@@ -3135,6 +3172,10 @@ export function DashboardContent() {
                   onMatchNameContextMenu={(matchIndex) =>
                     onWeek2MatchNameContextMenu(index, matchIndex)
                   }
+                  matchForfeitingPlayerByMatchIndex={week2MatchForfeitsArray.slice(
+                    index * 3,
+                    index * 3 + 3
+                  )}
                 />
               </div>
             )}
@@ -3208,6 +3249,7 @@ export function DashboardContent() {
                 disabled={false}
                 matchStatusByIndex={getFinalsMatchStatusByIndex()}
                 onMatchNameContextMenu={onFinalsMatchNameContextMenu}
+                matchForfeitingPlayerByMatchIndex={finalsMatchForfeitsArray}
               />
               {finalsChampion != null && (
                 <>

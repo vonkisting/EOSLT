@@ -17,6 +17,12 @@ import {
 import { liveScoreGamesGlobalKey } from "@/lib/liveScoringGlobalKey";
 import { parseFinalsBracketMatchStatusesJson } from "@/lib/finalsBracketMatchStatuses";
 import {
+  FINALS_MATCH_FORFEIT_COUNT,
+  parseMatchForfeitsJson,
+  WEEK1_MATCH_FORFEIT_COUNT,
+  WEEK2_MATCH_FORFEIT_COUNT,
+} from "@/lib/matchForfeitsJson";
+import {
   parseWeek2BracketMatchStatusesJson,
   parseWeek2BracketScoresJson,
   parseWeek2BracketSlotsJson,
@@ -640,6 +646,30 @@ export function HomeBracketCards() {
     return parseFinalsBracketMatchStatusesJson(raw);
   }, [settings]);
 
+  const week1MatchForfeitsArray = useMemo(() => {
+    const raw =
+      settings && typeof settings === "object"
+        ? (settings as Record<string, unknown>).week1MatchForfeits
+        : undefined;
+    return parseMatchForfeitsJson(raw, WEEK1_MATCH_FORFEIT_COUNT);
+  }, [settings]);
+
+  const week2MatchForfeitsArray = useMemo(() => {
+    const raw =
+      settings && typeof settings === "object"
+        ? (settings as Record<string, unknown>).week2MatchForfeits
+        : undefined;
+    return parseMatchForfeitsJson(raw, WEEK2_MATCH_FORFEIT_COUNT);
+  }, [settings]);
+
+  const finalsMatchForfeitsArray = useMemo(() => {
+    const raw =
+      settings && typeof settings === "object"
+        ? (settings as Record<string, unknown>).finalsMatchForfeits
+        : undefined;
+    return parseMatchForfeitsJson(raw, FINALS_MATCH_FORFEIT_COUNT);
+  }, [settings]);
+
   const getWeek2MatchStatusByIndex = useCallback(
     (cardIndex: number): (string | null)[] => {
       if (!settings || typeof settings !== "object") return Array(3).fill(null);
@@ -1049,6 +1079,10 @@ export function HomeBracketCards() {
                 onMatchClickByIndex={(matchIndex) =>
                   handleWeek1BracketMatchClick(index, matchIndex)
                 }
+                matchForfeitingPlayerByMatchIndex={week1MatchForfeitsArray.slice(
+                  index * 6,
+                  index * 6 + 6
+                )}
               />
             </div>
           </div>
@@ -1163,6 +1197,10 @@ export function HomeBracketCards() {
                       onMatchClickByIndex={(matchIndex) =>
                         handleWeek2BracketMatchClick(index, matchIndex)
                       }
+                      matchForfeitingPlayerByMatchIndex={week2MatchForfeitsArray.slice(
+                        index * 3,
+                        index * 3 + 3
+                      )}
                     />
                   </div>
                 ) : null}
@@ -1266,6 +1304,7 @@ export function HomeBracketCards() {
                     onMatchClickByIndex={(matchIndex) =>
                       handleFinalsBracketMatchClick(matchIndex)
                     }
+                    matchForfeitingPlayerByMatchIndex={finalsMatchForfeitsArray}
                   />
                 </div>
               ) : null}

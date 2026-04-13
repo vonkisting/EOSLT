@@ -14,6 +14,13 @@ import {
 import { liveScoreGamesGlobalKey } from "@/lib/liveScoringGlobalKey";
 import { buildMatchCompletionPatch } from "@/lib/liveScoringMatchCompletionPatch";
 import {
+  displayNameWithForfeitSuffix,
+  FINALS_MATCH_FORFEIT_COUNT,
+  parseMatchForfeitsJson,
+  WEEK1_MATCH_FORFEIT_COUNT,
+  WEEK2_MATCH_FORFEIT_COUNT,
+} from "@/lib/matchForfeitsJson";
+import {
   buildMatchupResetPatch,
   emptyLiveScoreGamesJson,
 } from "@/lib/liveScoringMatchupReset";
@@ -600,8 +607,38 @@ export function LiveScoringCard({
     sharedMatchupStatusCompleted,
   ]);
 
+  const forfeitingPlayerForThisMatch = useMemo(() => {
+    if (!settings || typeof settings !== "object" || !validCard || !validMatch) return null;
+    const s = settings as Record<string, unknown>;
+    if (stage === "week1") {
+      const arr = parseMatchForfeitsJson(s.week1MatchForfeits, WEEK1_MATCH_FORFEIT_COUNT);
+      const v = arr[cardIndex * 6 + matchIndex]?.trim() ?? "";
+      return v || null;
+    }
+    if (stage === "week2") {
+      const arr = parseMatchForfeitsJson(s.week2MatchForfeits, WEEK2_MATCH_FORFEIT_COUNT);
+      const v = arr[cardIndex * 3 + matchIndex]?.trim() ?? "";
+      return v || null;
+    }
+    const arr = parseMatchForfeitsJson(s.finalsMatchForfeits, FINALS_MATCH_FORFEIT_COUNT);
+    const v = arr[matchIndex]?.trim() ?? "";
+    return v || null;
+  }, [settings, stage, cardIndex, matchIndex, validCard, validMatch]);
+
+  const player1DisplayName = useMemo(
+    () => displayNameWithForfeitSuffix(player1Name, forfeitingPlayerForThisMatch) || player1Name,
+    [player1Name, forfeitingPlayerForThisMatch]
+  );
+  const player2DisplayName = useMemo(
+    () => displayNameWithForfeitSuffix(player2Name, forfeitingPlayerForThisMatch) || player2Name,
+    [player2Name, forfeitingPlayerForThisMatch]
+  );
+
   const updateMatchStatus = useCallback(
-    (status: string, opts?: { forcedWinnerName?: string | null }) => {
+    (
+      status: string,
+      opts?: { forcedWinnerName?: string | null; forfeitingPlayerName?: string | null }
+    ) => {
       if (effectiveReadOnly || !email || !settings || typeof settings !== "object" || !validCard || !validMatch) {
         return;
       }
@@ -619,7 +656,9 @@ export function LiveScoringCard({
               displayTotal2
             );
 
-      const completionPatch = buildMatchCompletionPatch(stage, cardIndex, matchIndex, s, winner);
+      const completionPatch = buildMatchCompletionPatch(stage, cardIndex, matchIndex, s, winner, {
+        forfeitingPlayerName: opts?.forfeitingPlayerName ?? null,
+      });
       setDashboardSettings({
         email,
         leagueName: String(s.leagueName ?? ""),
@@ -848,7 +887,11 @@ export function LiveScoringCard({
       setRequireStrictExceedPlayer1(false);
       setRequireStrictExceedPlayer2(false);
       setForfeitModalOpen(false);
-      updateMatchStatus("Completed", { forcedWinnerName: winnerName });
+      const forfeitingName = forfeitingIsPlayer1 ? player1Name : player2Name;
+      updateMatchStatus("Completed", {
+        forcedWinnerName: winnerName,
+        forfeitingPlayerName: forfeitingName,
+      });
       setSubmitSuccessModalOpen(true);
     },
     [
@@ -896,7 +939,7 @@ export function LiveScoringCard({
                           : "break-words text-sm font-semibold text-white sm:text-base"
                       }
                     >
-                      {p1Won ? `${player1Name} Wins!!!` : player1Name}
+                      {p1Won ? `${player1DisplayName} Wins!!!` : player1DisplayName}
                     </p>
                     <p className="mt-1 bg-gradient-to-r from-cyan-400 via-teal-400 to-blue-500 bg-clip-text text-3xl font-medium tabular-nums text-transparent">
                       {player1RaceTo != null ? player1RaceTo : "—"}
@@ -913,7 +956,7 @@ export function LiveScoringCard({
                           : "break-words text-sm font-semibold text-white sm:text-base"
                       }
                     >
-                      {p2Won ? `${player2Name} Wins!!!` : player2Name}
+                      {p2Won ? `${player2DisplayName} Wins!!!` : player2DisplayName}
                     </p>
                     <p className="mt-1 bg-gradient-to-r from-cyan-400 via-teal-400 to-blue-500 bg-clip-text text-3xl font-medium tabular-nums text-transparent">
                       {player2RaceTo != null ? player2RaceTo : "—"}
@@ -935,7 +978,7 @@ export function LiveScoringCard({
                             : "border border-slate-600 px-3 py-2.5 text-center font-bold text-white"
                         }
                       >
-                        {p1Won ? `${player1Name} Wins!!!` : player1Name}
+                        {p1Won ? `${player1DisplayName} Wins!!!` : player1DisplayName}
                       </th>
                       <th
                         className={
@@ -944,7 +987,7 @@ export function LiveScoringCard({
                             : "border border-slate-600 px-3 py-2.5 text-center font-bold text-white"
                         }
                       >
-                        {p2Won ? `${player2Name} Wins!!!` : player2Name}
+                        {p2Won ? `${player2DisplayName} Wins!!!` : player2DisplayName}
                       </th>
                     </tr>
                   </thead>
@@ -978,7 +1021,7 @@ export function LiveScoringCard({
                                     (player1Scores[i] ?? "").trim() === ""
                                   }
                                   className="w-full min-w-[2.5rem] border-0 bg-white px-2 py-1.5 text-center text-[16px] text-black outline-none focus:ring-1 focus:ring-inset focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 sm:text-base"
-                                  aria-label={`Game ${i + 1} ${player1Name}`}
+                                  aria-label={`Game ${i + 1} ${player1DisplayName}`}
                                 />
                               )}
                             </td>
@@ -1000,7 +1043,7 @@ export function LiveScoringCard({
                                     (player2Scores[i] ?? "").trim() === ""
                                   }
                                   className="w-full min-w-[2.5rem] border-0 bg-white px-2 py-1.5 text-center text-[16px] text-black outline-none focus:ring-1 focus:ring-inset focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 sm:text-base"
-                                  aria-label={`Game ${i + 1} ${player2Name}`}
+                                  aria-label={`Game ${i + 1} ${player2DisplayName}`}
                                 />
                               )}
                             </td>

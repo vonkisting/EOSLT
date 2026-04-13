@@ -12,6 +12,12 @@ import {
 import type { LiveScoringStage } from "@/lib/liveScoringGlobalKey";
 import { liveScoreGamesGlobalKey } from "@/lib/liveScoringGlobalKey";
 import {
+  FINALS_MATCH_FORFEIT_COUNT,
+  mergeMatchForfeitSlotIntoArray,
+  WEEK1_MATCH_FORFEIT_COUNT,
+  WEEK2_MATCH_FORFEIT_COUNT,
+} from "@/lib/matchForfeitsJson";
+import {
   parseWeek2BracketMatchStatusesJson,
   parseWeek2BracketScoresJson,
   parseWeek2BracketSlotsJson,
@@ -47,6 +53,12 @@ export function buildMatchupResetPatch(
     patch[`bracketMatchStatus${cardIndex * 6 + matchIndex}`] = "";
     patch[`bracketScoreTop${globalKey}`] = "0";
     patch[`bracketScoreBottom${globalKey}`] = "0";
+    patch.week1MatchForfeits = mergeMatchForfeitSlotIntoArray(
+      settings.week1MatchForfeits,
+      WEEK1_MATCH_FORFEIT_COUNT,
+      cardIndex * 6 + matchIndex,
+      ""
+    );
 
     const w1Target = week1TargetSlotForWinner(matchIndex);
     if (w1Target != null) {
@@ -74,6 +86,12 @@ export function buildMatchupResetPatch(
     const idx = cardIndex * 3 + matchIndex;
     nextStatuses[idx] = "";
     patch.week2BracketMatchStatuses = JSON.stringify(nextStatuses);
+    patch.week2MatchForfeits = mergeMatchForfeitSlotIntoArray(
+      settings.week2MatchForfeits,
+      WEEK2_MATCH_FORFEIT_COUNT,
+      cardIndex * 3 + matchIndex,
+      ""
+    );
 
     const w2Advance = bracket4TargetSlotForWinner(matchIndex);
     if (w2Advance != null) {
@@ -105,6 +123,12 @@ export function buildMatchupResetPatch(
     const nextStatuses = [...statuses];
     nextStatuses[matchIndex] = "";
     patch.finalsBracketMatchStatuses = JSON.stringify(nextStatuses);
+    patch.finalsMatchForfeits = mergeMatchForfeitSlotIntoArray(
+      settings.finalsMatchForfeits,
+      FINALS_MATCH_FORFEIT_COUNT,
+      matchIndex,
+      ""
+    );
 
     const finalsAdvance = bracket4TargetSlotForWinner(matchIndex);
     if (finalsAdvance != null) {

@@ -103,6 +103,12 @@ function mapDocToSettings(doc: Doc<"dashboardSettings">) {
   const finalsStatusesRaw = d.finalsBracketMatchStatuses;
   out.finalsBracketMatchStatuses =
     typeof finalsStatusesRaw === "string" ? finalsStatusesRaw : null;
+  const w1f = d.week1MatchForfeits;
+  out.week1MatchForfeits = typeof w1f === "string" ? w1f : null;
+  const w2f = d.week2MatchForfeits;
+  out.week2MatchForfeits = typeof w2f === "string" ? w2f : null;
+  const ff = d.finalsMatchForfeits;
+  out.finalsMatchForfeits = typeof ff === "string" ? ff : null;
   const bracketCardsUiRaw = d.dashboardBracketCardsUiJson;
   out.dashboardBracketCardsUiJson =
     typeof bracketCardsUiRaw === "string" && bracketCardsUiRaw.trim() !== ""
@@ -122,7 +128,7 @@ function mapDocToSettings(doc: Doc<"dashboardSettings">) {
     leagueGuid: string | null;
     tournamentStarted: boolean;
     tournamentPaused: boolean;
-  } & Record<(typeof locationKeys)[number], string | null> & { locationStartMeta: string | null } & Record<`bracketSlot${number}`, string | null> & Record<`bracketMatchStatus${number}`, string | null> & Record<`bracketScoreTop${number}` | `bracketScoreBottom${number}`, string | null> & Record<`liveScoreGames${number}`, string | null> & { week2BracketSlots: string | null; week2BracketScores: string | null; week2BracketMatchStatuses: string | null; finalsBracketSlots: string | null; finalsBracketScores: string | null; finalsBracketMatchStatuses: string | null; week1BracketsRandomized: boolean; showBracketsOnHomeScreen: boolean   } & Record<(typeof uiCollapsedKeys)[number], boolean | null>;
+  } & Record<(typeof locationKeys)[number], string | null> & { locationStartMeta: string | null } & Record<`bracketSlot${number}`, string | null> & Record<`bracketMatchStatus${number}`, string | null> & Record<`bracketScoreTop${number}` | `bracketScoreBottom${number}`, string | null> & Record<`liveScoreGames${number}`, string | null> & { week2BracketSlots: string | null; week2BracketScores: string | null; week2BracketMatchStatuses: string | null; finalsBracketSlots: string | null; finalsBracketScores: string | null; finalsBracketMatchStatuses: string | null; week1MatchForfeits: string | null; week2MatchForfeits: string | null; finalsMatchForfeits: string | null; week1BracketsRandomized: boolean; showBracketsOnHomeScreen: boolean   } & Record<(typeof uiCollapsedKeys)[number], boolean | null>;
 }
 
 /**
@@ -266,6 +272,15 @@ function buildPatch(args: Record<string, unknown>) {
   if (args.finalsBracketMatchStatuses !== undefined) {
     patch.finalsBracketMatchStatuses = args.finalsBracketMatchStatuses as string ?? undefined;
   }
+  if (args.week1MatchForfeits !== undefined) {
+    patch.week1MatchForfeits = args.week1MatchForfeits as string ?? undefined;
+  }
+  if (args.week2MatchForfeits !== undefined) {
+    patch.week2MatchForfeits = args.week2MatchForfeits as string ?? undefined;
+  }
+  if (args.finalsMatchForfeits !== undefined) {
+    patch.finalsMatchForfeits = args.finalsMatchForfeits as string ?? undefined;
+  }
   if (args.week1BracketsRandomized !== undefined) patch.week1BracketsRandomized = args.week1BracketsRandomized as boolean;
   if (args.showBracketsOnHomeScreen !== undefined) patch.showBracketsOnHomeScreen = args.showBracketsOnHomeScreen as boolean;
   if (args.dashboardBracketCardsUiJson !== undefined) {
@@ -321,6 +336,9 @@ export const set = mutation({
     finalsBracketSlots: v.optional(v.string()),
     finalsBracketScores: v.optional(v.string()),
     finalsBracketMatchStatuses: v.optional(v.string()),
+    week1MatchForfeits: v.optional(v.string()),
+    week2MatchForfeits: v.optional(v.string()),
+    finalsMatchForfeits: v.optional(v.string()),
     week1BracketsRandomized: v.optional(v.boolean()),
     showBracketsOnHomeScreen: v.optional(v.boolean()),
     dashboardBracketCardsUiJson: v.optional(v.string()),
@@ -352,6 +370,9 @@ export const setShared = mutation({
     finalsBracketSlots: v.optional(v.string()),
     finalsBracketScores: v.optional(v.string()),
     finalsBracketMatchStatuses: v.optional(v.string()),
+    week1MatchForfeits: v.optional(v.string()),
+    week2MatchForfeits: v.optional(v.string()),
+    finalsMatchForfeits: v.optional(v.string()),
     week1BracketsRandomized: v.optional(v.boolean()),
     showBracketsOnHomeScreen: v.optional(v.boolean()),
     dashboardBracketCardsUiJson: v.optional(v.string()),

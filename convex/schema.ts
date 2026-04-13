@@ -362,6 +362,12 @@ export default defineSchema({
     finalsBracketScores: v.optional(v.string()),
     /** Finals per-matchup status (3 matches). JSON: string[3]. */
     finalsBracketMatchStatuses: v.optional(v.string()),
+    /** Week 1: forfeiting player name per matchup (8×6). Same index as bracketMatchStatus. JSON: string[48]. */
+    week1MatchForfeits: v.optional(v.string()),
+    /** Week 2: forfeiting player per matchup (4×3). JSON: string[12]. */
+    week2MatchForfeits: v.optional(v.string()),
+    /** Finals: forfeiting player per matchup (3). JSON: string[3]. */
+    finalsMatchForfeits: v.optional(v.string()),
     /** Collapsible UI state: restored on reload so sections stay open/closed. */
     uiUsersCardOpen: v.optional(v.boolean()),
     uiLeagueCardOpen: v.optional(v.boolean()),
