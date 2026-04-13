@@ -6,19 +6,13 @@ import { useSession } from "next-auth/react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Modal } from "@/components/ui/Modal";
-import {
-  bracket4TargetSlotForWinner,
-  finalsSlotIndexForWeek2FinalWinner,
-  resolveWinnerNameForAdvancement,
-  week1TargetSlotForWinner,
-  week2SlotIndexForWeek1SemiWinner,
-} from "@/lib/bracketMatchAdvance";
+import { resolveWinnerNameForAdvancement } from "@/lib/bracketMatchAdvance";
 import {
   parseFinalsBracketMatchStatusesJson,
   parseFinalsBracketScoresJson,
-  parseFinalsBracketSlotsJson,
 } from "@/lib/finalsBracketMatchStatuses";
 import { liveScoreGamesGlobalKey } from "@/lib/liveScoringGlobalKey";
+import { buildMatchCompletionPatch } from "@/lib/liveScoringMatchCompletionPatch";
 import {
   buildMatchupResetPatch,
   emptyLiveScoreGamesJson,
@@ -607,103 +601,33 @@ export function LiveScoringCard({
   ]);
 
   const updateMatchStatus = useCallback(
-    (status: string) => {
+    (status: string, opts?: { forcedWinnerName?: string | null }) => {
       if (effectiveReadOnly || !email || !settings || typeof settings !== "object" || !validCard || !validMatch) {
         return;
       }
+      if (status !== "Completed") return;
       const s = settings as Record<string, unknown>;
-      const payload: Record<string, unknown> = {
+      const forced = opts?.forcedWinnerName?.trim() ?? "";
+      const winner =
+        forced !== ""
+          ? forced
+          : resolveWinnerNameForAdvancement(
+              singleWinnerName,
+              player1Name,
+              player2Name,
+              displayTotal1,
+              displayTotal2
+            );
+
+      const completionPatch = buildMatchCompletionPatch(stage, cardIndex, matchIndex, s, winner);
+      setDashboardSettings({
         email,
         leagueName: String(s.leagueName ?? ""),
         season: String(s.season ?? ""),
         tournamentStarted: s.tournamentStarted === true,
         tournamentPaused: s.tournamentPaused === true,
-      };
-
-      if (stage === "week1") {
-        const statusKey = `bracketMatchStatus${cardIndex * 6 + matchIndex}`;
-        payload[statusKey] = status;
-        if (status === "Completed") {
-          const winner = resolveWinnerNameForAdvancement(
-            singleWinnerName,
-            player1Name,
-            player2Name,
-            displayTotal1,
-            displayTotal2
-          );
-          const targetSlot = week1TargetSlotForWinner(matchIndex);
-          if (targetSlot != null && winner) {
-            const base = cardIndex * 12;
-            payload[`bracketSlot${base + targetSlot}`] = winner;
-          }
-          const w2Idx = week2SlotIndexForWeek1SemiWinner(cardIndex, matchIndex);
-          if (w2Idx != null && winner) {
-            const slots = parseWeek2BracketSlotsJson(s.week2BracketSlots);
-            const nextSlots = [...slots];
-            if (w2Idx < nextSlots.length) {
-              nextSlots[w2Idx] = winner;
-              payload.week2BracketSlots = JSON.stringify(nextSlots);
-            }
-          }
-        }
-      } else if (stage === "week2") {
-        const idx = cardIndex * 3 + matchIndex;
-        const statuses = parseWeek2BracketMatchStatusesJson(s.week2BracketMatchStatuses);
-        const nextStatuses = [...statuses];
-        nextStatuses[idx] = status;
-        payload.week2BracketMatchStatuses = JSON.stringify(nextStatuses);
-        if (status === "Completed") {
-          const winner = resolveWinnerNameForAdvancement(
-            singleWinnerName,
-            player1Name,
-            player2Name,
-            displayTotal1,
-            displayTotal2
-          );
-          const targetSlot = bracket4TargetSlotForWinner(matchIndex);
-          if (targetSlot != null && winner) {
-            const slots = parseWeek2BracketSlotsJson(s.week2BracketSlots);
-            const nextSlots = [...slots];
-            const base = cardIndex * 6;
-            if (base + targetSlot < nextSlots.length) {
-              nextSlots[base + targetSlot] = winner;
-              payload.week2BracketSlots = JSON.stringify(nextSlots);
-            }
-          }
-          if (matchIndex === 2 && winner) {
-            const finalsIdx = finalsSlotIndexForWeek2FinalWinner(cardIndex);
-            if (finalsIdx != null) {
-              const nextFinals = [...parseFinalsBracketSlotsJson(s.finalsBracketSlots)];
-              nextFinals[finalsIdx] = winner;
-              payload.finalsBracketSlots = JSON.stringify(nextFinals);
-            }
-          }
-        }
-      } else {
-        const statuses = parseFinalsBracketMatchStatusesJson(s.finalsBracketMatchStatuses);
-        const nextStatuses = [...statuses];
-        nextStatuses[matchIndex] = status;
-        payload.finalsBracketMatchStatuses = JSON.stringify(nextStatuses);
-        if (status === "Completed") {
-          const winner = resolveWinnerNameForAdvancement(
-            singleWinnerName,
-            player1Name,
-            player2Name,
-            displayTotal1,
-            displayTotal2
-          );
-          const targetSlot = bracket4TargetSlotForWinner(matchIndex);
-          if (targetSlot != null && winner) {
-            const nextSlots = [...parseFinalsBracketSlotsJson(s.finalsBracketSlots)];
-            if (targetSlot < nextSlots.length) {
-              nextSlots[targetSlot] = winner;
-              payload.finalsBracketSlots = JSON.stringify(nextSlots);
-            }
-          }
-        }
-      }
-
-      setDashboardSettings(payload as Parameters<typeof setDashboardSettings>[0]);
+        ...completionPatch,
+      } as Parameters<typeof setDashboardSettings>[0]);
     },
     [
       email,
@@ -839,6 +763,17 @@ export function LiveScoringCard({
 
   const [submitSuccessModalOpen, setSubmitSuccessModalOpen] = useState(false);
   const [resetMatchupModalOpen, setResetMatchupModalOpen] = useState(false);
+  const [forfeitModalOpen, setForfeitModalOpen] = useState(false);
+
+  const canForfeitMatch =
+    isDashboardAdmin &&
+    effectiveDashboardOperator &&
+    !effectiveReadOnly &&
+    !sharedMatchupStatusCompleted &&
+    player1Name.trim() !== "" &&
+    player1Name !== "—" &&
+    player2Name.trim() !== "" &&
+    player2Name !== "—";
 
   const confirmResetMatchup = useCallback(() => {
     if (
@@ -886,6 +821,47 @@ export function LiveScoringCard({
     matchIndex,
     setDashboardSettings,
   ]);
+
+  const confirmForfeit = useCallback(
+    (forfeitingIsPlayer1: boolean) => {
+      if (
+        !canForfeitMatch ||
+        !validCard ||
+        !validMatch ||
+        !email ||
+        !settings ||
+        typeof settings !== "object"
+      ) {
+        setForfeitModalOpen(false);
+        return;
+      }
+      const winnerName = forfeitingIsPlayer1 ? player2Name : player1Name;
+      const emptyGames = emptyLiveScoreGamesJson();
+      lastSyncedRawRef.current = emptyGames;
+      lastWrittenRawRef.current = emptyGames;
+      skipNextSaveRef.current = true;
+      baselineSnapshotRef.current = { p1: [...EMPTY_ROW], p2: [...EMPTY_ROW] };
+      setPlayer1Scores([...EMPTY_ROW]);
+      setPlayer2Scores([...EMPTY_ROW]);
+      setLegalWinConfirmed(false);
+      setLegalWinModalOpen(false);
+      setRequireStrictExceedPlayer1(false);
+      setRequireStrictExceedPlayer2(false);
+      setForfeitModalOpen(false);
+      updateMatchStatus("Completed", { forcedWinnerName: winnerName });
+      setSubmitSuccessModalOpen(true);
+    },
+    [
+      canForfeitMatch,
+      validCard,
+      validMatch,
+      email,
+      settings,
+      player1Name,
+      player2Name,
+      updateMatchStatus,
+    ]
+  );
 
   useEffect(() => {
     if (!submitSuccessModalOpen) return;
@@ -1077,6 +1053,15 @@ export function LiveScoringCard({
                       Reset Matchup
                     </button>
                   )}
+                  {canForfeitMatch && (
+                    <button
+                      type="button"
+                      onClick={() => setForfeitModalOpen(true)}
+                      className="rounded-lg border border-orange-500/70 bg-orange-950/40 px-5 py-2.5 font-semibold text-orange-100 shadow transition-colors hover:bg-orange-900/50 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:ring-offset-2 focus:ring-offset-slate-800"
+                    >
+                      Forfeit
+                    </button>
+                  )}
                   {effectiveReadOnly && isDashboardAdmin && (
                     <button
                       type="button"
@@ -1165,6 +1150,47 @@ export function LiveScoringCard({
             (empty). If a winner had been advanced to the next round on this card, Week 2, or Finals, that
             advanced name is cleared so the slot shows as empty (Select Player). Other unrelated matchups are
             not changed.
+          </p>
+        </Modal>
+      ) : null}
+      {isDashboardAdmin ? (
+        <Modal
+          open={forfeitModalOpen}
+          onClose={() => setForfeitModalOpen(false)}
+          title="Forfeit match"
+          footer={
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setForfeitModalOpen(false)}
+                className="cursor-pointer rounded-lg border border-white/20 bg-transparent px-4 py-2.5 text-sm font-medium text-slate-200 transition-colors hover:bg-white/10"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => confirmForfeit(true)}
+                className="cursor-pointer rounded-lg border border-orange-500/50 bg-orange-900/80 px-4 py-2.5 text-sm font-medium text-orange-100 shadow-sm transition-colors hover:bg-orange-800/80"
+              >
+                <span className="block max-w-full break-words text-left sm:max-w-[min(100vw-4rem,320px)]">
+                  {player1Name} forfeited
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => confirmForfeit(false)}
+                className="cursor-pointer rounded-lg border border-orange-500/50 bg-orange-900/80 px-4 py-2.5 text-sm font-medium text-orange-100 shadow-sm transition-colors hover:bg-orange-800/80"
+              >
+                <span className="block max-w-full break-words text-left sm:max-w-[min(100vw-4rem,320px)]">
+                  {player2Name} forfeited
+                </span>
+              </button>
+            </div>
+          }
+        >
+          <p className="text-slate-200">
+            The scorecard will be submitted as 0–0. The other player will be advanced to the next round
+            (or Week 2 / Finals when this matchup feeds forward). Choose who forfeited.
           </p>
         </Modal>
       ) : null}

@@ -610,6 +610,8 @@ export function DashboardContent() {
     (savedSettings && typeof savedSettings === "object" && (savedSettings as Record<string, unknown>).tournamentStarted === true) ?? false;
   const tournamentPaused =
     (savedSettings && typeof savedSettings === "object" && (savedSettings as Record<string, unknown>).tournamentPaused === true) ?? false;
+  /** Venue + start date/time: editable before start or while paused; locked only during active play. */
+  const lockLocationScheduleFields = tournamentStarted && !tournamentPaused;
   const week1BracketsRandomized =
     (savedSettings &&
       typeof savedSettings === "object" &&
@@ -2568,7 +2570,7 @@ export function DashboardContent() {
                           setLocations((prev) => ({ ...prev, [key]: v }));
                         }}
                         onBlur={saveLocations}
-                        disabled={venuesLoading || tournamentStarted || tournamentPaused}
+                        disabled={venuesLoading || lockLocationScheduleFields}
                         className={`select-dark min-w-0 rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-800/70 disabled:text-slate-400 ${locations[key]?.trim() ? "slot-filled" : ""}`}
                         style={{ borderColor: "var(--surface-border)" }}
                         aria-label={LOCATION_LABELS[key]}
@@ -2603,7 +2605,7 @@ export function DashboardContent() {
                             saveLocationStartMeta(JSON.stringify(meta));
                           }}
                           onBlur={saveLocations}
-                          disabled={tournamentStarted || tournamentPaused}
+                          disabled={lockLocationScheduleFields}
                           className="input-dark min-w-0 rounded-lg border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:bg-slate-800/70 disabled:text-slate-400"
                           style={{ borderColor: "var(--surface-border)" }}
                           aria-label={`${LOCATION_LABELS[key]} start date`}
@@ -2627,7 +2629,7 @@ export function DashboardContent() {
                             saveLocationStartMeta(JSON.stringify(meta));
                           }}
                           onBlur={saveLocations}
-                          disabled={tournamentStarted || tournamentPaused}
+                          disabled={lockLocationScheduleFields}
                           className="input-dark min-w-0 rounded-lg border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:bg-slate-800/70 disabled:text-slate-400"
                           style={{ borderColor: "var(--surface-border)" }}
                           aria-label={`${LOCATION_LABELS[key]} start time`}
@@ -2677,7 +2679,7 @@ export function DashboardContent() {
                           setLocations((prev) => ({ ...prev, [key]: v }));
                         }}
                         onBlur={saveLocations}
-                        disabled={venuesLoading || tournamentStarted || tournamentPaused}
+                        disabled={venuesLoading || lockLocationScheduleFields}
                         className={`select-dark min-w-0 rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-800/70 disabled:text-slate-400 ${locations[key]?.trim() ? "slot-filled" : ""}`}
                         style={{ borderColor: "var(--surface-border)" }}
                         aria-label={LOCATION_LABELS[key]}
@@ -2712,7 +2714,7 @@ export function DashboardContent() {
                             saveLocationStartMeta(JSON.stringify(meta));
                           }}
                           onBlur={saveLocations}
-                          disabled={tournamentStarted || tournamentPaused}
+                          disabled={lockLocationScheduleFields}
                           className="input-dark min-w-0 rounded-lg border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:bg-slate-800/70 disabled:text-slate-400"
                           style={{ borderColor: "var(--surface-border)" }}
                           aria-label={`${LOCATION_LABELS[key]} start date`}
@@ -2736,7 +2738,7 @@ export function DashboardContent() {
                             saveLocationStartMeta(JSON.stringify(meta));
                           }}
                           onBlur={saveLocations}
-                          disabled={tournamentStarted || tournamentPaused}
+                          disabled={lockLocationScheduleFields}
                           className="input-dark min-w-0 rounded-lg border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:bg-slate-800/70 disabled:text-slate-400"
                           style={{ borderColor: "var(--surface-border)" }}
                           aria-label={`${LOCATION_LABELS[key]} start time`}
@@ -2782,7 +2784,7 @@ export function DashboardContent() {
                         setLocations((prev) => ({ ...prev, finalsLocation: v }));
                       }}
                       onBlur={saveLocations}
-                      disabled={venuesLoading || tournamentStarted || tournamentPaused}
+                      disabled={venuesLoading || lockLocationScheduleFields}
                       className={`select-dark min-w-0 rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-800/70 disabled:text-slate-400 ${locations.finalsLocation?.trim() ? "slot-filled" : ""}`}
                       style={{ borderColor: "var(--surface-border)" }}
                       aria-label={LOCATION_LABELS.finalsLocation}
@@ -2817,7 +2819,7 @@ export function DashboardContent() {
                           saveLocationStartMeta(JSON.stringify(meta));
                         }}
                         onBlur={saveLocations}
-                        disabled={tournamentStarted || tournamentPaused}
+                        disabled={lockLocationScheduleFields}
                         className="input-dark min-w-0 rounded-lg border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:bg-slate-800/70 disabled:text-slate-400"
                         style={{ borderColor: "var(--surface-border)" }}
                         aria-label="Finals start date"
@@ -2841,7 +2843,7 @@ export function DashboardContent() {
                           saveLocationStartMeta(JSON.stringify(meta));
                         }}
                         onBlur={saveLocations}
-                        disabled={tournamentStarted || tournamentPaused}
+                        disabled={lockLocationScheduleFields}
                         className="input-dark min-w-0 rounded-lg border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:bg-slate-800/70 disabled:text-slate-400"
                         style={{ borderColor: "var(--surface-border)" }}
                         aria-label="Finals start time"
