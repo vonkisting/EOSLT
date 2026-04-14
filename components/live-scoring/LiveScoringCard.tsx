@@ -300,8 +300,13 @@ export function LiveScoringCard({
 
   /** Spectator read-only from URL, unless this user is a linked player in this matchup. */
   const effectiveReadOnly = readOnly && !linkedPlayerInThisMatchup;
-  /** Dashboard operator tools only when not scoring as a linked player in this matchup. */
-  const effectiveDashboardOperator = dashboardOperator && !linkedPlayerInThisMatchup;
+  /**
+   * Operator controls: allowlisted dashboard admins always (any entry URL, any matchup, even if they are
+   * a linked player in this match). Everyone else needs `?dashboard=1` and must not be the linked player
+   * here (those users score as the linked entrant).
+   */
+  const effectiveDashboardOperator =
+    isDashboardAdmin || (dashboardOperator && !linkedPlayerInThisMatchup);
 
   /** Stored bracket status for this matchup (shared settings). */
   const sharedMatchupStatusCompleted = useMemo(() => {
