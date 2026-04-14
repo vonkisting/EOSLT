@@ -656,8 +656,22 @@ export function LiveScoringCard({
               displayTotal2
             );
 
+      const forfeitFlow = (opts?.forfeitingPlayerName?.trim() ?? "") !== "";
+      const { total1: submitTotal1, total2: submitTotal2 } = sumScoresWhenBothPresent(
+        player1Scores,
+        player2Scores
+      );
       const completionPatch = buildMatchCompletionPatch(stage, cardIndex, matchIndex, s, winner, {
         forfeitingPlayerName: opts?.forfeitingPlayerName ?? null,
+        ...(!forfeitFlow
+          ? {
+              finalScorecard: {
+                liveGamesJson: JSON.stringify({ p1: player1Scores, p2: player2Scores }),
+                total1: submitTotal1,
+                total2: submitTotal2,
+              },
+            }
+          : {}),
       });
       setDashboardSettings({
         email,
@@ -683,6 +697,8 @@ export function LiveScoringCard({
       player2Name,
       displayTotal1,
       displayTotal2,
+      player1Scores,
+      player2Scores,
     ]
   );
 

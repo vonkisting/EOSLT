@@ -25,8 +25,9 @@ import {
 } from "@/lib/week2BracketSlots";
 
 /**
- * Convex patch fields for marking a matchup completed with 0–0 stored totals, empty per-game JSON,
- * and advancing `winnerName` when non-null (same rules as live submit).
+ * Convex patch fields for marking a matchup completed, advancing `winnerName` when non-null.
+ * Forfeit / 0–0 flow: empty per-game JSON and 0–0 bracket totals.
+ * Normal submit: pass `finalScorecard` so per-game cells and match totals are kept on the record.
  */
 export function buildMatchCompletionPatch(
   stage: LiveScoringStage,
@@ -34,18 +35,26 @@ export function buildMatchCompletionPatch(
   matchIndex: number,
   settings: Record<string, unknown>,
   winnerName: string | null,
-  options?: { forfeitingPlayerName?: string | null }
+  options?: {
+    forfeitingPlayerName?: string | null;
+    finalScorecard?: { liveGamesJson: string; total1: number; total2: number };
+  }
 ): Record<string, unknown> {
   const globalKey = liveScoreGamesGlobalKey(stage, cardIndex, matchIndex);
+  const finalCard = options?.finalScorecard;
+  const topStored = finalCard ? String(finalCard.total1) : "0";
+  const bottomStored = finalCard ? String(finalCard.total2) : "0";
   const patch: Record<string, unknown> = {
-    [`liveScoreGames${globalKey}`]: emptyLiveScoreGamesJson(),
+    [`liveScoreGames${globalKey}`]: finalCard
+      ? finalCard.liveGamesJson
+      : emptyLiveScoreGamesJson(),
   };
   const winner = winnerName?.trim() ? winnerName.trim() : null;
 
   if (stage === "week1") {
     patch[`bracketMatchStatus${cardIndex * 6 + matchIndex}`] = "Completed";
-    patch[`bracketScoreTop${globalKey}`] = "0";
-    patch[`bracketScoreBottom${globalKey}`] = "0";
+    patch[`bracketScoreTop${globalKey}`] = topStored;
+    patch[`bracketScoreBottom${globalKey}`] = bottomStored;
     if (winner) {
       const targetSlot = week1TargetSlotForWinner(matchIndex);
       if (targetSlot != null) {
@@ -72,8 +81,8 @@ export function buildMatchCompletionPatch(
     const nextScores = [...scores];
     const base = cardIndex * 6;
     const si = base + matchIndex * 2;
-    nextScores[si] = "0";
-    nextScores[si + 1] = "0";
+    nextScores[si] = topStored;
+    nextScores[si + 1] = bottomStored;
     patch.week2BracketScores = JSON.stringify(nextScores);
 
     if (winner) {
@@ -103,8 +112,8 @@ export function buildMatchCompletionPatch(
 
     const scores = parseFinalsBracketScoresJson(settings.finalsBracketScores);
     const nextScores = [...scores];
-    nextScores[matchIndex * 2] = "0";
-    nextScores[matchIndex * 2 + 1] = "0";
+    nextScores[matchIndex * 2] = topStored;
+    nextScores[matchIndex * 2 + 1] = bottomStored;
     patch.finalsBracketScores = JSON.stringify(nextScores);
 
     if (winner) {
