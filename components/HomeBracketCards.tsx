@@ -51,7 +51,6 @@ const WEEK_2_LOCATION_KEYS = [
 ] as const;
 
 const FINALS_LOCATION_KEY = "finalsLocation" as const;
-const HOME_COLLAPSE_STATE_KEY = "eoslt:home-bracket-collapse";
 
 type OverallPlayerStatsRow = Record<string, string | number | null | undefined>;
 
@@ -91,12 +90,8 @@ export function HomeBracketCards() {
   const { data: session, status } = useSession();
   const email = session?.user?.email?.toLowerCase().trim();
   const settings = useQuery(api.dashboardSettings.getPublic, {});
-  /** Per-user row: collapse prefs only (not shared tournament data). */
-  const patchMyDashboardRow = useMutation(api.dashboardSettings.set);
   /** Canonical tournament doc — same source as getPublic (bracket + match statuses). */
   const patchSharedTournament = useMutation(api.dashboardSettings.setShared);
-  /** Per-user row (collapse prefs); tournament data still comes from getPublic. */
-  const myUserSettings = useQuery(api.dashboardSettings.get, email ? { email } : "skip");
   const convexUser = useQuery(
     api.users.getByEmail,
     email ? { email } : "skip"
@@ -113,8 +108,6 @@ export function HomeBracketCards() {
   const [loadingPlayers, setLoadingPlayers] = useState(false);
   const [loadingTimedOut, setLoadingTimedOut] = useState(false);
   const [bracketError, setBracketError] = useState(false);
-  const [week2CardsOpen, setWeek2CardsOpen] = useState<boolean[]>(() => Array(4).fill(true));
-  const [finalsCardOpen, setFinalsCardOpen] = useState(true);
 
   const openReadOnlyScorecard = useCallback(
     (stage: "week1" | "week2" | "finals", cardIndex: number, matchIndex: number) => {
@@ -124,104 +117,12 @@ export function HomeBracketCards() {
     },
     [router]
   );
-  const collapseStorageKey = useMemo(() => {
-    if (!settings || typeof settings !== "object") return HOME_COLLAPSE_STATE_KEY;
-    const s = settings as Record<string, unknown>;
-    const leagueName = typeof s.leagueName === "string" ? s.leagueName.trim() : "";
-    const season = typeof s.season === "string" ? s.season.trim() : "";
-    return leagueName && season
-      ? `${HOME_COLLAPSE_STATE_KEY}:${leagueName}:${season}`
-      : HOME_COLLAPSE_STATE_KEY;
-  }, [settings]);
 
   useEffect(() => {
     if (status !== "loading" && settings !== undefined) return;
     const t = setTimeout(() => setLoadingTimedOut(true), 10000);
     return () => clearTimeout(t);
   }, [status, settings]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (email && myUserSettings === undefined) return;
-
-    const readLocal = () => {
-      try {
-        const raw = window.localStorage.getItem(collapseStorageKey);
-        if (!raw) {
-          setWeek2CardsOpen(Array(4).fill(true));
-          setFinalsCardOpen(true);
-          return;
-        }
-        const parsed = JSON.parse(raw) as {
-          week2CardsOpen?: unknown;
-          finalsCardOpen?: unknown;
-        };
-        setWeek2CardsOpen(
-          Array.isArray(parsed.week2CardsOpen) && parsed.week2CardsOpen.length === 4
-            ? parsed.week2CardsOpen.map((value) => value === true)
-            : Array(4).fill(true)
-        );
-        setFinalsCardOpen(parsed.finalsCardOpen === false ? false : true);
-      } catch {
-        setWeek2CardsOpen(Array(4).fill(true));
-        setFinalsCardOpen(true);
-      }
-    };
-
-    if (email && myUserSettings !== undefined) {
-      if (myUserSettings !== null) {
-        const ui = myUserSettings as Record<string, unknown>;
-        setWeek2CardsOpen(
-          [0, 1, 2, 3].map((i) => {
-            const v = ui[`uiWeek2Slot${i}Open`];
-            if (v === true || v === false) return v;
-            return true;
-          })
-        );
-        const fv = ui.uiFinalsCardOpen;
-        setFinalsCardOpen(fv === true ? true : fv === false ? false : true);
-        return;
-      }
-      readLocal();
-      return;
-    }
-
-    readLocal();
-  }, [email, myUserSettings, collapseStorageKey]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (email) {
-      if (!settings || typeof settings !== "object") return;
-      const s = settings as Record<string, unknown>;
-      const leagueName = String(s.leagueName ?? "").trim();
-      const season = String(s.season ?? "").trim();
-      if (!leagueName || !season || myUserSettings === undefined) return;
-      void patchMyDashboardRow({
-        email,
-        leagueName,
-        season,
-        uiWeek2Slot0Open: week2CardsOpen[0],
-        uiWeek2Slot1Open: week2CardsOpen[1],
-        uiWeek2Slot2Open: week2CardsOpen[2],
-        uiWeek2Slot3Open: week2CardsOpen[3],
-        uiFinalsCardOpen: finalsCardOpen,
-      } as Parameters<typeof patchMyDashboardRow>[0]);
-      return;
-    }
-    window.localStorage.setItem(
-      collapseStorageKey,
-      JSON.stringify({ week2CardsOpen, finalsCardOpen })
-    );
-  }, [
-    email,
-    myUserSettings,
-    collapseStorageKey,
-    week2CardsOpen,
-    finalsCardOpen,
-    settings,
-    patchMyDashboardRow,
-  ]);
 
   const hasLeagueAndSeason =
     settings &&
@@ -1098,30 +999,14 @@ export function HomeBracketCards() {
                 className="w-full min-w-0 max-w-[600px] overflow-hidden rounded-xl border border-white/40 bg-black text-foreground sm:min-w-[555px]"
               >
                 <div
-                  className={`flex min-h-14 w-full flex-shrink-0 flex-col gap-1 bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 px-5 py-4 ${week2CardsOpen[index] ? "rounded-t-xl" : "rounded-xl"}`}
+                  className="flex min-h-14 w-full flex-shrink-0 flex-col gap-1 rounded-t-xl bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 px-5 py-4"
                   id={`home-week2-slot-${index}-heading`}
                 >
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setWeek2CardsOpen((prev) => {
-                        const next = [...prev];
-                        next[index] = !next[index];
-                        return next;
-                      })
-                    }
-                    className="flex min-w-0 cursor-pointer items-center justify-center gap-4 text-left transition-opacity hover:opacity-90"
-                    aria-expanded={week2CardsOpen[index]}
-                    aria-controls={`home-week2-slot-${index}-body`}
-                    aria-label={week2CardsOpen[index] ? "Collapse" : "Expand"}
-                  >
-                    <h2 className="min-w-0 truncate text-[1.6875rem] font-semibold tracking-tight text-yellow-400">
+                  <div className="w-full">
+                    <h2 className="min-w-0 truncate text-center text-[1.6875rem] font-semibold tracking-tight text-yellow-400">
                       {getLocationName(key)}
                     </h2>
-                    <span className="shrink-0 text-blue-100/80" aria-hidden>
-                      {week2CardsOpen[index] ? "▼" : "▶"}
-                    </span>
-                  </button>
+                  </div>
                   {hasLinkedPoolhubPlayer &&
                     tournamentInProgress &&
                     getMyMatchInWeek2Card(index) !== null &&
@@ -1172,38 +1057,36 @@ export function HomeBracketCards() {
                     </span>
                   </div>
                 </div>
-                {week2CardsOpen[index] ? (
-                  <div
-                    id={`home-week2-slot-${index}-body`}
-                    aria-labelledby={`home-week2-slot-${index}-heading`}
-                    className="min-h-0 overflow-auto rounded-b-xl border-t border-white/40 bg-black pb-4 pt-4 pl-4"
-                  >
-                    <Bracket4
-                      players={playerDisplayNames}
-                      playerRaceToMap={playerRaceToMap}
-                      initialSlotSelections={(() => {
-                        const base = index * 6;
-                        let byeNum = 0;
-                        return Array.from({ length: 6 }, (_, i) => {
-                          const val = week2BracketSlotsArray[base + i] ?? "";
-                          if (val === BYE_LABEL) return `-- Bye ${++byeNum} --`;
-                          return val;
-                        });
-                      })()}
-                      initialScores={week2BracketScoresArray.slice(index * 6, index * 6 + 6)}
-                      disabled
-                      placeholderText="TBD..."
-                      matchStatusByIndex={getWeek2MatchStatusByIndex(index)}
-                      onMatchClickByIndex={(matchIndex) =>
-                        handleWeek2BracketMatchClick(index, matchIndex)
-                      }
-                      matchForfeitingPlayerByMatchIndex={week2MatchForfeitsArray.slice(
-                        index * 3,
-                        index * 3 + 3
-                      )}
-                    />
-                  </div>
-                ) : null}
+                <div
+                  id={`home-week2-slot-${index}-body`}
+                  aria-labelledby={`home-week2-slot-${index}-heading`}
+                  className="min-h-0 overflow-auto rounded-b-xl border-t border-white/40 bg-black pb-4 pt-4 pl-4"
+                >
+                  <Bracket4
+                    players={playerDisplayNames}
+                    playerRaceToMap={playerRaceToMap}
+                    initialSlotSelections={(() => {
+                      const base = index * 6;
+                      let byeNum = 0;
+                      return Array.from({ length: 6 }, (_, i) => {
+                        const val = week2BracketSlotsArray[base + i] ?? "";
+                        if (val === BYE_LABEL) return `-- Bye ${++byeNum} --`;
+                        return val;
+                      });
+                    })()}
+                    initialScores={week2BracketScoresArray.slice(index * 6, index * 6 + 6)}
+                    disabled
+                    placeholderText="TBD..."
+                    matchStatusByIndex={getWeek2MatchStatusByIndex(index)}
+                    onMatchClickByIndex={(matchIndex) =>
+                      handleWeek2BracketMatchClick(index, matchIndex)
+                    }
+                    matchForfeitingPlayerByMatchIndex={week2MatchForfeitsArray.slice(
+                      index * 3,
+                      index * 3 + 3
+                    )}
+                  />
+                </div>
               </div>
             ))}
           </div>
@@ -1213,24 +1096,14 @@ export function HomeBracketCards() {
             </h2>
             <div className="w-full min-w-0 max-w-[600px] overflow-hidden rounded-xl border border-white/40 bg-black text-foreground sm:min-w-[555px]">
               <div
-                className={`flex min-h-14 w-full flex-shrink-0 flex-col gap-1 bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 px-5 py-4 ${finalsCardOpen ? "rounded-t-xl" : "rounded-xl"}`}
+                className="flex min-h-14 w-full flex-shrink-0 flex-col gap-1 rounded-t-xl bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 px-5 py-4"
                 id="home-finals-slot-heading"
               >
-                <button
-                  type="button"
-                  onClick={() => setFinalsCardOpen((prev) => !prev)}
-                  className="flex min-w-0 cursor-pointer items-center justify-center gap-4 text-left transition-opacity hover:opacity-90"
-                  aria-expanded={finalsCardOpen}
-                  aria-controls="home-finals-slot-body"
-                  aria-label={finalsCardOpen ? "Collapse" : "Expand"}
-                >
-                  <h2 className="min-w-0 truncate text-[1.6875rem] font-semibold tracking-tight text-yellow-400">
+                <div className="w-full">
+                  <h2 className="min-w-0 truncate text-center text-[1.6875rem] font-semibold tracking-tight text-yellow-400">
                     {getLocationName(FINALS_LOCATION_KEY)}
                   </h2>
-                  <span className="shrink-0 text-blue-100/80" aria-hidden>
-                    {finalsCardOpen ? "▼" : "▶"}
-                  </span>
-                </button>
+                </div>
                 {hasLinkedPoolhubPlayer &&
                   tournamentInProgress &&
                   getMyMatchInFinals() !== null &&
@@ -1281,33 +1154,31 @@ export function HomeBracketCards() {
                   </span>
                 </div>
               </div>
-              {finalsCardOpen ? (
-                <div
-                  id="home-finals-slot-body"
-                  aria-labelledby="home-finals-slot-heading"
-                  className="min-h-0 overflow-auto rounded-b-xl border-t border-white/40 bg-black pb-4 pt-4 pl-4"
-                >
-                  <Bracket4
-                    players={playerDisplayNames}
-                    playerRaceToMap={playerRaceToMap}
-                    initialSlotSelections={(() => {
-                      let byeNum = 0;
-                      return finalsBracketSlotsArray.map((val) => {
-                        if (val === BYE_LABEL) return `-- Bye ${++byeNum} --`;
-                        return val;
-                      });
-                    })()}
-                    initialScores={finalsBracketScoresArray}
-                    disabled
-                    placeholderText="TBD..."
-                    matchStatusByIndex={getFinalsMatchStatusByIndex()}
-                    onMatchClickByIndex={(matchIndex) =>
-                      handleFinalsBracketMatchClick(matchIndex)
-                    }
-                    matchForfeitingPlayerByMatchIndex={finalsMatchForfeitsArray}
-                  />
-                </div>
-              ) : null}
+              <div
+                id="home-finals-slot-body"
+                aria-labelledby="home-finals-slot-heading"
+                className="min-h-0 overflow-auto rounded-b-xl border-t border-white/40 bg-black pb-4 pt-4 pl-4"
+              >
+                <Bracket4
+                  players={playerDisplayNames}
+                  playerRaceToMap={playerRaceToMap}
+                  initialSlotSelections={(() => {
+                    let byeNum = 0;
+                    return finalsBracketSlotsArray.map((val) => {
+                      if (val === BYE_LABEL) return `-- Bye ${++byeNum} --`;
+                      return val;
+                    });
+                  })()}
+                  initialScores={finalsBracketScoresArray}
+                  disabled
+                  placeholderText="TBD..."
+                  matchStatusByIndex={getFinalsMatchStatusByIndex()}
+                  onMatchClickByIndex={(matchIndex) =>
+                    handleFinalsBracketMatchClick(matchIndex)
+                  }
+                  matchForfeitingPlayerByMatchIndex={finalsMatchForfeitsArray}
+                />
+              </div>
             </div>
           </div>
         </div>

@@ -397,7 +397,7 @@ export function StreamObsDashboard({
         return;
       } else {
         setWireResultsError(
-          "Expand the Scoreboard Overlay card so the results preview is fully visible, then export again."
+          "Make sure the results preview is fully visible on the page, then export again."
         );
         return;
       }

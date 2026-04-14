@@ -7,8 +7,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type Dispatch,
-  type SetStateAction,
 } from "react";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
@@ -350,9 +348,6 @@ export function DashboardContent() {
   const savedSettings = useQuery(api.dashboardSettings.getShared, {});
   /** Tournament/bracket data and shared writes (canonical doc). */
   const setDashboardSettings = useMutation(api.dashboardSettings.setShared);
-  /** Logged-in user’s own row: collapsible UI only (not global). */
-  const myUserSettings = useQuery(api.dashboardSettings.get, email ? { email } : "skip");
-  const patchUserDashboardSettings = useMutation(api.dashboardSettings.set);
   const hasAppliedInitialSettings = useRef(false);
   const settingsQueryHasReturned = useRef(false);
 
@@ -378,24 +373,6 @@ export function DashboardContent() {
   const [loadingSeasons, setLoadingSeasons] = useState(false);
   const [loadingPlayers, setLoadingPlayers] = useState(false);
   const [leagueLoadError, setLeagueLoadError] = useState<string | null>(null);
-  const [leagueCardOpen, setLeagueCardOpen] = useState(false);
-  const [playersCardOpen, setPlayersCardOpen] = useState(false);
-  const [usersCardOpen, setUsersCardOpen] = useState(false);
-  const [week1SlotCardsOpen, setWeek1SlotCardsOpen] = useState<boolean[]>(
-    () => Array(8).fill(false)
-  );
-  const [week2SlotCardsOpen, setWeek2SlotCardsOpen] = useState<boolean[]>(
-    () => Array(4).fill(false)
-  );
-  const [finalsCardOpen, setFinalsCardOpen] = useState(false);
-  const week2SlotCardsOpenRef = useRef<boolean[]>([false, false, false, false]);
-  const finalsCardOpenRef = useRef(false);
-  week2SlotCardsOpenRef.current = week2SlotCardsOpen;
-  finalsCardOpenRef.current = finalsCardOpen;
-  const [sidePanelOpen, setSidePanelOpen] = useState(false);
-  const [week1SectionOpen, setWeek1SectionOpen] = useState(false);
-  const [week2SectionOpen, setWeek2SectionOpen] = useState(false);
-  const [finalsSectionOpen, setFinalsSectionOpen] = useState(false);
   const [bracketResetKey, setBracketResetKey] = useState(0);
   const [resetBracketsModalOpen, setResetBracketsModalOpen] = useState(false);
   const [resetLocationsModalOpen, setResetLocationsModalOpen] = useState(false);
@@ -787,72 +764,6 @@ export function DashboardContent() {
       }
     }
   }, [savedSettings, leagueNames]);
-
-  /**
-   * Restore collapsible UI from the signed-in user’s Convex row (same pattern for every slot card:
-   * if Convex has an explicit boolean, use it; otherwise keep previous React state so shared-doc
-   * updates do not collapse Week 2 / Finals mid-session).
-   */
-  useEffect(() => {
-    if (!email || myUserSettings === undefined) return;
-    const ui =
-      myUserSettings !== null && typeof myUserSettings === "object"
-        ? (myUserSettings as Record<string, unknown>)
-        : null;
-
-    const applyBool = (key: string, set: Dispatch<SetStateAction<boolean>>) => {
-      const v = ui?.[key];
-      if (v === true || v === false) set(v);
-    };
-    applyBool("uiUsersCardOpen", setUsersCardOpen);
-    applyBool("uiLeagueCardOpen", setLeagueCardOpen);
-    applyBool("uiPlayersCardOpen", setPlayersCardOpen);
-    applyBool("uiWeek1SectionOpen", setWeek1SectionOpen);
-    applyBool("uiWeek2SectionOpen", setWeek2SectionOpen);
-    applyBool("uiFinalsSectionOpen", setFinalsSectionOpen);
-    setWeek1SlotCardsOpen((prev) =>
-      prev.map((p, i) => {
-        const v = ui?.[`uiWeek1Slot${i}Open`];
-        if (v === true || v === false) return v;
-        return p;
-      })
-    );
-
-    let jsonHandledW2 = false;
-    let jsonHandledF = false;
-    const rawCards = ui?.dashboardBracketCardsUiJson;
-    if (typeof rawCards === "string" && rawCards.trim() !== "") {
-      try {
-        const parsed = JSON.parse(rawCards) as { week2?: unknown; finals?: unknown };
-        if (Array.isArray(parsed.week2) && parsed.week2.length === 4) {
-          setWeek2SlotCardsOpen(parsed.week2.map((x) => x === true));
-          jsonHandledW2 = true;
-        }
-        if (typeof parsed.finals === "boolean") {
-          setFinalsCardOpen(parsed.finals);
-          jsonHandledF = true;
-        }
-      } catch {
-        /* fall through to legacy fields */
-      }
-    }
-    if (!jsonHandledW2) {
-      setWeek2SlotCardsOpen((prev) =>
-        prev.map((p, i) => {
-          const v = ui?.[`uiWeek2Slot${i}Open`];
-          if (v === true || v === false) return v;
-          return p;
-        })
-      );
-    }
-    if (!jsonHandledF) {
-      setFinalsCardOpen((prev) => {
-        const v = ui?.uiFinalsCardOpen;
-        if (v === true || v === false) return v;
-        return prev;
-      });
-    }
-  }, [email, myUserSettings]);
 
   useEffect(() => {
     if (pendingSeasonFromSettings.current == null || !seasonNames.length) return;
@@ -1511,76 +1422,6 @@ export function DashboardContent() {
     } as Parameters<typeof setDashboardSettings>[0]);
   }, [email, selectedLeagueName, selectedSeason, tournamentStarted, tournamentPaused, setDashboardSettings]);
 
-  /** Persist collapsible open/closed state to the signed-in user’s Convex row (not the shared tournament doc). */
-  const persistUiCollapsed = useCallback(
-    (patch: Record<string, boolean>) => {
-      if (!email) return;
-      const shared =
-        savedSettings && typeof savedSettings === "object"
-          ? (savedSettings as Record<string, unknown>)
-          : null;
-      const leagueName =
-        selectedLeagueName?.trim() ||
-        (typeof shared?.leagueName === "string" ? shared.leagueName.trim() : "");
-      const season =
-        selectedSeason?.trim() ||
-        (typeof shared?.season === "string" ? shared.season.trim() : "");
-      if (!leagueName || !season) return;
-      void patchUserDashboardSettings({
-        email,
-        leagueName,
-        season,
-        tournamentStarted,
-        tournamentPaused,
-        ...patch,
-      } as Parameters<typeof patchUserDashboardSettings>[0]);
-    },
-    [
-      email,
-      selectedLeagueName,
-      selectedSeason,
-      tournamentStarted,
-      tournamentPaused,
-      savedSettings,
-      patchUserDashboardSettings,
-    ]
-  );
-
-  /** Week 2 + Finals bracket card open state: one JSON field on the user row (reliable vs many booleans). */
-  const persistBracketCardsCollapse = useCallback(
-    (week2: boolean[], finals: boolean) => {
-      if (!email) return;
-      const shared =
-        savedSettings && typeof savedSettings === "object"
-          ? (savedSettings as Record<string, unknown>)
-          : null;
-      const leagueName =
-        selectedLeagueName?.trim() ||
-        (typeof shared?.leagueName === "string" ? shared.leagueName.trim() : "");
-      const season =
-        selectedSeason?.trim() ||
-        (typeof shared?.season === "string" ? shared.season.trim() : "");
-      if (!leagueName || !season) return;
-      void patchUserDashboardSettings({
-        email,
-        leagueName,
-        season,
-        tournamentStarted,
-        tournamentPaused,
-        dashboardBracketCardsUiJson: JSON.stringify({ week2, finals }),
-      } as Parameters<typeof patchUserDashboardSettings>[0]);
-    },
-    [
-      email,
-      selectedLeagueName,
-      selectedSeason,
-      tournamentStarted,
-      tournamentPaused,
-      savedSettings,
-      patchUserDashboardSettings,
-    ]
-  );
-
   // Debounced save when any location or start date/time input changes (skip until we've applied initial settings from Convex so we don't overwrite with empty state).
   // Do not send tournamentStarted/tournamentPaused here: they are derived from Convex and a pending timer could fire after "Start Tournament" before the query updates, wiping true back to false.
   useEffect(() => {
@@ -1743,7 +1584,6 @@ export function DashboardContent() {
       });
   }, [playerTeamMap, selectedLeagueGuid]);
 
-  const SIDE_PANEL_TAB_WIDTH = 40;
   const sidePanelRef = useRef<HTMLElement>(null);
   const setupScrollRef = useRef<HTMLDivElement>(null);
   const [sidePanelMeasuredWidth, setSidePanelMeasuredWidth] = useState(400);
@@ -1764,7 +1604,7 @@ export function DashboardContent() {
   }, []);
 
   useLayoutEffect(() => {
-    if (!sidePanelOpen || !sidePanelRef.current) return;
+    if (!sidePanelRef.current) return;
     const el = sidePanelRef.current;
     const update = () => {
       const w = el.offsetWidth;
@@ -1774,10 +1614,10 @@ export function DashboardContent() {
     const ro = new ResizeObserver(update);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [sidePanelOpen]);
+  }, []);
 
   useLayoutEffect(() => {
-    if (!sidePanelOpen || !setupScrollRef.current) return;
+    if (!setupScrollRef.current) return;
     const el = setupScrollRef.current;
     const update = () => {
       const hasScrollbar = el.scrollHeight > el.clientHeight;
@@ -1787,7 +1627,7 @@ export function DashboardContent() {
     const ro = new ResizeObserver(update);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [sidePanelOpen]);
+  }, []);
 
   return (
     <>
@@ -1814,59 +1654,36 @@ export function DashboardContent() {
           </div>,
           document.body
         )}
-      {/* Side card: inset from page padding, collapsible */}
+      {/* Side card: inset from page padding; always expanded */}
       <aside
         ref={sidePanelRef}
-        className="fixed z-30 overflow-hidden rounded-2xl border border-white/20 bg-gradient-to-br from-slate-900 to-slate-950 shadow-2xl transition-[width] duration-200 ease-out"
+        className="fixed z-30 overflow-hidden rounded-2xl border border-white/20 bg-gradient-to-br from-slate-900 to-slate-950 shadow-2xl"
         style={{
           left: pageInsets.left,
           top: pageInsets.top,
           bottom: pageInsets.bottom,
-          width: sidePanelOpen ? "max-content" : 0,
-          maxWidth: sidePanelOpen ? `calc(100vw - ${pageInsets.left * 2}px)` : undefined,
+          width: "max-content",
+          maxWidth: `calc(100vw - ${pageInsets.left * 2}px)`,
         }}
-        aria-hidden={!sidePanelOpen}
       >
         <div
           ref={setupScrollRef}
           className="flex h-full min-h-0 min-w-0 max-w-full flex-col gap-6 overflow-y-auto overflow-x-hidden p-4 pt-4"
           style={setupScrollbarPadding > 0 ? { paddingRight: 16 + setupScrollbarPadding } : undefined}
         >
-          <div className="flex items-center justify-between gap-2 pb-2">
-            <span className="pl-[5px] text-[1.4rem] font-medium text-blue-400">Tournament Setup</span>
-            <button
-              type="button"
-              onClick={() => setSidePanelOpen(false)}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-blue-100/80 transition-colors hover:bg-white/10 hover:text-blue-100"
-              aria-label="Collapse setup card"
-            >
-              <span aria-hidden>◀</span>
-            </button>
+          <div className="pb-2 pl-[5px]">
+            <span className="text-[1.4rem] font-medium text-blue-400">Tournament Setup</span>
           </div>
       {/* Users card – list of Convex users */}
       <div className="w-full min-w-0 shrink-0 overflow-hidden rounded-xl border border-[var(--surface-border)] bg-black text-foreground">
-        <button
-          type="button"
-          onClick={() => {
-            setUsersCardOpen((o) => {
-              const next = !o;
-              persistUiCollapsed({ uiUsersCardOpen: next });
-              return next;
-            });
-          }}
-          className={`flex min-h-14 w-full cursor-pointer flex-shrink-0 items-center justify-between px-5 py-4 text-left transition-opacity hover:opacity-90 ${usersCardOpen ? "rounded-t-xl" : "rounded-xl"} bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900`}
-          aria-expanded={usersCardOpen}
-          aria-controls="users-card-body"
+        <div
+          className="flex min-h-14 w-full flex-shrink-0 items-center rounded-t-xl bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 px-5 py-4"
           id="users-card-heading"
         >
           <h2 className="text-lg font-semibold tracking-tight text-blue-100">
             Users {usersList != null ? `(${usersList.length})` : ""}
           </h2>
-          <span className="text-blue-100/80" aria-hidden>
-            {usersCardOpen ? "▼" : "▶"}
-          </span>
-        </button>
-        {usersCardOpen && (
+        </div>
           <div
             id="users-card-body"
             aria-labelledby="users-card-heading"
@@ -1958,7 +1775,6 @@ export function DashboardContent() {
               </table>
             )}
           </div>
-        )}
       </div>
 
       <Modal
@@ -2071,7 +1887,7 @@ export function DashboardContent() {
         )}
       </Modal>
 
-      {/* League & Season card – content height only, collapsible; width matches wider card */}
+      {/* League & Season card – content height only; width matches wider card */}
       {leagueLoadError && (
         <div className="w-full min-w-0" role="alert">
           <p id="league-load-error" className="whitespace-pre-line rounded-xl border border-amber-500/50 bg-amber-950/30 px-4 py-3 text-sm text-amber-200">
@@ -2085,28 +1901,12 @@ export function DashboardContent() {
         </div>
       )}
       <div className="w-full min-w-0 shrink-0 overflow-hidden rounded-xl border border-[var(--surface-border)] text-foreground">
-        <button
-          type="button"
-          onClick={() => {
-            setLeagueCardOpen((o) => {
-              const next = !o;
-              persistUiCollapsed({ uiLeagueCardOpen: next });
-              return next;
-            });
-          }}
-          className={`flex min-h-14 w-full cursor-pointer flex-shrink-0 items-center justify-between px-5 py-4 text-left transition-opacity hover:opacity-90 ${leagueCardOpen ? "rounded-t-xl" : "rounded-xl"} bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900`}
-          aria-expanded={leagueCardOpen}
-          aria-controls="league-card-body"
+        <div
+          className="flex min-h-14 w-full flex-shrink-0 items-center rounded-t-xl bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 px-5 py-4"
           id="league-card-heading"
         >
-          <h2 className="text-lg font-semibold tracking-tight text-blue-100">
-            Tournament Settings
-          </h2>
-          <span className="text-blue-100/80" aria-hidden>
-            {leagueCardOpen ? "▼" : "▶"}
-          </span>
-        </button>
-        {leagueCardOpen && (
+          <h2 className="text-lg font-semibold tracking-tight text-blue-100">Tournament Settings</h2>
+        </div>
           <div
             id="league-card-body"
             aria-labelledby="league-card-heading"
@@ -2564,30 +2364,17 @@ export function DashboardContent() {
               </p>
             )}
             <div className="flex flex-col gap-3">
-              {/* Week 1 – collapsible */}
               <div className="flex flex-col gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setWeek1SectionOpen((o) => {
-                      const next = !o;
-                      persistUiCollapsed({ uiWeek1SectionOpen: next });
-                      return next;
-                    });
-                  }}
-                  className="flex cursor-pointer items-center justify-center gap-2 text-xl font-semibold text-yellow-400 transition-opacity hover:opacity-90"
-                  aria-expanded={week1SectionOpen}
-                  aria-controls="league-card-week1-locations"
+                <h3
+                  id="league-card-week1-locations-heading"
+                  className="text-center text-xl font-semibold text-yellow-400"
                 >
                   Week 1
-                  <span className="text-base" aria-hidden>
-                    {week1SectionOpen ? "▼" : "▶"}
-                  </span>
-                </button>
+                </h3>
                 <div
                   id="league-card-week1-locations"
-                  className={`flex flex-col gap-3 overflow-hidden transition-[max-height] duration-200 ease-out ${week1SectionOpen ? "max-h-[2200px] px-[5px] pb-[5px]" : "max-h-0 px-0 pb-0 pt-0"}`}
-                  aria-hidden={!week1SectionOpen}
+                  aria-labelledby="league-card-week1-locations-heading"
+                  className="flex flex-col gap-3 px-[5px] pb-[5px]"
                 >
                   {WEEK_1_KEYS.map((key) => (
                     <div
@@ -2673,32 +2460,19 @@ export function DashboardContent() {
                 </div>
               </div>
               <hr className="border-t border-[var(--surface-border)] my-1" aria-hidden />
-              {/* Week 2 – collapsible */}
               <div className="flex flex-col gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setWeek2SectionOpen((o) => {
-                      const next = !o;
-                      persistUiCollapsed({ uiWeek2SectionOpen: next });
-                      return next;
-                    });
-                  }}
-                  className="flex cursor-pointer items-center justify-center gap-2 text-xl font-semibold text-yellow-400 transition-opacity hover:opacity-90"
-                  aria-expanded={week2SectionOpen}
-                  aria-controls="league-card-week2-locations"
+                <h3
+                  id="league-card-week2-locations-heading"
+                  className="text-center text-xl font-semibold text-yellow-400"
                 >
                   Week 2
-                  <span className="text-base" aria-hidden>
-                    {week2SectionOpen ? "▼" : "▶"}
-                  </span>
-                </button>
+                </h3>
                 <div
                   id="league-card-week2-locations"
-                  className={`flex flex-col gap-3 overflow-hidden transition-[max-height] duration-200 ease-out ${week2SectionOpen ? "max-h-[1200px] px-[5px] pb-4" : "max-h-0 px-0 pb-0 pt-0"}`}
-                  aria-hidden={!week2SectionOpen}
+                  aria-labelledby="league-card-week2-locations-heading"
+                  className="flex flex-col gap-3 px-[5px] pb-4"
                 >
-                  {week2SectionOpen && WEEK_2_KEYS.map((key) => (
+                  {WEEK_2_KEYS.map((key) => (
                     <div
                       key={key}
                       className="rounded-lg border border-[var(--surface-border)] bg-slate-800/30 p-3"
@@ -2782,30 +2556,17 @@ export function DashboardContent() {
                 </div>
               </div>
               <hr className="border-t border-[var(--surface-border)] my-1" aria-hidden />
-              {/* Finals – collapsible */}
               <div className="flex flex-col gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFinalsSectionOpen((o) => {
-                      const next = !o;
-                      persistUiCollapsed({ uiFinalsSectionOpen: next });
-                      return next;
-                    });
-                  }}
-                  className="flex cursor-pointer items-center justify-center gap-2 text-xl font-semibold text-yellow-400 transition-opacity hover:opacity-90"
-                  aria-expanded={finalsSectionOpen}
-                  aria-controls="league-card-finals-location"
+                <h3
+                  id="league-card-finals-location-heading"
+                  className="text-center text-xl font-semibold text-yellow-400"
                 >
                   Finals
-                  <span className="text-base" aria-hidden>
-                    {finalsSectionOpen ? "▼" : "▶"}
-                  </span>
-                </button>
+                </h3>
                 <div
                   id="league-card-finals-location"
-                  className={`flex flex-col gap-3 overflow-hidden transition-[max-height] duration-200 ease-out ${finalsSectionOpen ? "max-h-[200px] px-[5px] pb-[5px]" : "max-h-0 px-0 pb-0 pt-0"}`}
-                  aria-hidden={!finalsSectionOpen}
+                  aria-labelledby="league-card-finals-location-heading"
+                  className="flex flex-col gap-3 px-[5px] pb-[5px]"
                 >
                   <div className="rounded-lg border border-[var(--surface-border)] bg-slate-800/30 p-3">
                     <div className="grid grid-cols-[auto_1fr] items-center gap-x-6 gap-y-3">
@@ -2887,41 +2648,22 @@ export function DashboardContent() {
               </div>
             </div>
           </div>
-        )}
       </div>
 
-      {/* Players card – below League card, collapsible; same width as League card */}
+      {/* Players card – below League card; same width as League card */}
       <div className="w-full min-w-0 shrink-0 overflow-hidden rounded-xl border border-[var(--surface-border)] bg-black text-foreground">
         <div
-          className="flex min-h-14 w-full flex-shrink-0 items-center justify-between gap-4 rounded-t-xl bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 px-5 py-4"
+          className="flex min-h-14 w-full flex-shrink-0 items-center rounded-t-xl bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 px-5 py-4"
           id="players-card-heading"
         >
-          <div className="flex flex-1 items-center gap-3">
-            <h2 className="text-lg font-semibold tracking-tight text-blue-100">
-              Players ({playerRows.filter((r) => r.playerName !== BYE_LABEL).length})
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              setPlayersCardOpen((o) => {
-                const next = !o;
-                persistUiCollapsed({ uiPlayersCardOpen: next });
-                return next;
-              });
-            }}
-            className="cursor-pointer rounded p-1 text-blue-100/80 transition-opacity hover:opacity-90"
-            aria-expanded={playersCardOpen}
-            aria-controls="players-card-body"
-            aria-label={playersCardOpen ? "Collapse players" : "Expand players"}
-          >
-            {playersCardOpen ? "▼" : "▶"}
-          </button>
+          <h2 className="text-lg font-semibold tracking-tight text-blue-100">
+            Players ({playerRows.filter((r) => r.playerName !== BYE_LABEL).length})
+          </h2>
         </div>
         <div
           id="players-card-body"
           aria-labelledby="players-card-heading"
-          className={`transition-[max-height] duration-200 ease-out ${playersCardOpen ? "max-h-[4000px]" : "max-h-0 overflow-hidden"}`}
+          className="max-h-none"
         >
           <div className="overflow-x-auto bg-gradient-to-br from-[#0c1220] via-[#0e1525] to-[#0c1220]">
             <table className="w-max min-w-full border-collapse text-left text-sm">
@@ -2961,29 +2703,11 @@ export function DashboardContent() {
         </div>
       </aside>
 
-      {/* Tab to re-open side card when collapsed – same inset as card */}
-      {!sidePanelOpen && (
-        <button
-          type="button"
-          onClick={() => setSidePanelOpen(true)}
-          className="fixed z-40 flex w-10 items-center justify-center rounded-xl border border-white/20 bg-gradient-to-br from-slate-900 to-slate-950 text-blue-100/90 shadow-2xl transition-colors hover:from-slate-800 hover:to-slate-900 hover:text-blue-100"
-          style={{
-            left: pageInsets.left,
-            top: pageInsets.top,
-            bottom: pageInsets.bottom,
-          }}
-          aria-label="Open setup card"
-        >
-          <span aria-hidden>▶</span>
-        </button>
-      )}
-
-      {/* Main content: bracket columns, with margin so they don’t sit under the panel/tab */}
+      {/* Main content: bracket columns, with margin so they don’t sit under the setup panel */}
       <div
         className="min-w-0 w-full overflow-x-hidden transition-[padding] duration-200 ease-out"
         style={{
-          paddingLeft:
-            pageInsets.left + (sidePanelOpen ? sidePanelMeasuredWidth : SIDE_PANEL_TAB_WIDTH),
+          paddingLeft: pageInsets.left + sidePanelMeasuredWidth,
         }}
       >
         <div className="min-w-0 overflow-x-auto pb-10">
@@ -2999,31 +2723,14 @@ export function DashboardContent() {
             className="w-full min-w-0 overflow-hidden rounded-xl border border-white/40 bg-black text-foreground"
           >
             <div
-              className={`flex min-h-14 w-full flex-shrink-0 flex-col gap-1 px-5 py-4 ${week1SlotCardsOpen[index] ? "rounded-t-xl" : "rounded-xl"} bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900`}
+              className="flex min-h-14 w-full flex-shrink-0 flex-col gap-1 rounded-t-xl bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 px-5 py-4"
               id={`week1-slot-${index}-heading`}
             >
-              <button
-                type="button"
-                onClick={() => {
-                  setWeek1SlotCardsOpen((prev) => {
-                    const next = [...prev];
-                    next[index] = !next[index];
-                    persistUiCollapsed({ [`uiWeek1Slot${index}Open`]: next[index] });
-                    return next;
-                  });
-                }}
-                className="flex min-w-0 cursor-pointer items-center justify-center gap-4 text-left transition-opacity hover:opacity-90"
-                aria-expanded={week1SlotCardsOpen[index]}
-                aria-controls={`week1-slot-${index}-body`}
-                aria-label={week1SlotCardsOpen[index] ? "Collapse" : "Expand"}
-              >
-                <h2 className="min-w-0 truncate text-[1.6875rem] font-semibold tracking-tight text-yellow-400">
+              <div className="w-full">
+                <h2 className="min-w-0 truncate text-center text-[1.6875rem] font-semibold tracking-tight text-yellow-400">
                   {locations[key]?.trim() || "TBD"}
                 </h2>
-                <span className="shrink-0 text-blue-100/80" aria-hidden>
-                  {week1SlotCardsOpen[index] ? "▼" : "▶"}
-                </span>
-              </button>
+              </div>
               <div className="grid w-full grid-cols-3 items-center gap-2 border-t border-white/30 pt-2 text-sm font-medium text-blue-100/90">
                 <span className="text-left">Week 1</span>
                 <span className="text-center">
@@ -3034,7 +2741,6 @@ export function DashboardContent() {
                 </span>
               </div>
             </div>
-            {week1SlotCardsOpen[index] && (
               <div
                 id={`week1-slot-${index}-body`}
                 aria-labelledby={`week1-slot-${index}-heading`}
@@ -3090,7 +2796,6 @@ export function DashboardContent() {
                   )}
                 />
               </div>
-            )}
           </div>
         ))}
       </div>
@@ -3106,31 +2811,14 @@ export function DashboardContent() {
             className="w-full min-w-0 overflow-hidden rounded-xl border border-white/40 bg-black text-foreground"
           >
             <div
-              className={`flex min-h-14 w-full flex-shrink-0 flex-col gap-1 px-5 py-4 ${week2SlotCardsOpen[index] ? "rounded-t-xl" : "rounded-xl"} bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900`}
+              className="flex min-h-14 w-full flex-shrink-0 flex-col gap-1 rounded-t-xl bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 px-5 py-4"
               id={`week2-slot-${index}-heading`}
             >
-              <button
-                type="button"
-                onClick={() => {
-                  setWeek2SlotCardsOpen((prev) => {
-                    const next = [...prev];
-                    next[index] = !prev[index];
-                    persistBracketCardsCollapse(next, finalsCardOpenRef.current);
-                    return next;
-                  });
-                }}
-                className="flex min-w-0 cursor-pointer items-center justify-center gap-4 text-left transition-opacity hover:opacity-90"
-                aria-expanded={week2SlotCardsOpen[index]}
-                aria-controls={`week2-slot-${index}-body`}
-                aria-label={week2SlotCardsOpen[index] ? "Collapse" : "Expand"}
-              >
-                <h2 className="min-w-0 truncate text-[1.6875rem] font-semibold tracking-tight text-yellow-400">
+              <div className="w-full">
+                <h2 className="min-w-0 truncate text-center text-[1.6875rem] font-semibold tracking-tight text-yellow-400">
                   {locations[key]?.trim() || "TBD"}
                 </h2>
-                <span className="shrink-0 text-blue-100/80" aria-hidden>
-                  {week2SlotCardsOpen[index] ? "▼" : "▶"}
-                </span>
-              </button>
+              </div>
               <div className="grid w-full grid-cols-3 items-center gap-2 border-t border-white/30 pt-2 text-sm font-medium text-blue-100/90">
                 <span className="text-left">Week 2</span>
                 <span className="text-center">
@@ -3141,7 +2829,6 @@ export function DashboardContent() {
                 </span>
               </div>
             </div>
-            {week2SlotCardsOpen[index] && (
               <div
                 id={`week2-slot-${index}-body`}
                 aria-labelledby={`week2-slot-${index}-heading`}
@@ -3178,7 +2865,6 @@ export function DashboardContent() {
                   )}
                 />
               </div>
-            )}
           </div>
         ))}
       </div>
@@ -3190,30 +2876,14 @@ export function DashboardContent() {
         </h2>
         <div className="w-max min-w-0 overflow-hidden rounded-xl border border-white/40 bg-black text-foreground">
           <div
-            className={`flex min-h-14 w-full flex-shrink-0 flex-col gap-1 px-5 py-4 ${finalsCardOpen ? "rounded-t-xl" : "rounded-xl"} bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900`}
+            className="flex min-h-14 w-full flex-shrink-0 flex-col gap-1 rounded-t-xl bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 px-5 py-4"
             id="finals-slot-heading"
           >
-            <button
-              type="button"
-              onClick={() =>
-                setFinalsCardOpen((o) => {
-                  const next = !o;
-                  persistBracketCardsCollapse(week2SlotCardsOpenRef.current, next);
-                  return next;
-                })
-              }
-              className="flex min-w-0 cursor-pointer items-center justify-center gap-4 text-left transition-opacity hover:opacity-90"
-              aria-expanded={finalsCardOpen}
-              aria-controls="finals-slot-body"
-              aria-label={finalsCardOpen ? "Collapse" : "Expand"}
-            >
-              <h2 className="min-w-0 truncate text-[1.6875rem] font-semibold tracking-tight text-yellow-400">
+            <div className="w-full">
+              <h2 className="min-w-0 truncate text-center text-[1.6875rem] font-semibold tracking-tight text-yellow-400">
                 {locations.finalsLocation?.trim() || "TBD"}
               </h2>
-              <span className="shrink-0 text-blue-100/80" aria-hidden>
-                {finalsCardOpen ? "▼" : "▶"}
-              </span>
-            </button>
+            </div>
             <div className="grid w-full grid-cols-3 items-center gap-2 border-t border-white/30 pt-2 text-sm font-medium text-blue-100/90">
               <span className="text-left">Finals</span>
               <span className="text-center">
@@ -3224,7 +2894,6 @@ export function DashboardContent() {
               </span>
             </div>
           </div>
-          {finalsCardOpen && (
             <div
               id="finals-slot-body"
               aria-labelledby="finals-slot-heading"
@@ -3264,7 +2933,6 @@ export function DashboardContent() {
                 </>
               )}
             </div>
-          )}
         </div>
       </div>
         </div>

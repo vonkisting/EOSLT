@@ -1,6 +1,5 @@
 "use client";
 
-import { useLayoutEffect, useRef } from "react";
 import { ObsCollapsibleCard } from "@/components/stream/ObsCollapsibleCard";
 import { labelTitleCase } from "@/lib/labelTitleCase";
 import { ObsConnectionNameCombobox } from "@/components/stream/ObsConnectionNameCombobox";
@@ -8,8 +7,6 @@ import { ObsConnectionLogosSection } from "@/components/stream/ObsConnectionLogo
 import { ObsConnectionOverlayUrlsSection } from "@/components/stream/ObsConnectionOverlayUrlsSection";
 import type { StreamLogoRowUi } from "@/components/stream/streamObsLogoTypes";
 import type { ObsCredentials } from "@/components/stream/useObsProgramSources";
-import { STREAM_OBS_CARD_IDS } from "@/components/stream/streamObsCardIds";
-import { useObsStreamCardOpen } from "@/components/stream/ObsStreamCardOpenContext";
 
 type ObsConnectionPanelProps = {
   connected: boolean;
@@ -109,17 +106,6 @@ export function ObsConnectionPanel({
   obsCredentials,
   onSaveStreamProfile,
 }: ObsConnectionPanelProps) {
-  const { open: cardOpen, setOpen: setCardOpen } = useObsStreamCardOpen(STREAM_OBS_CARD_IDS.connection);
-  const wasConnectedRef = useRef(false);
-
-  /** Collapse once when a connection succeeds — not on every render while connected (would block re-opening). */
-  useLayoutEffect(() => {
-    if (connected && !wasConnectedRef.current) {
-      setCardOpen(false);
-    }
-    wasConnectedRef.current = connected;
-  }, [connected, setCardOpen]);
-
   const glowClass = connected
     ? "border-green-400/70 shadow-[0_0_28px_rgba(74,222,128,0.65),0_0_56px_rgba(34,197,94,0.35)] ring-2 ring-green-400/80 ring-offset-2 ring-offset-black transition-[box-shadow,border-color,ring] duration-300"
     : "transition-[box-shadow,border-color,ring] duration-300";
@@ -127,10 +113,7 @@ export function ObsConnectionPanel({
   return (
     <ObsCollapsibleCard
       title="OBS Connection"
-      collapseLabel="OBS Connection"
       className={glowClass}
-      open={cardOpen}
-      onOpenChange={setCardOpen}
       headerExtra={
         <span
           className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${

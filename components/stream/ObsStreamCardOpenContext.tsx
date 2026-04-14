@@ -31,7 +31,7 @@ function parseMap(json: string | null): MapState {
   }
 }
 
-/** Connection card open state is not persisted (it uses connect/collapse rules). */
+/** Connection card open state is not persisted. */
 function stripConnectionFromMap(m: MapState): MapState {
   const { [STREAM_OBS_CARD_IDS.connection]: _removed, ...rest } = m;
   return rest;
@@ -51,8 +51,8 @@ type ObsStreamCardOpenProviderProps = {
 
 /**
  * Persists which stream OBS dashboard cards and nested sections are expanded (per user, Convex
- * `streamObsUiState.cardOpenByIdJson`). Add a stable id in `STREAM_OBS_CARD_IDS` for each collapsible.
- * The OBS Connection card is expanded on each full page load; it collapses when a connection succeeds.
+ * `streamObsUiState.cardOpenByIdJson`). Add a stable id in `STREAM_OBS_CARD_IDS` for each stream card.
+ * Stream cards are always expanded in the UI; this map remains for compatibility with persisted state.
  */
 export function ObsStreamCardOpenProvider({ email, children }: ObsStreamCardOpenProviderProps) {
   const normalized = email.toLowerCase().trim();
