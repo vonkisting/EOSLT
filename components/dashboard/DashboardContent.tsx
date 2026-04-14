@@ -1584,10 +1584,12 @@ export function DashboardContent() {
       });
   }, [playerTeamMap, selectedLeagueGuid]);
 
+  const SIDE_PANEL_TAB_WIDTH = 40;
   const sidePanelRef = useRef<HTMLElement>(null);
   const setupScrollRef = useRef<HTMLDivElement>(null);
+  const [sidePanelOpen, setSidePanelOpen] = useState(true);
   const [sidePanelMeasuredWidth, setSidePanelMeasuredWidth] = useState(400);
-  const [setupScrollbarPadding, setSetupScrollbarPadding] = useState(0);
+  const lastMeasuredPanelWidthRef = useRef(0);
 
   /** Page padding (matches dashboard page: px-4 py-6 md:p-[25px]) and header (h-14) for card positioning. */
   const [pageInsets, setPageInsets] = useState({ left: 16, top: 80, bottom: 24 });
@@ -1604,30 +1606,23 @@ export function DashboardContent() {
   }, []);
 
   useLayoutEffect(() => {
-    if (!sidePanelRef.current) return;
+    if (!sidePanelOpen || !sidePanelRef.current) return;
     const el = sidePanelRef.current;
     const update = () => {
       const w = el.offsetWidth;
-      if (w > 0) setSidePanelMeasuredWidth(w);
+      if (w <= 0) return;
+      const prev = lastMeasuredPanelWidthRef.current;
+      if (prev !== 0 && Math.abs(w - prev) < 2) return;
+      lastMeasuredPanelWidthRef.current = w;
+      setSidePanelMeasuredWidth(w);
     };
     update();
-    const ro = new ResizeObserver(update);
+    const ro = new ResizeObserver(() => {
+      requestAnimationFrame(update);
+    });
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
-
-  useLayoutEffect(() => {
-    if (!setupScrollRef.current) return;
-    const el = setupScrollRef.current;
-    const update = () => {
-      const hasScrollbar = el.scrollHeight > el.clientHeight;
-      setSetupScrollbarPadding(hasScrollbar ? 12 : 0);
-    };
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
+  }, [sidePanelOpen]);
 
   return (
     <>
@@ -1654,25 +1649,33 @@ export function DashboardContent() {
           </div>,
           document.body
         )}
-      {/* Side card: inset from page padding; always expanded */}
+      {/* Side card: Tournament Setup — collapsible; scrollbar-gutter avoids layout thrash */}
       <aside
         ref={sidePanelRef}
-        className="fixed z-30 overflow-hidden rounded-2xl border border-white/20 bg-gradient-to-br from-slate-900 to-slate-950 shadow-2xl"
+        className="fixed z-30 overflow-hidden rounded-2xl border border-white/20 bg-gradient-to-br from-slate-900 to-slate-950 shadow-2xl transition-[width] duration-200 ease-out"
         style={{
           left: pageInsets.left,
           top: pageInsets.top,
           bottom: pageInsets.bottom,
-          width: "max-content",
-          maxWidth: `calc(100vw - ${pageInsets.left * 2}px)`,
+          width: sidePanelOpen ? "max-content" : 0,
+          maxWidth: sidePanelOpen ? `calc(100vw - ${pageInsets.left * 2}px)` : undefined,
         }}
+        aria-hidden={!sidePanelOpen}
       >
         <div
           ref={setupScrollRef}
-          className="flex h-full min-h-0 min-w-0 max-w-full flex-col gap-6 overflow-y-auto overflow-x-hidden p-4 pt-4"
-          style={setupScrollbarPadding > 0 ? { paddingRight: 16 + setupScrollbarPadding } : undefined}
+          className="flex h-full min-h-0 min-w-0 max-w-full flex-col gap-6 overflow-y-auto overflow-x-hidden p-4 pt-4 [scrollbar-gutter:stable]"
         >
-          <div className="pb-2 pl-[5px]">
-            <span className="text-[1.4rem] font-medium text-blue-400">Tournament Setup</span>
+          <div className="flex items-center justify-between gap-2 pb-2">
+            <span className="pl-[5px] text-[1.4rem] font-medium text-blue-400">Tournament Setup</span>
+            <button
+              type="button"
+              onClick={() => setSidePanelOpen(false)}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-blue-100/80 transition-colors hover:bg-white/10 hover:text-blue-100"
+              aria-label="Collapse tournament setup"
+            >
+              <span aria-hidden>◀</span>
+            </button>
           </div>
       {/* Users card – list of Convex users */}
       <div className="w-full min-w-0 shrink-0 overflow-hidden rounded-xl border border-[var(--surface-border)] bg-black text-foreground">
@@ -2703,11 +2706,30 @@ export function DashboardContent() {
         </div>
       </aside>
 
+      {!sidePanelOpen && (
+        <button
+          type="button"
+          onClick={() => setSidePanelOpen(true)}
+          className="fixed z-40 flex items-center justify-center rounded-r-lg border border-l-0 border-white/20 bg-gradient-to-br from-slate-900 to-slate-950 text-blue-100/90 shadow-lg transition-colors hover:bg-slate-800/80 hover:text-blue-100"
+          style={{
+            left: pageInsets.left,
+            top: pageInsets.top,
+            bottom: pageInsets.bottom,
+            width: SIDE_PANEL_TAB_WIDTH,
+          }}
+          aria-label="Expand tournament setup"
+        >
+          <span aria-hidden>▶</span>
+        </button>
+      )}
+
       {/* Main content: bracket columns, with margin so they don’t sit under the setup panel */}
       <div
         className="min-w-0 w-full overflow-x-hidden transition-[padding] duration-200 ease-out"
         style={{
-          paddingLeft: pageInsets.left + sidePanelMeasuredWidth,
+          paddingLeft:
+            pageInsets.left +
+            (sidePanelOpen ? sidePanelMeasuredWidth : SIDE_PANEL_TAB_WIDTH),
         }}
       >
         <div className="min-w-0 overflow-x-auto pb-10">

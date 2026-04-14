@@ -364,7 +364,12 @@ export function Bracket8TwoRounds({
   useEffect(() => {
     if (initialSlotSelectionsSerialized == null) return;
     const next = JSON.parse(initialSlotSelectionsSerialized) as string[];
-    queueMicrotask(() => setSlotSelections(applyByeAdvancesToBracket8(next)));
+    const applied = applyByeAdvancesToBracket8(next);
+    queueMicrotask(() =>
+      setSlotSelections((prev) =>
+        prev.length === applied.length && prev.every((v, i) => v === applied[i]) ? prev : applied
+      )
+    );
   }, [initialSlotSelectionsSerialized]);
 
   const setSlotSelection = useCallback((index: number, value: string) => {
@@ -390,7 +395,11 @@ export function Bracket8TwoRounds({
   useEffect(() => {
     if (initialScoresSerialized == null) return;
     const next = JSON.parse(initialScoresSerialized) as string[];
-    queueMicrotask(() => setScores(next));
+    queueMicrotask(() =>
+      setScores((prev) =>
+        prev.length === next.length && prev.every((v, i) => v === (next[i] ?? "")) ? prev : [...next]
+      )
+    );
   }, [initialScoresSerialized]);
 
   const handleScoreChange = useCallback(

@@ -1060,7 +1060,7 @@ export function HomeBracketCards() {
                 <div
                   id={`home-week2-slot-${index}-body`}
                   aria-labelledby={`home-week2-slot-${index}-heading`}
-                  className="min-h-0 overflow-auto rounded-b-xl border-t border-white/40 bg-black pb-4 pt-4 pl-4"
+                  className="min-h-0 overflow-auto rounded-b-xl border-t border-white/40 bg-black pb-4 pt-4 pl-4 [scrollbar-gutter:stable]"
                 >
                   <Bracket4
                     players={playerDisplayNames}
@@ -1157,7 +1157,7 @@ export function HomeBracketCards() {
               <div
                 id="home-finals-slot-body"
                 aria-labelledby="home-finals-slot-heading"
-                className="min-h-0 overflow-auto rounded-b-xl border-t border-white/40 bg-black pb-4 pt-4 pl-4"
+                className="min-h-0 overflow-auto rounded-b-xl border-t border-white/40 bg-black pb-4 pt-4 pl-4 [scrollbar-gutter:stable]"
               >
                 <Bracket4
                   players={playerDisplayNames}
