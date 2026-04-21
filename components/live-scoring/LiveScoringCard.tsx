@@ -789,7 +789,7 @@ export function LiveScoringCard({
 
   const { total1CellClass, total2CellClass } = useMemo(() => {
     const base =
-      "border border-slate-600 bg-gradient-to-b from-slate-700 to-slate-800 px-3 py-2.5 text-center tabular-nums font-bold text-white";
+      "border border-slate-600 bg-gradient-to-b from-slate-700 to-slate-800 px-3 py-2.5 text-center text-[32px] font-bold tabular-nums leading-none text-white";
     const winner = "text-yellow-400";
     const neutral = "text-white";
     if (p1Won) {
@@ -956,13 +956,13 @@ export function LiveScoringCard({
                     <p
                       className={
                         p1Won
-                          ? "break-words text-sm font-semibold text-yellow-400 sm:text-base"
-                          : "break-words text-sm font-semibold text-white sm:text-base"
+                          ? "break-words text-[28px] font-semibold text-yellow-400 sm:text-[32px]"
+                          : "break-words text-[28px] font-semibold text-white sm:text-[32px]"
                       }
                     >
                       {p1Won ? `${player1DisplayName} Wins!!!` : player1DisplayName}
                     </p>
-                    <p className="mt-1 bg-gradient-to-r from-cyan-400 via-teal-400 to-blue-500 bg-clip-text text-3xl font-medium tabular-nums text-transparent">
+                    <p className="mt-1 bg-gradient-to-r from-cyan-400 via-teal-400 to-blue-500 bg-clip-text text-6xl font-medium tabular-nums text-transparent">
                       {player1RaceTo != null ? player1RaceTo : "—"}
                     </p>
                   </div>
@@ -973,30 +973,30 @@ export function LiveScoringCard({
                     <p
                       className={
                         p2Won
-                          ? "break-words text-sm font-semibold text-yellow-400 sm:text-base"
-                          : "break-words text-sm font-semibold text-white sm:text-base"
+                          ? "break-words text-[28px] font-semibold text-yellow-400 sm:text-[32px]"
+                          : "break-words text-[28px] font-semibold text-white sm:text-[32px]"
                       }
                     >
                       {p2Won ? `${player2DisplayName} Wins!!!` : player2DisplayName}
                     </p>
-                    <p className="mt-1 bg-gradient-to-r from-cyan-400 via-teal-400 to-blue-500 bg-clip-text text-3xl font-medium tabular-nums text-transparent">
+                    <p className="mt-1 bg-gradient-to-r from-cyan-400 via-teal-400 to-blue-500 bg-clip-text text-6xl font-medium tabular-nums text-transparent">
                       {player2RaceTo != null ? player2RaceTo : "—"}
                     </p>
                   </div>
                 </div>
               </header>
               <div className="mt-[5px] overflow-x-auto rounded-lg border border-slate-600">
-                <table className="w-full min-w-full border-collapse text-sm">
+                <table className="w-full min-w-full border-collapse">
                   <thead>
                     <tr className="bg-gradient-to-b from-slate-700 to-slate-800">
-                      <th className="whitespace-nowrap border border-slate-600 px-3 py-2.5 text-center font-bold text-white">
+                      <th className="whitespace-nowrap border border-slate-600 px-3 py-2.5 text-center text-sm font-bold text-white">
                         Game #
                       </th>
                       <th
                         className={
                           p1Won
-                            ? "border border-slate-600 px-3 py-2.5 text-center font-bold text-yellow-400"
-                            : "border border-slate-600 px-3 py-2.5 text-center font-bold text-white"
+                            ? "break-words border border-slate-600 px-3 py-2.5 text-center text-[28px] font-bold leading-tight text-yellow-400 sm:text-[32px]"
+                            : "break-words border border-slate-600 px-3 py-2.5 text-center text-[28px] font-bold leading-tight text-white sm:text-[32px]"
                         }
                       >
                         {p1Won ? `${player1DisplayName} Wins!!!` : player1DisplayName}
@@ -1004,15 +1004,15 @@ export function LiveScoringCard({
                       <th
                         className={
                           p2Won
-                            ? "border border-slate-600 px-3 py-2.5 text-center font-bold text-yellow-400"
-                            : "border border-slate-600 px-3 py-2.5 text-center font-bold text-white"
+                            ? "break-words border border-slate-600 px-3 py-2.5 text-center text-[28px] font-bold leading-tight text-yellow-400 sm:text-[32px]"
+                            : "break-words border border-slate-600 px-3 py-2.5 text-center text-[28px] font-bold leading-tight text-white sm:text-[32px]"
                         }
                       >
                         {p2Won ? `${player2DisplayName} Wins!!!` : player2DisplayName}
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white text-black">
+                  <tbody className="bg-white text-black text-sm">
                     {Array.from({ length: GAME_COUNT }, (_, i) => {
                       const hasAnyValue =
                         (player1Scores[i] ?? "").trim() !== "" || (player2Scores[i] ?? "").trim() !== "";
@@ -1026,7 +1026,7 @@ export function LiveScoringCard({
                             </td>
                             <td className="border border-slate-300 p-0">
                               {effectiveReadOnly ? (
-                                <div className="w-full min-w-[2.5rem] bg-white px-2 py-1.5 text-center text-black">
+                                <div className="w-full min-w-[3.25rem] bg-white px-2 py-1.5 text-center text-[32px] font-semibold tabular-nums leading-none text-black">
                                   {player1Scores[i] || "—"}
                                 </div>
                               ) : (
@@ -1041,14 +1041,14 @@ export function LiveScoringCard({
                                     legalWinSatisfied &&
                                     (player1Scores[i] ?? "").trim() === ""
                                   }
-                                  className="w-full min-w-[2.5rem] border-0 bg-white px-2 py-1.5 text-center text-[16px] text-black outline-none focus:ring-1 focus:ring-inset focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 sm:text-base"
+                                  className="w-full min-w-[3.25rem] border-0 bg-white px-2 py-1.5 text-center text-[32px] font-semibold tabular-nums leading-none text-black outline-none focus:ring-1 focus:ring-inset focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 sm:text-[32px]"
                                   aria-label={`Game ${i + 1} ${player1DisplayName}`}
                                 />
                               )}
                             </td>
                             <td className="border border-slate-300 p-0">
                               {effectiveReadOnly ? (
-                                <div className="w-full min-w-[2.5rem] bg-white px-2 py-1.5 text-center text-black">
+                                <div className="w-full min-w-[3.25rem] bg-white px-2 py-1.5 text-center text-[32px] font-semibold tabular-nums leading-none text-black">
                                   {player2Scores[i] || "—"}
                                 </div>
                               ) : (
@@ -1063,7 +1063,7 @@ export function LiveScoringCard({
                                     legalWinSatisfied &&
                                     (player2Scores[i] ?? "").trim() === ""
                                   }
-                                  className="w-full min-w-[2.5rem] border-0 bg-white px-2 py-1.5 text-center text-[16px] text-black outline-none focus:ring-1 focus:ring-inset focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 sm:text-base"
+                                  className="w-full min-w-[3.25rem] border-0 bg-white px-2 py-1.5 text-center text-[32px] font-semibold tabular-nums leading-none text-black outline-none focus:ring-1 focus:ring-inset focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 sm:text-[32px]"
                                   aria-label={`Game ${i + 1} ${player2DisplayName}`}
                                 />
                               )}
@@ -1088,7 +1088,7 @@ export function LiveScoringCard({
                   </tbody>
                   <tfoot>
                     <tr className="bg-gradient-to-b from-slate-700 to-slate-800">
-                      <td className="whitespace-nowrap border border-slate-600 px-3 py-2.5 font-bold text-white">
+                      <td className="whitespace-nowrap border border-slate-600 px-3 py-2.5 text-center text-[32px] font-bold tabular-nums leading-none text-white">
                         Total
                       </td>
                       <td className={total1CellClass}>
